@@ -146,23 +146,23 @@ KG_utils/
 ├── README.md
 ├── pyproject.toml
 ├── pytest.ini
-└── src/
-    ├── kg_utils/
-    │   ├── __init__.py
-    │   ├── py.typed                  # PEP 561 marker
-    │   ├── types/
-    │   │   ├── __init__.py           # Public re-exports
-    │   │   ├── specs.py              # NodeSpec, EdgeSpec, QueryResult, SnippetPack
-    │   │   ├── extractor.py          # KGExtractor ABC
-    │   │   └── module.py             # KGModule ABC
-    │   └── snapshots/
-    │       ├── __init__.py           # Public re-exports
-    │       ├── models.py             # Snapshot, SnapshotManifest, PruneResult
-    │       └── manager.py            # SnapshotManager
-    └── tests/
-        ├── __init__.py
-        ├── test_types.py
-        └── test_snapshots.py
+├── src/
+│   └── kg_utils/
+│       ├── __init__.py
+│       ├── py.typed                  # PEP 561 marker
+│       ├── types/
+│       │   ├── __init__.py           # Public re-exports
+│       │   ├── specs.py              # NodeSpec, EdgeSpec, QueryResult, SnippetPack
+│       │   ├── extractor.py          # KGExtractor ABC
+│       │   └── module.py             # KGModule ABC
+│       └── snapshots/
+│           ├── __init__.py           # Public re-exports
+│           ├── models.py             # Snapshot, SnapshotManifest, PruneResult
+│           └── manager.py            # SnapshotManager
+└── tests/
+    ├── __init__.py
+    ├── test_types.py
+    └── test_snapshots.py
 ```
 
 ---
