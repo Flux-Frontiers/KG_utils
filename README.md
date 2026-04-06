@@ -2,6 +2,7 @@
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 
 # kg-utils
@@ -146,23 +147,23 @@ KG_utils/
 ├── README.md
 ├── pyproject.toml
 ├── pytest.ini
-└── src/
-    ├── kg_utils/
-    │   ├── __init__.py
-    │   ├── py.typed                  # PEP 561 marker
-    │   ├── types/
-    │   │   ├── __init__.py           # Public re-exports
-    │   │   ├── specs.py              # NodeSpec, EdgeSpec, QueryResult, SnippetPack
-    │   │   ├── extractor.py          # KGExtractor ABC
-    │   │   └── module.py             # KGModule ABC
-    │   └── snapshots/
-    │       ├── __init__.py           # Public re-exports
-    │       ├── models.py             # Snapshot, SnapshotManifest, PruneResult
-    │       └── manager.py            # SnapshotManager
-    └── tests/
-        ├── __init__.py
-        ├── test_types.py
-        └── test_snapshots.py
+├── src/
+│   └── kg_utils/
+│       ├── __init__.py
+│       ├── py.typed                  # PEP 561 marker
+│       ├── types/
+│       │   ├── __init__.py           # Public re-exports
+│       │   ├── specs.py              # NodeSpec, EdgeSpec, QueryResult, SnippetPack
+│       │   ├── extractor.py          # KGExtractor ABC
+│       │   └── module.py             # KGModule ABC
+│       └── snapshots/
+│           ├── __init__.py           # Public re-exports
+│           ├── models.py             # Snapshot, SnapshotManifest, PruneResult
+│           └── manager.py            # SnapshotManager
+└── tests/
+    ├── __init__.py
+    ├── test_types.py
+    └── test_snapshots.py
 ```
 
 ---

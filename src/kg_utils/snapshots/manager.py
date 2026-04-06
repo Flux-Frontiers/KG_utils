@@ -246,19 +246,15 @@ class SnapshotManager:
         # Backfill missing deltas from manifest
         if snap.vs_previous is None or snap.vs_baseline is None:
             manifest = self.load_manifest()
-            entries = sorted(
-                manifest.snapshots, key=lambda x: x.get("timestamp", ""), reverse=True
-            )
+            entries = sorted(manifest.snapshots, key=lambda x: x.get("timestamp", ""), reverse=True)
             idx = next((i for i, s in enumerate(entries) if s.get("key") == key), None)
 
             if idx is not None:
                 if snap.vs_previous is None and idx + 1 < len(entries):
                     prev_m = entries[idx + 1].get("metrics", {})
                     snap.vs_previous = {
-                        "nodes": snap.metrics.get("total_nodes", 0)
-                        - prev_m.get("total_nodes", 0),
-                        "edges": snap.metrics.get("total_edges", 0)
-                        - prev_m.get("total_edges", 0),
+                        "nodes": snap.metrics.get("total_nodes", 0) - prev_m.get("total_nodes", 0),
+                        "edges": snap.metrics.get("total_edges", 0) - prev_m.get("total_edges", 0),
                     }
                 if snap.vs_baseline is None and entries:
                     base_m = entries[-1].get("metrics", {})
@@ -438,9 +434,7 @@ class SnapshotManager:
                     kept_metrics = m
 
         # Pass 3: find orphaned JSON files.
-        referenced_files = {
-            e.get("file", f"{e.get('key', '')}.json") for e in manifest.snapshots
-        }
+        referenced_files = {e.get("file", f"{e.get('key', '')}.json") for e in manifest.snapshots}
         for path in self.snapshots_dir.glob("*.json"):
             if path.name == "manifest.json":
                 continue
@@ -463,9 +457,7 @@ class SnapshotManager:
                     p.unlink()
 
             drop_keys = set(removed_keys) | set(broken_keys)
-            manifest.snapshots = [
-                e for e in manifest.snapshots if e.get("key") not in drop_keys
-            ]
+            manifest.snapshots = [e for e in manifest.snapshots if e.get("key") not in drop_keys]
             manifest.last_update = datetime.now(UTC).isoformat()
             self._save_manifest(manifest)
 
