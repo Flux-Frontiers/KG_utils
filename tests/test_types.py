@@ -68,12 +68,19 @@ class DummyExtractor(KGExtractor):
 
     def extract(self) -> Iterator[NodeSpec | EdgeSpec]:
         yield NodeSpec(
-            node_id="file:a.txt:a.txt", kind="file", name="a.txt",
-            qualname="a.txt", source_path="a.txt", docstring="A text file.",
+            node_id="file:a.txt:a.txt",
+            kind="file",
+            name="a.txt",
+            qualname="a.txt",
+            source_path="a.txt",
+            docstring="A text file.",
         )
         yield NodeSpec(
-            node_id="file:b.txt:b.txt", kind="file", name="b.txt",
-            qualname="b.txt", source_path="b.txt",
+            node_id="file:b.txt:b.txt",
+            kind="file",
+            name="b.txt",
+            qualname="b.txt",
+            source_path="b.txt",
         )
         yield EdgeSpec(source_id="directory:.:.", target_id="file:a.txt:a.txt", relation="CONTAINS")
 

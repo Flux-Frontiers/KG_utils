@@ -85,7 +85,8 @@ def test_save_rejects_zero_nodes(mgr: SnapshotManager) -> None:
 
 def test_load_snapshot(mgr: SnapshotManager) -> None:
     snap = mgr.capture(
-        version="0.1.0", branch="test",
+        version="0.1.0",
+        branch="test",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5},
         tree_hash="loadtest",
     )
@@ -98,7 +99,8 @@ def test_load_snapshot(mgr: SnapshotManager) -> None:
 
 def test_load_latest(mgr: SnapshotManager) -> None:
     snap = mgr.capture(
-        version="0.1.0", branch="test",
+        version="0.1.0",
+        branch="test",
         graph_stats_dict={"total_nodes": 7, "total_edges": 2},
         tree_hash="latest1",
     )
@@ -112,7 +114,8 @@ def test_load_latest(mgr: SnapshotManager) -> None:
 def test_list_snapshots(mgr: SnapshotManager) -> None:
     for i, h in enumerate(["aaa", "bbb"]):
         snap = mgr.capture(
-            version="0.1.0", branch="test",
+            version="0.1.0",
+            branch="test",
             graph_stats_dict={"total_nodes": 10 + i, "total_edges": 5},
             tree_hash=h,
         )
@@ -124,12 +127,14 @@ def test_list_snapshots(mgr: SnapshotManager) -> None:
 
 def test_diff_snapshots(mgr: SnapshotManager) -> None:
     s1 = mgr.capture(
-        version="0.1.0", branch="test",
+        version="0.1.0",
+        branch="test",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5, "node_counts": {"file": 10}},
         tree_hash="diff_a",
     )
     s2 = mgr.capture(
-        version="0.1.0", branch="test",
+        version="0.1.0",
+        branch="test",
         graph_stats_dict={"total_nodes": 15, "total_edges": 8, "node_counts": {"file": 15}},
         tree_hash="diff_b",
     )
@@ -145,7 +150,8 @@ def test_diff_snapshots(mgr: SnapshotManager) -> None:
 def test_prune_dry_run(mgr: SnapshotManager) -> None:
     for h in ["p1", "p2", "p3"]:
         snap = mgr.capture(
-            version="0.1.0", branch="test",
+            version="0.1.0",
+            branch="test",
             graph_stats_dict={"total_nodes": 10, "total_edges": 5},
             tree_hash=h,
         )
