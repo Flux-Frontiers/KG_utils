@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.2.0] - 2026-04-26
+
+### Added
+
 - `kg_utils.embed` sub-package: shared embedding protocol and model-cache
   convention for the KGModule stack (stdlib-only, no external dependencies).
   - `Embedder` — `runtime_checkable` Protocol with `embed_query(text) -> list[float]`;
@@ -20,10 +30,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `KGRAG_MODEL_DIR` env-var redirects every module's cache simultaneously.
   - `resolve_model_path()` — converts a model name or alias to an absolute local
     cache path, with an optional per-module `local_fallback` for standalone use.
-
-### Changed
-
-
-### Removed
-
-### Fixed
