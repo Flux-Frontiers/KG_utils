@@ -1,13 +1,13 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 
-# kg-utils
+# kgmodule-utils
 
-**kg-utils** — Shared types and snapshot infrastructure for the KGModule SDK.
+**kgmodule-utils** — Shared types and snapshot infrastructure for the KGModule SDK.
 
 *Author: Eric G. Suchanek, PhD*
 
@@ -17,7 +17,7 @@
 
 ## Overview
 
-kg-utils is the **zero-dependency foundation package** for the Flux-Frontiers knowledge-graph ecosystem. It provides the canonical type abstractions and temporal snapshot infrastructure that all KGModule implementations — [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [FTreeKG](https://github.com/Flux-Frontiers/ftree_kg), [DocKG](https://github.com/Flux-Frontiers/doc_kg), [AgentKG](https://github.com/Flux-Frontiers/agent_kg) — depend on.
+kgmodule-utils is the **zero-dependency foundation package** for the Flux-Frontiers knowledge-graph ecosystem. It provides the canonical type abstractions and temporal snapshot infrastructure that all KGModule implementations — [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [FTreeKG](https://github.com/Flux-Frontiers/ftree_kg), [DocKG](https://github.com/Flux-Frontiers/doc_kg), [AgentKG](https://github.com/Flux-Frontiers/agent_kg) — depend on.
 
 Every KGModule shares the same `NodeSpec`, `EdgeSpec`, `KGExtractor`, and `KGModule` base classes defined here, ensuring consistent interfaces across the ecosystem. The snapshot subsystem enables temporal metric tracking, delta comparison, and pruning across git commits.
 
@@ -42,20 +42,20 @@ Every KGModule shares the same `NodeSpec`, `EdgeSpec`, `KGExtractor`, and `KGMod
 ### Standalone (pip)
 
 ```bash
-pip install 'kg-utils @ git+https://github.com/Flux-Frontiers/KG_utils.git'
+pip install kgmodule-utils
 ```
 
 ### Existing Poetry project
 
 ```bash
-poetry add 'kg-utils @ git+https://github.com/Flux-Frontiers/KG_utils.git'
+poetry add kgmodule-utils
 ```
 
 Or declare it directly in your `pyproject.toml`:
 
 ```toml
 [tool.poetry.dependencies]
-kg-utils = {git = "https://github.com/Flux-Frontiers/KG_utils.git"}
+kgmodule-utils = "^0.2.0"
 ```
 
 ---

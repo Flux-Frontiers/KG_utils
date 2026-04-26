@@ -1,4 +1,4 @@
-# pyproject.toml — kg-utils: shared types and snapshot infrastructure for KG modules
+# pyproject.toml — kgmodule-utils: shared types and snapshot infrastructure for KG modules
 #
 # Zero-dependency (stdlib-only) package providing:
 #   kg_utils.types    — NodeSpec, EdgeSpec, KGExtractor, KGModule, etc.
@@ -9,7 +9,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
-name = "kg-utils"
+name = "kgmodule-utils"
 version = "0.2.0"
 description = "Shared types and snapshot infrastructure for the KGModule SDK"
 readme = "README.md"
@@ -30,6 +30,9 @@ dependencies = []
 
 [project.urls]
 Repository = "https://github.com/Flux-Frontiers/kg_utils"
+
+[tool.poetry]
+packages = [{include = "kg_utils", from = "src"}]
 
 [tool.poetry.group.dev]
 optional = true
