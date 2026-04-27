@@ -31,7 +31,7 @@ class SnapshotManager:
 
     :param snapshots_dir: Directory for snapshot JSON files and manifest.
     :param package_name: Package name for auto-detecting version
-        (e.g. ``"code-kg"``, ``"doc-kg"``). Defaults to ``"kg-utils"``.
+        (e.g. ``"code-kg"``, ``"doc-kg"``). Defaults to ``"kgmodule-utils"``.
     :param db_path: Optional SQLite database path for collecting per-module or
         per-directory node counts via :meth:`_collect_breakdown_counts`.
     """
@@ -40,7 +40,7 @@ class SnapshotManager:
         self,
         snapshots_dir: Path | str,
         *,
-        package_name: str = "kg-utils",
+        package_name: str = "kgmodule-utils",
         db_path: Path | str | None = None,
     ) -> None:
         self.snapshots_dir = Path(snapshots_dir)
@@ -126,12 +126,16 @@ class SnapshotManager:
         saving degenerate (unbuilt) state.
 
         If ``version`` and ``metrics`` are unchanged from the latest snapshot,
-        the existing entry is refreshed in-place rather than creating a new
+        the existing entry is refreshed in-place (tree hash, timestamp, and
+        branch updated; old JSON file replaced) rather than creating a new
         history entry. Pass ``force=True`` to always create a new entry.
 
         :param snapshot: Snapshot to save.
-        :param force: If ``True``, always write a new history entry.
-        :return: Path to the saved JSON file, or ``None`` if no-op.
+        :param force: If ``True``, always write a new history entry even when
+            metrics and version are unchanged.
+        :return: Path to the saved JSON file, or ``None`` if the snapshot was
+            a no-op refresh and no file needed writing (same tree hash as the
+            entry being refreshed).
         :raises ValueError: If ``total_nodes`` is 0.
         """
         m = snapshot.metrics
@@ -361,9 +365,14 @@ class SnapshotManager:
     # ------------------------------------------------------------------
 
     def _metrics_changed(self, new_metrics: dict[str, Any], old_metrics: dict[str, Any]) -> bool:
-        """Return ``True`` if metrics represent a meaningful change.
+        """Return ``True`` if metrics represent a meaningful change worth recording.
 
-        Override in subclasses to customise.
+        Override in subclasses to customise — e.g. ignore minor coverage drift
+        or only react to node/edge count changes.
+
+        :param new_metrics: Metrics from the new snapshot.
+        :param old_metrics: Metrics from the previous latest snapshot.
+        :return: ``True`` if a new history entry should be written.
         """
         return new_metrics != old_metrics
 
@@ -403,7 +412,21 @@ class SnapshotManager:
     def prune_snapshots(self, *, dry_run: bool = False) -> PruneResult:
         """Remove vestigial snapshots that carry no new metric information.
 
-        :param dry_run: If ``True``, compute what would be removed without deleting.
+        Identifies three categories of junk and optionally deletes them:
+
+        1. **Metric-duplicates** — interior snapshots whose metrics are
+           unchanged from the previous kept entry according to
+           :meth:`_metrics_changed`. The oldest (baseline) and newest
+           (latest) entries are always preserved.
+
+        2. **Broken manifest entries** — entries in ``manifest.json`` whose
+           ``.json`` file no longer exists on disk.
+
+        3. **Orphaned JSON files** — ``.json`` files in the snapshot directory
+           that are not referenced by any manifest entry.
+
+        :param dry_run: If ``True``, compute and return what would be removed
+            without deleting anything.
         :return: :class:`PruneResult` summarising the cleanup.
         """
         manifest = self.load_manifest()

@@ -15,6 +15,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.3.0] - 2026-04-27
+
+### Added
+
+- Incorporated production snapshot infrastructure from `kg-snapshot` v0.3.0
+  into `kg_utils.snapshots`, making this the canonical home.
+- `SnapshotManager.prune_snapshots(dry_run=False)` — three-pass cleanup:
+  (1) metric-duplicate interior entries (unchanged vs. prior kept entry per
+  `_metrics_changed`); (2) broken manifest entries with missing JSON files;
+  (3) orphaned JSON files on disk not referenced by the manifest. Baseline
+  and latest entries are always preserved. Returns `PruneResult`.
+- `PruneResult` dataclass (`removed`, `orphaned_files`, `broken_entries`,
+  `dry_run`, `total_cleaned`) fully exported from public API.
+- `SnapshotManager._metrics_changed(new, old)` hook — subclasses override to
+  define what constitutes a meaningful metric change (default: full equality).
+- `save_snapshot(force=False)` dedup logic: if version and metrics are
+  unchanged vs. the latest snapshot, the existing entry is refreshed in-place
+  (tree hash, timestamp, branch updated; old JSON removed) instead of
+  appending a new history entry.
+- 12 new tests covering dedup behaviour (refresh-in-place, changed-metrics
+  appends, `force=True` override, `_metrics_changed` subclass hook) and
+  extended prune scenarios (baseline/latest protection, actual file removal,
+  orphaned file detection, single-snapshot no-op, override respect).
+
 ## [0.2.0] - 2026-04-26
 
 ### Added
