@@ -214,10 +214,13 @@ class SnapshotManager:
         manifest = SnapshotManifest.from_dict(
             json.loads(self.manifest_path.read_text(encoding="utf-8"))
         )
-        # Normalise legacy 'tree_hash' -> 'key'
+        # Normalise legacy key fields -> 'key'
         for entry in manifest.snapshots:
-            if "key" not in entry and "tree_hash" in entry:
-                entry["key"] = entry.pop("tree_hash")
+            if "key" not in entry:
+                if "tree_hash" in entry:
+                    entry["key"] = entry.pop("tree_hash")
+                elif "commit" in entry:
+                    entry["key"] = entry["commit"]
         return manifest
 
     def _save_manifest(self, manifest: SnapshotManifest) -> None:
@@ -277,19 +280,23 @@ class SnapshotManager:
         if not current_ts:
             return None
         prev_entry = None
-        for s in sorted(manifest.snapshots, key=lambda x: x["timestamp"], reverse=True):
-            if s["timestamp"] < current_ts:
+        for s in sorted(manifest.snapshots, key=lambda x: x.get("timestamp", ""), reverse=True):
+            if s.get("timestamp", "") < current_ts:
                 prev_entry = s
                 break
-        return self.load_snapshot(prev_entry["key"]) if prev_entry else None
+        if not prev_entry:
+            return None
+        prev_key = prev_entry.get("key", "")
+        return self.load_snapshot(prev_key) if prev_key else None
 
     def get_baseline(self) -> Snapshot | None:
         """Get the oldest snapshot (baseline for comparison)."""
         manifest = self.load_manifest()
         if not manifest.snapshots:
             return None
-        baseline_entry = min(manifest.snapshots, key=lambda x: x["timestamp"])
-        return self.load_snapshot(baseline_entry["key"])
+        baseline_entry = min(manifest.snapshots, key=lambda x: x.get("timestamp", ""))
+        baseline_key = baseline_entry.get("key", "")
+        return self.load_snapshot(baseline_key) if baseline_key else None
 
     def list_snapshots(
         self,

@@ -7,4 +7,4 @@ Sub-packages:
                           kg_model_cache_dir(), resolve_model_path().
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.1"

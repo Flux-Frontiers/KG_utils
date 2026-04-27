@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.2.1] - 2026-04-27
+
+### Fixed
+
+- `SnapshotManager._load_manifest`: extended legacy key normalization to handle
+  manifest entries that carry a `commit` field instead of `tree_hash` or `key`,
+  preventing `KeyError` when loading manifests written by older versions.
+- `SnapshotManager.get_previous_snapshot` / `get_baseline`: replaced hard
+  dict-key access (`entry["timestamp"]`, `entry["key"]`) with `.get()` calls
+  and added explicit empty-key guards so malformed or legacy manifest entries
+  no longer raise `KeyError` at runtime.
+- Bumped `__version__` in `src/kg_utils/__init__.py` to track the package
+  version (was stuck at `0.1.0`).
+
 ## [0.2.0] - 2026-04-26
 
 ### Added
