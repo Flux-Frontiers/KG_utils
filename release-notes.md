@@ -1,36 +1,31 @@
-# Release Notes — v0.2.2
+# Release Notes — v0.2.3
 
-> Released: 2026-04-28
-
-### Added
-
-- `kg_utils.embedder` sub-package: concrete `SentenceTransformer` embedding
-  implementation shared across all KGModule packages.
-  - `Embedder` — abstract base with `embed_texts` + `embed_query` + `dim`.
-  - `SentenceTransformerEmbedder` — concrete implementation with
-    `local_files_only=True` guard on MPS to prevent SIGBUS on first `encode()`.
-  - `load_sentence_transformer(model_name)` — canonical safe-load factory with
-    four-step resolution: local path → HF cache → live network fetch.
-  - `get_embedder(model_name)` — high-level factory returning a ready-to-use
-    `SentenceTransformerEmbedder`.
-  - `wrap_embedder(st_model, model_name)` — wraps a live `SentenceTransformer`
-    as an `Embedder` to share a model across pipeline stages without reloading.
-- Comprehensive test suite: `tests/test_embed.py`, `tests/test_embedder.py`,
-  `tests/test_snapshots.py` (extended), `tests/test_types.py` (extended), and
-  `tests/test_integration.py` covering cross-module protocol compliance, full
-  snapshot lifecycle, subclass delta extensibility, and git subprocess
-  integration.
+> Released: 2026-04-29
 
 ### Fixed
 
-- `SentenceTransformerEmbedder` and `wrap_embedder`: replaced direct
-  `get_sentence_embedding_dimension()` call with a `getattr` fallback that
-  tries `get_embedding_dimension` first (canonical in ST ≥ 5.4) then
-  `get_sentence_embedding_dimension` (ST ≤ 5.3), eliminating the
-  `FutureWarning` emitted by sentence-transformers ≥ 5.4.
-- Aligned `sentence-transformers` minimum version to `>=5.4.1` in `code_kg`,
-  `doc_kg`, and `diary_kg` so all KGModule packages resolve the same ST
-  release and the `FutureWarning` cannot occur in any module.
+- `load_sentence_transformer`: removed save/restore logic around HF logging
+  and TQDM state; now simply sets `TQDM_DISABLE=1` and `set_verbosity_error()`
+  once and leaves them set, eliminating the mypy `[assignment]` error caused
+  by the `Module | None` type mismatch on `_hf_logging`.
+- **CI: mypy** — added `[[tool.mypy.overrides]]` for `sentence_transformers`,
+  `transformers`, and `numpy` with `ignore_missing_imports = true`; added a
+  separate override for `kg_utils.embedder` disabling `disallow_untyped_calls`
+  so the `hf_logging.set_verbosity_error()` call requires no `type: ignore`
+  regardless of whether `transformers` is installed.
+- **CI: test** — marked all `sentence_transformers`-dependent tests in
+  `tests/test_embedder.py` with `@pytest.mark.integration`; added
+  `pytestmark = pytest.mark.integration` to `tests/test_integration.py`;
+  updated CI test step to `pytest -m "not integration"` so these are skipped
+  when the optional heavy deps are absent.
+- **pytest.ini** — corrected stale `testpaths` (`./src/tests` → `./tests`);
+  registered the `integration` marker to suppress unknown-mark warnings.
+- **pylint** — added `[tool.pylint.main]` with `source-roots` and `init-hook`
+  so pylint resolves the `src/` layout; added file-level disable in
+  `tests/test_embedder.py` for pytest-pattern false positives
+  (`redefined-outer-name`, `missing-function-docstring`, `too-few-public-methods`,
+  `import-outside-toplevel`); fixed redundant `kg_utils` reimport in
+  `test_doc_kg_re_exports_embedder_classes`.
 
 ---
 

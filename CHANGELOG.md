@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.2.3] - 2026-04-29
+
+### Fixed
+
+- `load_sentence_transformer`: removed save/restore logic around HF logging
+  and TQDM state; now simply sets `TQDM_DISABLE=1` and `set_verbosity_error()`
+  once and leaves them set, eliminating the mypy `[assignment]` error caused
+  by the `Module | None` type mismatch on `_hf_logging`.
 - **CI: mypy** — added `[[tool.mypy.overrides]]` for `sentence_transformers`,
   `transformers`, and `numpy` with `ignore_missing_imports = true`; added a
   separate override for `kg_utils.embedder` disabling `disallow_untyped_calls`
@@ -33,15 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`redefined-outer-name`, `missing-function-docstring`, `too-few-public-methods`,
   `import-outside-toplevel`); fixed redundant `kg_utils` reimport in
   `test_doc_kg_re_exports_embedder_classes`.
-
-## [0.2.3] - 2026-04-28
-
-### Fixed
-
-- `load_sentence_transformer`: removed save/restore logic around HF logging
-  and TQDM state; now simply sets `TQDM_DISABLE=1` and `set_verbosity_error()`
-  once and leaves them set, eliminating the mypy `[assignment]` error caused
-  by the `Module | None` type mismatch on `_hf_logging`.
 
 ## [0.2.2] - 2026-04-28
 
