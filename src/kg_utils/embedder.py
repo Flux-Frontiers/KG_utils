@@ -98,7 +98,7 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL) -> Any:
     try:
         from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
 
-        hf_logging.set_verbosity_error()  # type: ignore[no-untyped-call]
+        hf_logging.set_verbosity_error()
     except ImportError:
         pass
 
@@ -142,7 +142,7 @@ class SentenceTransformerEmbedder(Embedder):
         try:
             from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
 
-            hf_logging.set_verbosity_error()  # type: ignore[no-untyped-call]
+            hf_logging.set_verbosity_error()
         except ImportError:
             pass
 
