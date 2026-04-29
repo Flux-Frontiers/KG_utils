@@ -1,5 +1,7 @@
 """Tests for kg_utils.embedder — Embedder base class, load helpers, and factories."""
 
+# pylint: disable=redefined-outer-name,missing-function-docstring,too-few-public-methods,import-outside-toplevel
+
 from __future__ import annotations
 
 import math
@@ -30,8 +32,7 @@ def st_model() -> Any:
 
 
 @pytest.fixture(scope="session")
-def embedder(st_model: Any) -> SentenceTransformerEmbedder:
-    """Shared SentenceTransformerEmbedder — wraps the session model to avoid double load."""
+def embedder() -> SentenceTransformerEmbedder:
     return SentenceTransformerEmbedder(DEFAULT_MODEL)
 
 
@@ -81,6 +82,7 @@ def test_known_models_full_id_passthrough() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 def test_load_uses_local_files_only_when_path_exists(tmp_path) -> None:
     """When the resolved local path exists, local_files_only=True must be passed."""
     fake_model_dir = tmp_path / "BAAI" / "bge-small-en-v1.5"
@@ -96,6 +98,7 @@ def test_load_uses_local_files_only_when_path_exists(tmp_path) -> None:
     assert mock_st.call_args.kwargs.get("local_files_only") is True
 
 
+@pytest.mark.integration
 def test_load_falls_back_to_network_on_os_error(tmp_path) -> None:
     """Falls back to network fetch when local_files_only raises OSError."""
     missing = tmp_path / "nonexistent"  # does not exist
@@ -119,6 +122,7 @@ def test_load_falls_back_to_network_on_os_error(tmp_path) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 def test_load_returns_sentence_transformer(st_model: Any) -> None:
     assert st_model is not None
     dim_fn = getattr(st_model, "get_embedding_dimension", None) or getattr(
@@ -127,6 +131,7 @@ def test_load_returns_sentence_transformer(st_model: Any) -> None:
     assert dim_fn is not None and dim_fn() == 384
 
 
+@pytest.mark.integration
 def test_load_uses_mps_or_cpu(st_model: Any) -> None:
     device = str(st_model.device)
     assert device in ("mps:0", "cpu", "cuda:0"), f"unexpected device: {device}"
@@ -137,14 +142,17 @@ def test_load_uses_mps_or_cpu(st_model: Any) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 def test_embedder_dim(embedder: SentenceTransformerEmbedder) -> None:
     assert embedder.dim == 384
 
 
+@pytest.mark.integration
 def test_embedder_model_name_resolved(embedder: SentenceTransformerEmbedder) -> None:
     assert embedder.model_name == "BAAI/bge-small-en-v1.5"
 
 
+@pytest.mark.integration
 def test_embedder_repr(embedder: SentenceTransformerEmbedder) -> None:
     r = repr(embedder)
     assert "SentenceTransformerEmbedder" in r
@@ -152,17 +160,20 @@ def test_embedder_repr(embedder: SentenceTransformerEmbedder) -> None:
     assert "384" in r
 
 
+@pytest.mark.integration
 def test_embed_query_length(embedder: SentenceTransformerEmbedder) -> None:
     vec = embedder.embed_query("Samuel Pepys walked to Westminster Hall.")
     assert len(vec) == 384
 
 
+@pytest.mark.integration
 def test_embed_query_normalized(embedder: SentenceTransformerEmbedder) -> None:
     vec = embedder.embed_query("test normalization")
     norm = math.sqrt(sum(x * x for x in vec))
     assert abs(norm - 1.0) < 1e-4
 
 
+@pytest.mark.integration
 def test_embed_texts_batch(embedder: SentenceTransformerEmbedder) -> None:
     texts = [
         "Pepys dined at the tavern.",
@@ -174,12 +185,14 @@ def test_embed_texts_batch(embedder: SentenceTransformerEmbedder) -> None:
     assert all(len(v) == 384 for v in vecs)
 
 
+@pytest.mark.integration
 def test_embed_texts_normalized(embedder: SentenceTransformerEmbedder) -> None:
     vecs = embedder.embed_texts(["normalization check"])
     norm = math.sqrt(sum(x * x for x in vecs[0]))
     assert abs(norm - 1.0) < 1e-4
 
 
+@pytest.mark.integration
 def test_embed_texts_different_inputs_differ(embedder: SentenceTransformerEmbedder) -> None:
     a = embedder.embed_texts(["fire destroys the city"])
     b = embedder.embed_texts(["Pepys plays the lute"])
@@ -188,6 +201,7 @@ def test_embed_texts_different_inputs_differ(embedder: SentenceTransformerEmbedd
     assert dot < 0.99
 
 
+@pytest.mark.integration
 def test_embed_query_consistent_with_embed_texts(embedder: SentenceTransformerEmbedder) -> None:
     text = "The diary entry for 1 January 1660."
     via_query = embedder.embed_query(text)
@@ -201,12 +215,14 @@ def test_embed_query_consistent_with_embed_texts(embedder: SentenceTransformerEm
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 def test_get_embedder_returns_sentence_transformer_embedder() -> None:
     emb = get_embedder(DEFAULT_MODEL)
     assert isinstance(emb, SentenceTransformerEmbedder)
     assert emb.dim == 384
 
 
+@pytest.mark.integration
 def test_get_embedder_alias() -> None:
     emb = get_embedder("bge-small")
     assert emb.model_name == "BAAI/bge-small-en-v1.5"
@@ -217,21 +233,25 @@ def test_get_embedder_alias() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 def test_wrap_embedder_is_embedder(st_model: Any) -> None:
     wrapped = wrap_embedder(st_model, DEFAULT_MODEL)
     assert isinstance(wrapped, Embedder)
 
 
+@pytest.mark.integration
 def test_wrap_embedder_dim(st_model: Any) -> None:
     wrapped = wrap_embedder(st_model, DEFAULT_MODEL)
     assert wrapped.dim == 384
 
 
+@pytest.mark.integration
 def test_wrap_embedder_model_name(st_model: Any) -> None:
     wrapped = wrap_embedder(st_model, "bge-small")
     assert wrapped.model_name == "BAAI/bge-small-en-v1.5"  # type: ignore[attr-defined]
 
 
+@pytest.mark.integration
 def test_wrap_embedder_embed_query(st_model: Any) -> None:
     wrapped = wrap_embedder(st_model, DEFAULT_MODEL)
     vec = wrapped.embed_query("Pepys goes to the theatre.")
@@ -240,6 +260,7 @@ def test_wrap_embedder_embed_query(st_model: Any) -> None:
     assert abs(norm - 1.0) < 1e-4
 
 
+@pytest.mark.integration
 def test_wrap_embedder_embed_texts(st_model: Any) -> None:
     wrapped = wrap_embedder(st_model, DEFAULT_MODEL)
     vecs = wrapped.embed_texts(["entry one", "entry two"])
@@ -247,6 +268,7 @@ def test_wrap_embedder_embed_texts(st_model: Any) -> None:
     assert all(len(v) == 384 for v in vecs)
 
 
+@pytest.mark.integration
 def test_wrap_embedder_matches_direct_encode(
     st_model: Any, embedder: SentenceTransformerEmbedder
 ) -> None:
@@ -268,10 +290,8 @@ def test_wrap_embedder_matches_direct_encode(
     reason="doc_kg not installed",
 )
 def test_doc_kg_re_exports_embedder_classes() -> None:
-    from doc_kg.index import Embedder as DocEmbedder
-    from doc_kg.index import SentenceTransformerEmbedder as DocSTE
-    from kg_utils.embedder import Embedder as KGEmbedder
-    from kg_utils.embedder import SentenceTransformerEmbedder as KGSTE
+    from doc_kg.index import Embedder as DocEmbedder  # pylint: disable=import-error
+    from doc_kg.index import SentenceTransformerEmbedder as DocSTE  # pylint: disable=import-error
 
-    assert DocEmbedder is KGEmbedder
-    assert DocSTE is KGSTE
+    assert DocEmbedder is Embedder
+    assert DocSTE is SentenceTransformerEmbedder

@@ -25,6 +25,8 @@ from kg_utils.snapshots import SnapshotManager
 from kg_utils.snapshots.models import Snapshot
 from kg_utils.types import EdgeSpec, KGExtractor, KGModule, NodeSpec
 
+pytestmark = pytest.mark.integration
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
