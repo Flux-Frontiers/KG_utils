@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.2.3] - 2026-04-28
+
+### Fixed
+
+- `load_sentence_transformer`: removed save/restore logic around HF logging
+  and TQDM state; now simply sets `TQDM_DISABLE=1` and `set_verbosity_error()`
+  once and leaves them set, eliminating the mypy `[assignment]` error caused
+  by the `Module | None` type mismatch on `_hf_logging`.
+
 ## [0.2.2] - 2026-04-28
 
 ### Added

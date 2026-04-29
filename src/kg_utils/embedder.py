@@ -95,6 +95,15 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL) -> Any:
     """
     from sentence_transformers import SentenceTransformer  # pylint: disable=import-outside-toplevel
 
+    try:
+        from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
+
+        hf_logging.set_verbosity_error()  # type: ignore[no-untyped-call]
+    except ImportError:
+        pass
+
+    os.environ["TQDM_DISABLE"] = "1"
+
     resolved = KNOWN_MODELS.get(model_name, model_name)
     trust_remote = "nomic-ai/" in resolved
     local_path = resolve_model_path(resolved)

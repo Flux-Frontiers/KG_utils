@@ -1,0 +1,16 @@
+feat(embedder): add SentenceTransformerEmbedder and full test suite
+
+- Add kg_utils.embedder with Embedder base, SentenceTransformerEmbedder,
+  load_sentence_transformer, get_embedder, and wrap_embedder factory.
+  All KGModule packages now import the shared implementation instead of
+  maintaining their own copies.
+- Add tests/test_embed.py, test_embedder.py, test_integration.py and
+  extend test_snapshots.py and test_types.py for full coverage.
+- Fix get_embedding_dimension API compatibility with sentence-transformers
+  ≥5.4 (renamed from get_sentence_embedding_dimension); use getattr
+  fallback that works across both versions.
+- Align sentence-transformers pin to >=5.4.1 in code_kg, doc_kg, and
+  diary_kg for a consistent dependency floor across all KGModule packages.
+- Bump version to 0.2.2.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

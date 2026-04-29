@@ -9,4 +9,4 @@ Sub-packages:
                           wrap_embedder(), load_sentence_transformer().
 """
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
