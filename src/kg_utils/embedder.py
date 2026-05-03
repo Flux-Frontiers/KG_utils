@@ -99,6 +99,7 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL) -> Any:
         from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
 
         hf_logging.set_verbosity_error()
+        hf_logging.disable_progress_bar()  # TQDM_DISABLE alone misses transformers' _tqdm_active gate
     except ImportError:
         pass
 
@@ -143,6 +144,7 @@ class SentenceTransformerEmbedder(Embedder):
             from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
 
             hf_logging.set_verbosity_error()
+            hf_logging.disable_progress_bar()
         except ImportError:
             pass
 
