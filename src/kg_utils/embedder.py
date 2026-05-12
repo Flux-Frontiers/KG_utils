@@ -99,30 +99,47 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL) -> Any:
         from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
 
         hf_logging.set_verbosity_error()
-        hf_logging.disable_progress_bar()  # TQDM_DISABLE alone misses transformers' _tqdm_active gate
+        # TQDM_DISABLE alone misses transformers' _tqdm_active gate
+        hf_logging.disable_progress_bar()
     except ImportError:
         pass
 
     os.environ["TQDM_DISABLE"] = "1"
+
+    import torch  # pylint: disable=import-outside-toplevel
+
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        try:
+            device = "mps" if torch.backends.mps.is_available() else "cpu"
+        except AttributeError:
+            device = "cpu"
 
     resolved = KNOWN_MODELS.get(model_name, model_name)
     trust_remote = "nomic-ai/" in resolved
     local_path = resolve_model_path(resolved)
 
     if local_path.exists():
-        return SentenceTransformer(
+        model = SentenceTransformer(
             str(local_path),
             local_files_only=True,
             trust_remote_code=trust_remote,
+            device=device,
         )
-    try:
-        return SentenceTransformer(
-            resolved,
-            local_files_only=True,
-            trust_remote_code=trust_remote,
-        )
-    except OSError:
-        return SentenceTransformer(resolved, trust_remote_code=trust_remote)
+    else:
+        try:
+            model = SentenceTransformer(
+                resolved,
+                local_files_only=True,
+                trust_remote_code=trust_remote,
+                device=device,
+            )
+        except OSError:
+            model = SentenceTransformer(resolved, trust_remote_code=trust_remote, device=device)
+
+    model = model.to(device)
+    return model
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +176,7 @@ class SentenceTransformerEmbedder(Embedder):
                 os.environ["TQDM_DISABLE"] = _prev
 
         self.model_name: str = KNOWN_MODELS.get(model_name, model_name)
-        # ST ≥5.4 renamed to get_embedding_dimension; ≤5.3 only had get_sentence_embedding_dimension.
+        # ST ≥5.4 renamed get_embedding_dimension; ≤5.3 had get_sentence_embedding_dimension.
         _dim_fn = getattr(self.model, "get_embedding_dimension", None) or getattr(
             self.model, "get_sentence_embedding_dimension", None
         )
