@@ -206,3 +206,18 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 commit.txt
+
+# PyCodeKG generated artifacts — databases are transient/reproducible, snapshots are tracked
+# MUST include .pycodekg/snapshots!
+.pycodekg/lancedb/
+.pycodekg/lancedb-*
+.pycodekg/graph.sqlite
+.pycodekg/graph.sqlite*
+.pycodekg/models
+
+# DocKG generated artifacts — same pattern as CodeKG; snapshots will be tracked once added
+.dockg/lancedb/
+.dockg/lancedb-*
+.dockg/graph.sqlite
+.dockg/graph.sqlite*
+.dockg/models

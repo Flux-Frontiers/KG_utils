@@ -1,0 +1,70 @@
+{
+  "format": "1.0",
+  "last_update": "2026-05-23T17:12:35.378353+00:00",
+  "snapshots": [
+    {
+      "key": "fa95891f81635c2652ab80a50e43e5f732b597a6",
+      "branch": "main",
+      "timestamp": "2026-05-23T17:12:35.377922+00:00",
+      "version": "0.19.1",
+      "file": "fa95891f81635c2652ab80a50e43e5f732b597a6.json",
+      "metrics": {
+        "db_path": ".pycodekg/graph.sqlite",
+        "total_nodes": 2734,
+        "meaningful_nodes": 367,
+        "total_edges": 3368,
+        "node_counts": {
+          "class": 46,
+          "function": 135,
+          "method": 164,
+          "module": 22,
+          "symbol": 2367
+        },
+        "edge_counts": {
+          "ATTR_ACCESS": 785,
+          "CALLS": 906,
+          "CONTAINS": 345,
+          "IMPORTS": 167,
+          "INHERITS": 8,
+          "RESOLVES_TO": 1157
+        },
+        "module_count": 22,
+        "class_count": 46,
+        "function_count": 135,
+        "method_count": 164,
+        "docstring_coverage": 0.48200000000000004,
+        "snapshot_count": 0,
+        "critical_issues": 5,
+        "complexity_median": 9,
+        "module_node_counts": {
+          "src/kg_utils/__init__.py": 2,
+          "src/kg_utils/embed.py": 18,
+          "src/kg_utils/embedder.py": 94,
+          "src/kg_utils/extractor.py": 22,
+          "src/kg_utils/module.py": 15,
+          "src/kg_utils/pipeline.py": 342,
+          "src/kg_utils/semantic.py": 208,
+          "src/kg_utils/snapshots/__init__.py": 2,
+          "src/kg_utils/snapshots/manager.py": 256,
+          "src/kg_utils/snapshots/models.py": 43,
+          "src/kg_utils/specs.py": 114,
+          "src/kg_utils/store.py": 241,
+          "src/kg_utils/types/__init__.py": 2,
+          "src/kg_utils/types/extractor.py": 22,
+          "src/kg_utils/types/module.py": 15,
+          "src/kg_utils/types/specs.py": 7,
+          "tests/__init__.py": 1,
+          "tests/test_embed.py": 118,
+          "tests/test_embedder.py": 168,
+          "tests/test_integration.py": 257,
+          "tests/test_snapshots.py": 243,
+          "tests/test_types.py": 169
+        }
+      },
+      "deltas": {
+        "vs_previous": null,
+        "vs_baseline": null
+      }
+    }
+  ]
+}

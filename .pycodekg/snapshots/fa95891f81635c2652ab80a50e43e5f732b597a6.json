@@ -1,0 +1,130 @@
+{
+  "key": "fa95891f81635c2652ab80a50e43e5f732b597a6",
+  "branch": "main",
+  "timestamp": "2026-05-23T17:12:35.377922+00:00",
+  "version": "0.19.1",
+  "metrics": {
+    "db_path": ".pycodekg/graph.sqlite",
+    "total_nodes": 2734,
+    "meaningful_nodes": 367,
+    "total_edges": 3368,
+    "node_counts": {
+      "class": 46,
+      "function": 135,
+      "method": 164,
+      "module": 22,
+      "symbol": 2367
+    },
+    "edge_counts": {
+      "ATTR_ACCESS": 785,
+      "CALLS": 906,
+      "CONTAINS": 345,
+      "IMPORTS": 167,
+      "INHERITS": 8,
+      "RESOLVES_TO": 1157
+    },
+    "module_count": 22,
+    "class_count": 46,
+    "function_count": 135,
+    "method_count": 164,
+    "docstring_coverage": 0.48200000000000004,
+    "snapshot_count": 0,
+    "critical_issues": 5,
+    "complexity_median": 9,
+    "module_node_counts": {
+      "src/kg_utils/__init__.py": 2,
+      "src/kg_utils/embed.py": 18,
+      "src/kg_utils/embedder.py": 94,
+      "src/kg_utils/extractor.py": 22,
+      "src/kg_utils/module.py": 15,
+      "src/kg_utils/pipeline.py": 342,
+      "src/kg_utils/semantic.py": 208,
+      "src/kg_utils/snapshots/__init__.py": 2,
+      "src/kg_utils/snapshots/manager.py": 256,
+      "src/kg_utils/snapshots/models.py": 43,
+      "src/kg_utils/specs.py": 114,
+      "src/kg_utils/store.py": 241,
+      "src/kg_utils/types/__init__.py": 2,
+      "src/kg_utils/types/extractor.py": 22,
+      "src/kg_utils/types/module.py": 15,
+      "src/kg_utils/types/specs.py": 7,
+      "tests/__init__.py": 1,
+      "tests/test_embed.py": 118,
+      "tests/test_embedder.py": 168,
+      "tests/test_integration.py": 257,
+      "tests/test_snapshots.py": 243,
+      "tests/test_types.py": 169
+    }
+  },
+  "hotspots": [
+    {
+      "name": "m:src/kg_utils/store.py:GraphStore.con",
+      "callers": 12,
+      "callees": 4,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/kg_utils/snapshots/manager.py:SnapshotManager.load_snapshot",
+      "callers": 11,
+      "callees": 16,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/kg_utils/embedder.py:SentenceTransformerEmbedder.embed_texts",
+      "callers": 9,
+      "callees": 3,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/kg_utils/semantic.py:SentenceTransformerEmbedder.embed_texts",
+      "callers": 9,
+      "callees": 3,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/kg_utils/embed.py:Embedder.embed_query",
+      "callers": 9,
+      "callees": 0,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/kg_utils/embed.py:resolve_model_path",
+      "callers": 9,
+      "callees": 4,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/kg_utils/embedder.py:Embedder.embed_query",
+      "callers": 9,
+      "callees": 1,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/kg_utils/embedder.py:SentenceTransformerEmbedder.embed_query",
+      "callers": 9,
+      "callees": 4,
+      "risk_level": "low"
+    },
+    {
+      "name": "m:src/kg_utils/embedder.py:wrap_embedder._WrappedEmbedder.embed_query",
+      "callers": 9,
+      "callees": 0,
+      "risk_level": "low"
+    },
+    {
+      "name": "fn:src/kg_utils/embedder.py:wrap_embedder",
+      "callers": 9,
+      "callees": 4,
+      "risk_level": "low"
+    }
+  ],
+  "issues": [
+    "[LOW] Low docstring coverage (48.2%) \u2014 semantic query quality will be poor; embedding undocumented nodes yields only structured identifiers, not NL-searchable text. Prioritize docstrings on high-fan-in functions first.",
+    "[WARN] 5 orphaned functions found (`test_get_previous_returns_older_snapshot`, `test_snapshot_from_dict_drops_legacy_commit_field`, `test_embedder_protocol_not_satisfied_without_method`, `test_get_previous_empty_manifest_returns_none`, `test_resolve_with_no_fallback_uses_os_sep`) -- consider archiving or documenting",
+    "[WARN] `test_integration.py` has 47 functions/methods/classes -- consider splitting into focused submodules",
+    "[WARN] `test_snapshots.py` has 35 functions/methods/classes -- consider splitting into focused submodules",
+    "[WARN] `pipeline.py` has 33 functions/methods/classes -- consider splitting into focused submodules"
+  ],
+  "vs_previous": null,
+  "vs_baseline": null
+}

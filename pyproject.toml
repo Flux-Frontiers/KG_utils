@@ -10,8 +10,8 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.2.4"
-description = "Shared types and snapshot infrastructure for the KGModule SDK"
+version = "0.3.0"
+description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = { text = "Elastic-2.0" }
 authors = [
@@ -19,7 +19,7 @@ authors = [
 ]
 keywords = ["knowledge-graph", "kgmodule", "sdk", "types", "snapshots"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
@@ -28,11 +28,27 @@ classifiers = [
 requires-python = ">=3.12,<3.14"
 dependencies = []
 
+[project.optional-dependencies]
+semantic = [
+    "lancedb>=0.19.0",
+    "numpy>=1.24.0",
+    "sentence-transformers>=5.4.1",
+    "torch>=2.5.1",
+    "transformers>=4.40.0,<4.57",
+]
+
 [project.urls]
 Repository = "https://github.com/Flux-Frontiers/kg_utils"
 
 [tool.poetry]
 packages = [{include = "kg_utils", from = "src"}]
+
+[tool.poetry.group.kgdeps]
+optional = true
+
+[tool.poetry.group.kgdeps.dependencies]
+pycode-kg = ">=0.18.1"
+doc-kg    = ">=0.15.2"
 
 [tool.poetry.group.dev]
 optional = true
@@ -72,6 +88,7 @@ module = [
     "sentence_transformers.*",
     "transformers.*",
     "numpy.*",
+    "lancedb",
 ]
 ignore_missing_imports = true
 

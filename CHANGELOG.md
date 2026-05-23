@@ -15,6 +15,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.3.0] - 2026-05-23
+
+### Added
+
+- **`kg_utils.specs`** — rich `NodeSpec` and `EdgeSpec` dataclasses with
+  `lineno`, `end_lineno`, `metadata` fields; `BuildStats`, `QueryResult`, and
+  `SnippetPack` return types for the full pipeline surface.
+- **`kg_utils.extractor`** — `KGExtractor` abstract base class (yields
+  `NodeSpec` / `EdgeSpec` iterators); domain authors subclass this to feed any
+  source into the pipeline.
+- **`kg_utils.store`** — `GraphStore`: SQLite-backed authoritative node/edge
+  store with upsert, BFS expand, symbol resolution (`resolve_symbols`),
+  caller lookup (`callers_of`), provenance recording, and a `ProvMeta`
+  typed-dict.  SQLite is the single source of truth; the vector index is
+  always derived from it.
+- **`kg_utils.semantic`** — `SemanticIndex`: LanceDB vector index built from
+  `GraphStore` nodes.  Includes `Embedder` abstract base,
+  `SentenceTransformerEmbedder` (with ST ≥ 5.4 / ≤ 5.3 API fallback),
+  `SeedHit` result dataclass, model registry (`_KNOWN_MODELS`), and
+  `resolve_model_path` / `suppress_ingestion_logging` utilities.
+- **`kg_utils.pipeline`** — `KGModule`: concrete abstract base class with the
+  complete build → query → pack pipeline.  Domain authors implement only
+  `make_extractor()`, `kind()`, and `analyze()`.  Provides hybrid
+  semantic + lexical reranking, BFS graph expansion, configurable hop depth,
+  `min_score` filtering, `max_nodes` capping, and snippet extraction with
+  context lines.
+- **`kg_utils.module`** — thin re-export shim providing `KGModule` and
+  `KGExtractor` from a single import path for downstream compatibility.
+- **`[semantic]` optional extra** in `pyproject.toml`: `lancedb>=0.19.0`,
+  `numpy>=1.24.0`, `sentence-transformers>=5.4.1`, `torch>=2.5.1`,
+  `transformers>=4.40.0,<4.57`.  Install with
+  `pip install 'kgmodule-utils[semantic]'`.
+- **`[kgdeps]` Poetry group** (optional): `pycode-kg>=0.18.1`,
+  `doc-kg>=0.15.2` for integration testing against real KG modules.
+- **`poetry.toml`** — local venv configuration (`in-project = true`).
+- **`.pycodekg/snapshots/`** — initial CodeKG snapshot and manifest tracked
+  for reproducible metrics across releases.
+- **Test suite — three new files:**
+  - `tests/test_store.py` (343 lines) — unit tests for `GraphStore`: write/read,
+    edges, wipe, upsert, `query_nodes`, BFS expand, provenance, `resolve_symbols`,
+    `callers_of`, `edges_from`, stats, and context-manager lifecycle.
+  - `tests/test_pipeline_utils.py` (295 lines) — pure-function unit tests for
+    all pipeline utilities: `semantic_score_from_distance`, `query_tokens`,
+    `normalize_query_text`, `docstring_signal`, `lexical_overlap_score`,
+    `safe_join`, `read_lines`, `compute_span`, `make_snippet`,
+    `make_module_summary`, `spans_overlap`.
+  - `tests/test_pipeline_module.py` (318 lines, `@pytest.mark.integration`) —
+    end-to-end integration tests for a concrete `KGModule` implementation
+    (`_TextKG` / `_TextExtractor`): `build_graph`, `build_index`, `stats`,
+    `query` (semantic match, hop=0, hybrid rerank, `min_score`, `max_nodes`),
+    `pack` (markdown, JSON, snippet text, key stripping), and lazy property
+    initialisation.
+
+### Changed
+
+- **Version bump** `0.2.4` → `0.3.0` (significant new surface area).
+- **Development status** classifier `3 - Alpha` → `4 - Beta`.
+- **Package description** updated to reflect the expanded scope: "Shared
+  types, graph store, semantic index, and pipeline base for the KGModule SDK".
+- **`src/kg_utils/__init__.py`** — updated module docstring to document all
+  new sub-modules and the `[semantic]` extra install path.
+- **`lancedb` mypy override** added to `[[tool.mypy.overrides]]`
+  `ignore_missing_imports` list so mypy strict mode passes without stubs.
+- **`.gitignore`** — added exclusion rules for transient `.pycodekg/` and
+  `.dockg/` artifacts (SQLite databases, LanceDB dirs, model caches) while
+  keeping `snapshots/` tracked.
+- **`.secrets.baseline`** regenerated to whitelist SHA git-tree hashes in
+  `.pycodekg/snapshots/` that `detect-secrets` flags as `HexHighEntropyString`
+  false positives.
+
+### Fixed
+
+- **`kg_utils.embedder`** — `load_sentence_transformer` and
+  `SentenceTransformerEmbedder.__init__` now catch `(ImportError, ValueError)`
+  instead of `ImportError` alone when suppressing HF logging, preventing an
+  unhandled `ValueError` raised by some `transformers` versions when the
+  logging backend is already initialised.
+
 ## [0.2.4] - 2026-04-29
 
 ### Fixed

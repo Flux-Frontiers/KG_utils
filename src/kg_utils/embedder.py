@@ -101,7 +101,7 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL) -> Any:
         hf_logging.set_verbosity_error()
         # TQDM_DISABLE alone misses transformers' _tqdm_active gate
         hf_logging.disable_progress_bar()
-    except ImportError:
+    except (ImportError, ValueError):
         pass
 
     os.environ["TQDM_DISABLE"] = "1"
@@ -162,7 +162,7 @@ class SentenceTransformerEmbedder(Embedder):
 
             hf_logging.set_verbosity_error()
             hf_logging.disable_progress_bar()
-        except ImportError:
+        except (ImportError, ValueError):
             pass
 
         _prev = os.environ.get("TQDM_DISABLE")
