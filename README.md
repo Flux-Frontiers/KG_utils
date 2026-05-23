@@ -1,13 +1,13 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 
 # kgmodule-utils
 
-**kgmodule-utils** — Shared types and snapshot infrastructure for the KGModule SDK.
+**kgmodule-utils** — Shared graph store, semantic index, pipeline base, and snapshot infrastructure for the KGModule SDK.
 
 *Author: Eric G. Suchanek, PhD*
 
@@ -17,21 +17,22 @@
 
 ## Overview
 
-kgmodule-utils is the **zero-dependency foundation package** for the Flux-Frontiers knowledge-graph ecosystem. It provides the canonical type abstractions and temporal snapshot infrastructure that all KGModule implementations — [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [FTreeKG](https://github.com/Flux-Frontiers/ftree_kg), [DocKG](https://github.com/Flux-Frontiers/doc_kg), [AgentKG](https://github.com/Flux-Frontiers/agent_kg) — depend on.
+kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through LanceDB vector indexing and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
 
-Every KGModule shares the same `NodeSpec`, `EdgeSpec`, `KGExtractor`, and `KGModule` base classes defined here, ensuring consistent interfaces across the ecosystem. The snapshot subsystem enables temporal metric tracking, delta comparison, and pruning across git commits.
+Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [DocKG](https://github.com/Flux-Frontiers/doc_kg), and others — subclasses `KGModule` from here and implements exactly three methods: `make_extractor()`, `kind()`, and `analyze()`.
 
 ---
 
 ## Features
 
-- **Core type abstractions** — `NodeSpec`, `EdgeSpec`, `QueryResult`, `SnippetPack` dataclasses for knowledge-graph nodes, edges, and query results
-- **KGExtractor base class** — Abstract interface for domain-specific extractors with `extract()`, `node_kinds()`, `edge_kinds()`, and `coverage_metric()`
-- **KGModule base class** — Abstract interface for knowledge-graph modules with `build()`, `query()`, `pack()`, `stats()`, and `analyze()`
-- **Snapshot models** — `Snapshot` dataclass keyed by git tree hash with free-form metrics, hotspots, issues, and delta tracking
-- **SnapshotManager** — Capture, persist, load, list, diff, and prune snapshots with automatic deduplication and delta computation
-- **SnapshotManifest** — Fast-lookup index of all snapshots with format versioning
-- **Zero dependencies** — Stdlib-only; no external packages required at runtime
+- **`kg_utils.specs`** — `NodeSpec`, `EdgeSpec`, `BuildStats`, `QueryResult`, `SnippetPack` dataclasses
+- **`kg_utils.extractor`** — `KGExtractor` ABC: `extract()`, `node_kinds()`, `edge_kinds()`, `coverage_metric()`
+- **`kg_utils.store`** — `GraphStore`: SQLite-backed node/edge store with BFS expansion, symbol resolution, caller lookup, and provenance recording
+- **`kg_utils.semantic`** — `SemanticIndex` (LanceDB), `SentenceTransformerEmbedder`, `SeedHit`, model registry, `resolve_model_path()`
+- **`kg_utils.pipeline`** — `KGModule`: full build → query → pack pipeline base with hybrid semantic + lexical reranking and snippet extraction
+- **`kg_utils.embedder`** — `get_embedder()`, `wrap_embedder()`, `load_sentence_transformer()` factory functions
+- **`kg_utils.embed`** — `Embedder` protocol, `DEFAULT_MODEL`, `KNOWN_MODELS`, `resolve_model_path()`
+- **`kg_utils.snapshots`** — `Snapshot`, `SnapshotManager`, `SnapshotManifest` for temporal metric tracking
 
 ---
 
@@ -39,103 +40,148 @@ Every KGModule shares the same `NodeSpec`, `EdgeSpec`, `KGExtractor`, and `KGMod
 
 **Requirements:** Python ≥ 3.12, < 3.14
 
-### Standalone (pip)
+### Core only (stdlib, no optional deps)
 
 ```bash
 pip install kgmodule-utils
 ```
 
-### Existing Poetry project
+### With semantic search (LanceDB + sentence-transformers)
 
 ```bash
-poetry add kgmodule-utils
+pip install 'kgmodule-utils[semantic]'
 ```
 
-Or declare it directly in your `pyproject.toml`:
+### In a Poetry project
 
 ```toml
 [tool.poetry.dependencies]
-kgmodule-utils = "^0.2.0"
+kgmodule-utils = { version = ">=0.3.1", extras = ["semantic"] }
 ```
 
 ---
 
 ## Quick Start
 
-### Types — Define a KGModule
+### Build a domain KG module
 
 ```python
-from kg_utils.types import NodeSpec, EdgeSpec, KGExtractor, KGModule
+from collections.abc import Iterator
+from pathlib import Path
+
+from kg_utils.extractor import KGExtractor
+from kg_utils.pipeline import KGModule
+from kg_utils.specs import EdgeSpec, NodeSpec
+
 
 class MyExtractor(KGExtractor):
     def node_kinds(self) -> list[str]:
-        return ["module", "function", "class"]
+        return ["document", "section"]
 
     def edge_kinds(self) -> list[str]:
-        return ["CONTAINS", "CALLS", "IMPORTS"]
+        return ["CONTAINS"]
 
-    def extract(self, source_root: str):
-        # Yield NodeSpec and EdgeSpec objects from your domain
-        yield NodeSpec(
-            node_id="fn:main:hello",
-            kind="function",
-            name="hello",
-            qualname="main.hello",
-            source_path="main.py",
-            docstring="Greet the user.",
-        )
-        yield EdgeSpec(
-            source_id="mod:main",
-            target_id="fn:main:hello",
-            relation="CONTAINS",
-        )
+    def meaningful_node_kinds(self) -> list[str]:
+        return ["section"]
+
+    def extract(self) -> Iterator[NodeSpec | EdgeSpec]:
+        for doc in self.repo_path.glob("**/*.md"):
+            doc_id = f"document:{doc}"
+            yield NodeSpec(node_id=doc_id, kind="document",
+                           name=doc.stem, qualname=doc.stem,
+                           source_path=str(doc))
+            # … yield sections and CONTAINS edges
+
+
+class MyKG(KGModule):
+    _default_dir = ".mykg"
+
+    def make_extractor(self) -> KGExtractor:
+        return MyExtractor(self.repo_root)
+
+    def kind(self) -> str:
+        return "my"
+
+    def analyze(self) -> str:
+        s = self.stats()
+        return f"# MyKG\nnodes={s['total_nodes']}"
+
+
+# Build and query
+kg = MyKG("/path/to/repo")
+kg.build(wipe=True)
+
+result = kg.query("authentication flow", k=8, hop=1)
+pack   = kg.pack("error handling", max_nodes=10)
+print(pack.to_markdown())
 ```
 
-### Snapshots — Track metrics over time
+### Track metrics over time
 
 ```python
 from kg_utils.snapshots import SnapshotManager
 
-mgr = SnapshotManager(snapshots_dir=".my_kg/snapshots", package_name="my-kg")
+mgr = SnapshotManager(".mykg/snapshots", package_name="my-kg")
 
-# Capture a snapshot from current metrics
-snapshot = mgr.capture(metrics={
-    "total_nodes": 142,
-    "total_edges": 387,
-    "coverage": 0.78,
-})
-
-# Save with automatic deduplication
+snapshot = mgr.capture(
+    version="1.0.0",
+    branch="main",
+    graph_stats_dict=kg.stats(),
+)
 mgr.save_snapshot(snapshot)
 
-# List and compare
 snaps = mgr.list_snapshots(limit=5)
-delta = mgr.diff_snapshots(key_a=snaps[0].key, key_b=snaps[-1].key)
+delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 ```
 
 ---
 
 ## API Reference
 
-### `kg_utils.types`
+### `kg_utils.specs`
 
 | Class | Description |
 |---|---|
-| `NodeSpec` | Dataclass for KG nodes: `node_id`, `kind`, `name`, `qualname`, `source_path`, `docstring` |
-| `EdgeSpec` | Dataclass for KG edges: `source_id`, `target_id`, `relation` |
-| `QueryResult` | Container for query responses with nodes, edges, and metadata |
-| `SnippetPack` | Extended result container with source-code snippets |
-| `KGExtractor` | Abstract base class for domain extractors |
-| `KGModule` | Abstract base class for knowledge-graph modules |
+| `NodeSpec` | Graph node: `node_id`, `kind`, `name`, `qualname`, `source_path`, `lineno`, `end_lineno`, `docstring`, `metadata` |
+| `EdgeSpec` | Graph edge: `source_id`, `target_id`, `relation`, `weight`, `metadata` |
+| `BuildStats` | Build result: node/edge counts, indexed rows, embedding dim |
+| `QueryResult` | Query result: nodes, edges, seeds, hop, relevance metadata |
+| `SnippetPack` | Pack result: nodes with snippets, `to_markdown()`, `to_json()`, `save()` |
+
+### `kg_utils.extractor`
+
+| Class | Description |
+|---|---|
+| `KGExtractor` | ABC — implement `node_kinds()`, `edge_kinds()`, `extract()` |
+
+### `kg_utils.store`
+
+| Class | Description |
+|---|---|
+| `GraphStore` | SQLite persistence: `write()`, `expand()`, `query_nodes()`, `resolve_symbols()`, `callers_of()`, `stats()` |
+
+### `kg_utils.semantic`
+
+| Class / function | Description |
+|---|---|
+| `SemanticIndex` | LanceDB vector index: `build()`, `search()` |
+| `SentenceTransformerEmbedder` | Local embedding via sentence-transformers |
+| `resolve_model_path()` | Resolve model name / alias to local cache path |
+| `suppress_ingestion_logging()` | Silence verbose HF / tqdm output during ingestion |
+
+### `kg_utils.pipeline`
+
+| Class | Description |
+|---|---|
+| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()` for free |
 
 ### `kg_utils.snapshots`
 
 | Class | Description |
 |---|---|
-| `Snapshot` | Temporal snapshot keyed by git tree hash with free-form metrics and deltas |
+| `Snapshot` | Temporal snapshot keyed by git tree hash with metrics and deltas |
 | `SnapshotManager` | Capture, persist, load, list, diff, and prune snapshots |
-| `SnapshotManifest` | Index of all snapshots with format versioning and fast lookup |
-| `PruneResult` | Summary of pruning operations: removed, orphaned, broken entries |
+| `SnapshotManifest` | Fast-lookup index with format versioning |
 
 ---
 
@@ -143,27 +189,29 @@ delta = mgr.diff_snapshots(key_a=snaps[0].key, key_b=snaps[-1].key)
 
 ```
 KG_utils/
-├── LICENSE
-├── README.md
 ├── pyproject.toml
-├── pytest.ini
 ├── src/
 │   └── kg_utils/
 │       ├── __init__.py
-│       ├── py.typed                  # PEP 561 marker
-│       ├── types/
-│       │   ├── __init__.py           # Public re-exports
-│       │   ├── specs.py              # NodeSpec, EdgeSpec, QueryResult, SnippetPack
-│       │   ├── extractor.py          # KGExtractor ABC
-│       │   └── module.py             # KGModule ABC
+│       ├── specs.py          # NodeSpec, EdgeSpec, BuildStats, QueryResult, SnippetPack
+│       ├── extractor.py      # KGExtractor ABC
+│       ├── store.py          # GraphStore (SQLite)
+│       ├── semantic.py       # SemanticIndex, SentenceTransformerEmbedder, SeedHit
+│       ├── pipeline.py       # KGModule concrete base class
+│       ├── module.py         # Re-export shim
+│       ├── embed.py          # Embedder protocol, model registry
+│       ├── embedder.py       # SentenceTransformerEmbedder factory functions
 │       └── snapshots/
-│           ├── __init__.py           # Public re-exports
-│           ├── models.py             # Snapshot, SnapshotManifest, PruneResult
-│           └── manager.py            # SnapshotManager
+│           ├── __init__.py
+│           ├── models.py     # Snapshot, SnapshotManifest, PruneResult
+│           └── manager.py    # SnapshotManager
 └── tests/
-    ├── __init__.py
-    ├── test_types.py
-    └── test_snapshots.py
+    ├── test_store.py          # GraphStore unit tests
+    ├── test_pipeline_utils.py # Pipeline utility function tests
+    ├── test_pipeline_module.py # End-to-end integration tests (--integration)
+    ├── test_types.py          # Spec dataclass and KGExtractor tests
+    ├── test_snapshots.py      # Snapshot lifecycle tests
+    └── test_integration.py    # Cross-module integration tests
 ```
 
 ---
@@ -176,7 +224,13 @@ cd KG_utils
 poetry install --with dev
 ```
 
-Run the test suite:
+Run the fast test suite (no model downloads):
+
+```bash
+poetry run pytest -m "not integration"
+```
+
+Run all tests including semantic/integration (requires `[semantic]` extra):
 
 ```bash
 poetry run pytest

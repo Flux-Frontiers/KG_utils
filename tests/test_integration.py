@@ -23,7 +23,9 @@ from kg_utils.embedder import (
 )
 from kg_utils.snapshots import SnapshotManager
 from kg_utils.snapshots.models import Snapshot
-from kg_utils.types import EdgeSpec, KGExtractor, KGModule, NodeSpec
+from kg_utils.extractor import KGExtractor
+from kg_utils.pipeline import KGModule
+from kg_utils.specs import EdgeSpec, NodeSpec
 
 pytestmark = pytest.mark.integration
 
@@ -308,11 +310,16 @@ class _FileTreeExtractor(KGExtractor):
 
 
 class _FileTreeModule(KGModule):
+    _default_dir = ".filetreekg"
+
     def make_extractor(self) -> KGExtractor:
-        return _FileTreeExtractor(self.repo_root, self.config)
+        return _FileTreeExtractor(self.repo_root)
 
     def kind(self) -> str:
         return "filetree"
+
+    def analyze(self) -> str:
+        return "# FileTree KG"
 
     def stats(self) -> dict[str, Any]:
         ext = self.make_extractor()

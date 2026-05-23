@@ -1,4 +1,4 @@
-"""Tests for kg_utils.types."""
+"""Tests for kg_utils.specs and kg_utils.extractor."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from kg_utils.types import EdgeSpec, KGExtractor, KGModule, NodeSpec, QueryResult, SnippetPack
+from kg_utils.extractor import KGExtractor
+from kg_utils.specs import EdgeSpec, NodeSpec, QueryResult, SnippetPack
 
 
 # -- Spec dataclasses --------------------------------------------------------
@@ -109,60 +110,7 @@ def test_extractor_coverage(tmp_path: Path) -> None:
     assert ext.coverage_metric(nodes) == pytest.approx(0.5)
 
 
-def test_base_extractor_raises() -> None:
-    base = KGExtractor(Path("/tmp"))
-    with pytest.raises(NotImplementedError):
-        base.node_kinds()
-    with pytest.raises(NotImplementedError):
-        list(base.extract())
-
-
-# -- KGModule ----------------------------------------------------------------
-
-
-def test_base_module_raises() -> None:
-    m = KGModule(repo_root=Path("/tmp"))
-    with pytest.raises(NotImplementedError):
-        m.make_extractor()
-    with pytest.raises(NotImplementedError):
-        m.kind()
-    with pytest.raises(NotImplementedError):
-        m.build()
-    with pytest.raises(NotImplementedError):
-        m.query("test")
-    with pytest.raises(NotImplementedError):
-        m.stats()
-    with pytest.raises(NotImplementedError):
-        m.pack("test")
-    with pytest.raises(NotImplementedError):
-        m.analyze()
-
-
-def test_module_init_defaults() -> None:
-    m = KGModule(repo_root=Path("/tmp"))
-    assert m.db_path is None
-    assert m.lancedb_dir is None
-    assert m.config == {}
-
-
-def test_module_init_with_all_params(tmp_path: Path) -> None:
-    db = tmp_path / "graph.db"
-    lance = tmp_path / "lance"
-    cfg = {"key": "value"}
-    m = KGModule(repo_root=tmp_path, db_path=db, lancedb_dir=lance, config=cfg)
-    assert m.repo_root == tmp_path
-    assert m.db_path == db
-    assert m.lancedb_dir == lance
-    assert m.config == {"key": "value"}
-
-
 # -- KGExtractor additional cases --------------------------------------------
-
-
-def test_base_extractor_edge_kinds_raises() -> None:
-    base = KGExtractor(Path("/tmp"))
-    with pytest.raises(NotImplementedError):
-        base.edge_kinds()
 
 
 def test_extractor_meaningful_node_kinds_override(tmp_path: Path) -> None:
@@ -203,14 +151,12 @@ def test_extractor_coverage_only_non_meaningful_kinds(tmp_path: Path) -> None:
 
 
 def test_extractor_config_default(tmp_path: Path) -> None:
-    ext = KGExtractor.__new__(KGExtractor)
-    KGExtractor.__init__(ext, tmp_path)
+    ext = DummyExtractor(tmp_path)
     assert ext.config == {}
 
 
 def test_extractor_config_passed(tmp_path: Path) -> None:
-    ext = KGExtractor.__new__(KGExtractor)
-    KGExtractor.__init__(ext, tmp_path, config={"max_depth": 3})
+    ext = DummyExtractor(tmp_path, config={"max_depth": 3})
     assert ext.config == {"max_depth": 3}
 
 

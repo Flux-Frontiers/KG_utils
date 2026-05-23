@@ -15,6 +15,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.3.1] - 2026-05-23
+
+### Changed
+
+- **Version bump** `0.3.0` → `0.3.1`.
+- **README** — complete rewrite to reflect the 0.3.x expanded scope: updated
+  version badge, description, feature list, Quick Start examples (now using
+  correct `kg_utils.specs` / `kg_utils.extractor` / `kg_utils.pipeline`
+  import paths), API reference tables for all new modules, revised project
+  structure tree, and split test-suite instructions into fast vs. integration
+  runs.
+- **`tests/test_types.py`** — updated module docstring and import to use
+  `kg_utils.specs` and `kg_utils.extractor`; removed stale KGModule tests
+  (superseded by `test_pipeline_module.py`) and KGExtractor "raises
+  NotImplementedError" tests (now enforced by ABC); rewrote config tests to
+  use `DummyExtractor` instead of `KGExtractor.__new__`.
+- **`tests/test_integration.py`** — replaced `from kg_utils.types import …`
+  with imports from `kg_utils.extractor`, `kg_utils.pipeline`, and
+  `kg_utils.specs`; added `analyze()` implementation and `_default_dir` to
+  `_FileTreeModule` (required by the ABC and concrete `KGModule` base).
+
+### Removed
+
+- **`kg_utils.types` subpackage** (`types/__init__.py`, `types/specs.py`,
+  `types/extractor.py`, `types/module.py`) — the parallel thin/abstract
+  hierarchy has been eliminated.  All types now live at the canonical
+  top-level locations: `kg_utils.specs`, `kg_utils.extractor`,
+  `kg_utils.pipeline`.  This removes the dual-class friction where
+  `isinstance` checks and type annotations could silently diverge depending
+  on which import path was used.
+
 ## [0.3.0] - 2026-05-23
 
 ### Added

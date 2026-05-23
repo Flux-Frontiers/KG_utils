@@ -1,8 +1,8 @@
 """kg_utils — Shared types, store, semantic index, and pipeline base for the KGModule SDK.
 
 Sub-packages / modules:
-    kg_utils.types      — NodeSpec, EdgeSpec, BuildStats, QueryResult, SnippetPack,
-                          KGExtractor (abstract), KGModule (abstract interface).
+    kg_utils.specs      — NodeSpec, EdgeSpec, BuildStats, QueryResult, SnippetPack.
+    kg_utils.extractor  — KGExtractor abstract base class.
     kg_utils.store      — GraphStore: SQLite-backed authoritative node/edge store.
     kg_utils.semantic   — Embedder, SentenceTransformerEmbedder, SemanticIndex, SeedHit.
     kg_utils.pipeline   — KGModule: concrete base class with full build/query/pack pipeline.
@@ -17,4 +17,4 @@ Optional extras
     pip install 'kgmodule-utils[semantic]'   # lancedb + sentence-transformers
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
