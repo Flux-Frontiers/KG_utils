@@ -38,7 +38,7 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from kg_utils.semantic import (
     DEFAULT_MODEL,
@@ -715,7 +715,7 @@ class KGModule(ABC):
                     file_nlines=len(lines),
                 )
             if n.get("qualname") and n.get("_span"):
-                spans_by_qualname[(mp, n["qualname"])] = n["_span"]
+                spans_by_qualname[(mp, n["qualname"])] = cast(tuple[int, int], n["_span"])
 
         raw_nodes.sort(key=lambda x: x["_rank_key"])
 

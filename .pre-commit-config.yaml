@@ -9,6 +9,7 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=1000]
+        exclude: '^\.dockg/'
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -32,9 +33,9 @@ repos:
 
   - repo: local
     hooks:
-      - id: mypy
-        name: mypy
-        entry: poetry run mypy src/
+      - id: ty
+        name: ty
+        entry: poetry run ty check src/
         language: system
         pass_filenames: false
         always_run: true

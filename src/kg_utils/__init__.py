@@ -11,10 +11,15 @@ Sub-packages / modules:
                           kg_model_cache_dir(), resolve_model_path().
     kg_utils.embedder   — Concrete SentenceTransformerEmbedder, get_embedder(),
                           wrap_embedder(), load_sentence_transformer().
+    kg_utils.synthesis  — Unified text + image synthesis: TextSynthesizer, ImageSynthesizer.
+                          Backends: omlx | ollama | openai (text);
+                                    mflux-local | mflux-serve | openai (image).
 
 Optional extras
 ---------------
-    pip install 'kgmodule-utils[semantic]'   # lancedb + sentence-transformers
+    pip install 'kgmodule-utils[semantic]'         # lancedb + sentence-transformers
+    pip install 'kgmodule-utils[synthesis]'        # httpx + openai + pillow
+    pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
