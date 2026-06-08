@@ -221,3 +221,6 @@ commit.txt
 .dockg/graph.sqlite
 .dockg/graph.sqlite*
 .dockg/models
+
+# Claude Code project memory and settings
+.claude/

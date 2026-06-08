@@ -53,6 +53,11 @@ from kg_utils.synthesis._config import (
 )
 from kg_utils.synthesis._image import ImageSynthesizer
 from kg_utils.synthesis._text import TextSynthesizer
+from kg_utils.synthesis.factory import (
+    image_synth_for_backend,
+    normalize_openai_base_url,
+    text_synth_for_backend,
+)
 
 
 def text_synthesizer_from_env() -> TextSynthesizer:
@@ -76,4 +81,7 @@ __all__ = [
     "image_synthesizer_from_env",
     "text_config_from_env",
     "image_config_from_env",
+    "normalize_openai_base_url",
+    "text_synth_for_backend",
+    "image_synth_for_backend",
 ]

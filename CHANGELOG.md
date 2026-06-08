@@ -15,6 +15,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.4.2] - 2026-06-08
+
+### Added
+
+- **`kg_utils.retrieval`** — new sub-package for shared retrieval helpers:
+  - `hit_to_dict(hit, include_diary_timestamp)` — serializes a KGRAG hit object into a
+    plain dictionary; optionally includes a `timestamp` field for diary-kind hits.
+  - `attach_content_by_sqlite(hits, kg_sqlite_map)` — batched SQLite lookups that hydrate
+    `content` on hit dicts in-place; missing or unreadable databases are silently skipped.
+
+- **`kg_utils.worker`** — new sub-package centralizing RunPod `/runsync` protocol helpers:
+  - `WorkerClient` — small HTTP client wrapping `list_models`, `rewrite`, `imagine`, and
+    `query` operations with per-call `httpx.Timeout` tuning.
+  - `WorkerError` — application-level error raised on structured worker failure payloads.
+  - `decode_worker_response` / `extract_worker_error` — decode and surface RunPod error
+    payloads in both `status: FAILED` and soft `output.error` forms.
+  - `handle_aux_ops` — shared handler dispatch for `models`, `rewrite`, and `imagine`
+    operations; eliminates duplicated logic across Streamlit worker handlers.
+
+- **`kg_utils.synthesis.factory`** — synthesis backend factory helpers for per-request
+  backend overrides, exported via `kg_utils.synthesis`:
+  - `normalize_openai_base_url(endpoint)` — normalizes an endpoint string to end with `/v1`.
+  - `text_synth_for_backend(backend, fallback)` — constructs a `TextSynthesizer` for the
+    requested backend using env vars (`SYNTH_ENDPOINT`, `VLLM_*`, `OLLAMA_ENDPOINT`,
+    `OPENAI_API_KEY`); returns `fallback` for unknown or empty values.
+  - `image_synth_for_backend(backend, fallback)` — constructs an `ImageSynthesizer` for
+    `openai`, `mflux-serve`, or `mflux-local` backends from env vars; returns `fallback`
+    for unknown or empty values.
+
+### Changed
+
+- **`.gitignore`** — exclude `.claude/` project memory and settings directories.
+
 ## [0.4.1] - 2026-06-08
 
 ### Changed

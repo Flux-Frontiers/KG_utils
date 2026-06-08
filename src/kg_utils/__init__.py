@@ -14,6 +14,8 @@ Sub-packages / modules:
     kg_utils.synthesis  — Unified text + image synthesis: TextSynthesizer, ImageSynthesizer.
                           Backends: omlx | ollama | openai (text);
                                     mflux-local | mflux-serve | openai (image).
+    kg_utils.worker     — RunPod worker protocol helpers and WorkerClient for /runsync calls.
+    kg_utils.retrieval  — Shared retrieval helpers: hit_to_dict, attach_content_by_sqlite.
 
 Optional extras
 ---------------
@@ -22,4 +24,4 @@ Optional extras
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
