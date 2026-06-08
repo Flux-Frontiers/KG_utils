@@ -160,7 +160,7 @@ def test_image_config_mflux_local_defaults() -> None:
 
 def test_image_config_openai_defaults() -> None:
     cfg = ImageConfig(backend=ImageBackend.OPENAI)
-    assert cfg.resolved_model() == "dall-e-3"
+    assert cfg.resolved_model() == "gpt-image-1"
     assert cfg.resolved_server_url() == ""
 
 

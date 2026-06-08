@@ -39,6 +39,17 @@ _DALLE3_SIZES: dict[str, str] = {
     "3:4": "1024x1792",
 }
 
+# gpt-image-1 supports portrait/landscape 1024×1536 instead of 1792-wide.
+_GPT_IMAGE_SIZES: dict[str, str] = {
+    "1:1": "1024x1024",
+    "3:2": "1536x1024",
+    "2:3": "1024x1536",
+    "16:9": "1536x1024",
+    "9:16": "1024x1536",
+    "4:3": "1536x1024",
+    "3:4": "1024x1536",
+}
+
 
 # ---------------------------------------------------------------------------
 # Synthesizer
@@ -221,7 +232,13 @@ class ImageSynthesizer:
 
         cfg = self._cfg
         api_key = cfg.api_key or os.environ.get("OPENAI_API_KEY", "")
-        size = _DALLE3_SIZES.get(aspect_ratio, _DALLE3_SIZES["3:2"])
+
+        # gpt-image-1 uses different valid sizes and does not accept response_format.
+        # dall-e-3 returns a URL by default; gpt-image-1 returns b64_json by default.
+        if model.startswith("gpt-image"):
+            size = _GPT_IMAGE_SIZES.get(aspect_ratio, _GPT_IMAGE_SIZES["3:2"])
+        else:
+            size = _DALLE3_SIZES.get(aspect_ratio, _DALLE3_SIZES["3:2"])
 
         client = OpenAI(api_key=api_key)
         resp = client.images.generate(
@@ -229,7 +246,13 @@ class ImageSynthesizer:
             prompt=prompt,
             n=1,
             size=size,  # type: ignore[arg-type]
-            response_format="b64_json",
         )
-        b64 = (resp.data[0].b64_json or "") if resp.data else ""
-        return Image.open(BytesIO(base64.b64decode(b64)))
+        item = resp.data[0] if resp.data else None
+        if item and item.b64_json:
+            return Image.open(BytesIO(base64.b64decode(item.b64_json)))
+        if item and item.url:
+            import httpx  # type: ignore[import-unresolved]
+
+            raw = httpx.get(item.url, timeout=httpx.Timeout(30.0)).content
+            return Image.open(BytesIO(raw))
+        raise RuntimeError("OpenAI image response contained neither b64_json nor url")

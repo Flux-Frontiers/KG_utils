@@ -21,7 +21,7 @@ class ImageBackend(str, Enum):
 
     MFLUX_LOCAL = "mflux-local"  # local Flux2Klein via mflux (Apple Silicon only)
     MFLUX_SERVE = "mflux-serve"  # HTTP proxy to a running mflux-serve instance
-    OPENAI = "openai"  # OpenAI DALL-E — requires OPENAI_API_KEY / IMAGE_API_KEY
+    OPENAI = "openai"  # OpenAI gpt-image-1 — requires OPENAI_API_KEY / IMAGE_API_KEY
 
 
 # Per-backend defaults — filled in when the user has not provided an override.
@@ -49,7 +49,7 @@ _IMAGE_DEFAULTS: dict[ImageBackend, dict[str, str]] = {
         "model": "flux2-klein-4b",
     },
     ImageBackend.OPENAI: {
-        "model": "dall-e-3",
+        "model": "gpt-image-1",
     },
 }
 

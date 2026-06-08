@@ -15,6 +15,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.4.1] - 2026-06-08
+
+### Changed
+
+- **`ImageBackend.OPENAI` default model** — upgraded from `dall-e-3` to `gpt-image-1`.
+  `gpt-image-1` produces higher-quality images and supports portrait/landscape at
+  1024×1536 (vs. DALL-E 3's 1792-wide variants).  Override with `IMAGE_MODEL=dall-e-3`
+  to restore the previous behaviour.
+
+### Fixed
+
+- **`_generate_openai` size routing** — added `_GPT_IMAGE_SIZES` table for `gpt-image-1`
+  (1024×1536 portrait/landscape); `_generate_openai` now selects the correct size table
+  based on the model prefix (`gpt-image` vs. `dall-e`).
+- **`response_format` removed from `gpt-image-1` calls** — `gpt-image-1` returns
+  `b64_json` by default and does not accept the `response_format` parameter.  The
+  `dall-e-3` fallback path now downloads via URL when `b64_json` is absent.
+- **`docs/synthesis.md`** — annotated example API-key placeholder as a known
+  false positive; regenerated `.secrets.baseline`.
+
+## [0.4.0] - 2026-06-07
+
+### Added
+
+- **`kg_utils.synthesis`** — new sub-package providing unified text and image synthesis
+  across six backends with a single, env-var-configurable API.
+
+  **Text backends** (all use the OpenAI wire protocol):
+  - `TextBackend.OMLX` — local oMLX / vLLM; MLX chain-of-thought suppressed via
+    `extra_body` and `<think>` block stripping.  Default model:
+    `Qwen3-4B-Instruct-2507-MLX-8bit`.
+  - `TextBackend.OLLAMA` — local Ollama; no API key required.  Default model:
+    `hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q8_0`.
+  - `TextBackend.OPENAI` — OpenAI cloud.  Default model: `gpt-4o-mini`.
+
+  **Image backends:**
+  - `ImageBackend.MFLUX_LOCAL` — in-process Flux2Klein via `mflux` (Apple Silicon);
+    per-instance model cache avoids reloading across calls.
+  - `ImageBackend.MFLUX_SERVE` — HTTP proxy to a running `mflux-serve` instance.
+  - `ImageBackend.OPENAI` — DALL-E 3 with aspect-ratio → size mapping.
+
+  **Public API surface:**
+  - `TextConfig` / `ImageConfig` dataclasses with `resolved_endpoint()` and
+    `resolved_model()` helpers.
+  - `TextSynthesizer.list_models()` — available models at the endpoint.
+  - `TextSynthesizer.synthesize_rag(query, snippets)` — grounded RAG answer; skips
+    whitespace-only snippets; `max_k` cap; optional system prompt override.
+  - `TextSynthesizer.rewrite_for_image(corpus_text)` — rewrites historical prose into
+    an image-generation prompt; returns `(prompt, error)` — never raises.
+  - `ImageSynthesizer.generate()` → PIL Image; `generate_b64()` → base64 PNG.
+  - `text_config_from_env()` / `image_config_from_env()` — build configs from
+    `SYNTH_*` / `IMAGE_*` env vars; honour legacy `VLLM_*` and `GUTENKG_IMAGE_MODEL`
+    aliases with no migration required.
+  - `text_synthesizer_from_env()` / `image_synthesizer_from_env()` — one-call
+    convenience factories.
+
+- **`[synthesis]` optional extra** — `httpx>=0.27.0`, `openai>=1.30.0`,
+  `pillow>=10.0.0`.
+- **`[synthesis-mflux]` optional extra** — all of `[synthesis]` plus `mflux>=0.9.0`.
+- **Test suite — three new files** (116 tests total, stdlib + mocks only):
+  - `tests/test_synthesis_config.py` (44 tests) — all config defaults and env-var
+    priority chains; `clean_synth` / `clean_image` fixtures scrub env state.
+  - `tests/test_synthesis_text.py` (38 tests) — `TextSynthesizer` with mocked
+    `openai.OpenAI`; `<think>` stripping; empty-content filter; `rewrite_for_image`
+    fallback behaviour.
+  - `tests/test_synthesis_image.py` (34 tests) — `ImageSynthesizer` with mocked
+    `httpx.post` (mflux-serve) and `_load_mflux` (local); DALL-E size mapping;
+    base64 round-trip with a real 4×4 PNG.
+- **`docs/synthesis.md`** — full reference document: env vars, backend defaults,
+  API tables, DALL-E / mflux size maps, usage patterns, and integration notes.
+
+### Changed
+
+- **`mypy` → `ty`** throughout:
+  - `pyproject.toml`: removed `[tool.mypy]` and both `[[tool.mypy.overrides]]` sections;
+    added `ty = ">=0.0.41"` to dev group; added `[tool.ty.environment]` and
+    `[tool.ty.rules]` (`unresolved-import = "ignore"`).
+  - `.github/workflows/ci.yml`: `poetry run mypy src/` → `poetry run ty check src/`.
+  - `.pre-commit-config.yaml`: `mypy` local hook → `ty` local hook,
+    `entry: poetry run ty check src/`.
+- **README** — version badge bumped to 0.4.0; synthesis added to Features, Installation,
+  API Reference, and project structure tree.
+
 ## [0.3.1] - 2026-05-23
 
 ### Changed

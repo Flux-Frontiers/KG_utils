@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 
@@ -33,6 +33,7 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 - **`kg_utils.embedder`** — `get_embedder()`, `wrap_embedder()`, `load_sentence_transformer()` factory functions
 - **`kg_utils.embed`** — `Embedder` protocol, `DEFAULT_MODEL`, `KNOWN_MODELS`, `resolve_model_path()`
 - **`kg_utils.snapshots`** — `Snapshot`, `SnapshotManager`, `SnapshotManifest` for temporal metric tracking
+- **`kg_utils.synthesis`** — Unified text + image synthesis: oMLX, Ollama, and OpenAI text backends; mflux-local, mflux-serve, and DALL-E image backends; all env-var configurable
 
 ---
 
@@ -52,11 +53,23 @@ pip install kgmodule-utils
 pip install 'kgmodule-utils[semantic]'
 ```
 
+### With text + image synthesis (oMLX / Ollama / OpenAI / mflux-serve)
+
+```bash
+pip install 'kgmodule-utils[synthesis]'
+```
+
+### With local mflux image generation (Apple Silicon, includes synthesis)
+
+```bash
+pip install 'kgmodule-utils[synthesis-mflux]'
+```
+
 ### In a Poetry project
 
 ```toml
 [tool.poetry.dependencies]
-kgmodule-utils = { version = ">=0.3.1", extras = ["semantic"] }
+kgmodule-utils = { version = ">=0.4.0", extras = ["semantic", "synthesis"] }
 ```
 
 ---
@@ -183,6 +196,23 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 | `SnapshotManager` | Capture, persist, load, list, diff, and prune snapshots |
 | `SnapshotManifest` | Fast-lookup index with format versioning |
 
+### `kg_utils.synthesis`
+
+> Full reference: [docs/synthesis.md](docs/synthesis.md)
+
+| Class / function | Description |
+|---|---|
+| `TextBackend` | Enum: `omlx` \| `ollama` \| `openai` |
+| `ImageBackend` | Enum: `mflux-local` \| `mflux-serve` \| `openai` |
+| `TextConfig` | Backend config dataclass with `resolved_endpoint()` / `resolved_model()` |
+| `ImageConfig` | Backend config dataclass with `resolved_server_url()` / `resolved_model()` |
+| `TextSynthesizer` | `list_models()`, `synthesize_rag()`, `rewrite_for_image()` |
+| `ImageSynthesizer` | `generate()` → PIL Image, `generate_b64()` → base64 PNG |
+| `text_config_from_env()` | Build `TextConfig` from `SYNTH_*` env vars |
+| `image_config_from_env()` | Build `ImageConfig` from `IMAGE_*` env vars |
+| `text_synthesizer_from_env()` | Convenience: config + synthesizer in one call |
+| `image_synthesizer_from_env()` | Convenience: config + synthesizer in one call |
+
 ---
 
 ## Project Structure
@@ -190,6 +220,8 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 ```
 KG_utils/
 ├── pyproject.toml
+├── docs/
+│   └── synthesis.md          # Synthesis sub-package reference
 ├── src/
 │   └── kg_utils/
 │       ├── __init__.py
@@ -201,17 +233,25 @@ KG_utils/
 │       ├── module.py         # Re-export shim
 │       ├── embed.py          # Embedder protocol, model registry
 │       ├── embedder.py       # SentenceTransformerEmbedder factory functions
-│       └── snapshots/
-│           ├── __init__.py
-│           ├── models.py     # Snapshot, SnapshotManifest, PruneResult
-│           └── manager.py    # SnapshotManager
+│       ├── snapshots/
+│       │   ├── __init__.py
+│       │   ├── models.py     # Snapshot, SnapshotManifest, PruneResult
+│       │   └── manager.py    # SnapshotManager
+│       └── synthesis/
+│           ├── __init__.py   # Public API + factory functions
+│           ├── _config.py    # TextBackend, ImageBackend, TextConfig, ImageConfig, env factories
+│           ├── _text.py      # TextSynthesizer
+│           └── _image.py     # ImageSynthesizer
 └── tests/
-    ├── test_store.py          # GraphStore unit tests
-    ├── test_pipeline_utils.py # Pipeline utility function tests
-    ├── test_pipeline_module.py # End-to-end integration tests (--integration)
-    ├── test_types.py          # Spec dataclass and KGExtractor tests
-    ├── test_snapshots.py      # Snapshot lifecycle tests
-    └── test_integration.py    # Cross-module integration tests
+    ├── test_store.py               # GraphStore unit tests
+    ├── test_pipeline_utils.py      # Pipeline utility function tests
+    ├── test_pipeline_module.py     # End-to-end integration tests (--integration)
+    ├── test_types.py               # Spec dataclass and KGExtractor tests
+    ├── test_snapshots.py           # Snapshot lifecycle tests
+    ├── test_integration.py         # Cross-module integration tests
+    ├── test_synthesis_config.py    # Config defaults and env-var priority chains (44 tests)
+    ├── test_synthesis_text.py      # TextSynthesizer with mocked openai client (38 tests)
+    └── test_synthesis_image.py     # ImageSynthesizer with mocked backends (34 tests)
 ```
 
 ---
