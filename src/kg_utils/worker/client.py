@@ -137,12 +137,15 @@ class WorkerClient:
         image_backend: str = "",
         aspect_ratio: str = "3:2",
         steps: int | None = None,
+        size: str | None = None,
     ) -> tuple[str | None, str | None, str | None, str | None]:
         inp: dict[str, Any] = {"op": "imagine", "prompt": prompt, "aspect_ratio": aspect_ratio}
         if image_backend:
             inp["image_backend"] = image_backend
         if steps is not None:
             inp["steps"] = steps
+        if size:
+            inp["size"] = size
         if self._secret:
             inp["secret"] = self._secret
         payload: dict[str, Any] = {"input": inp}

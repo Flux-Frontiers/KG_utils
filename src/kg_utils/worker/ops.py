@@ -48,24 +48,39 @@ def handle_aux_ops(
             return {"error": "imagine requires a non-empty 'prompt'"}
 
         aspect = inp.get("aspect_ratio", "3:2")
+        size = inp.get("size")
         seed = inp.get("seed")
         steps = inp.get("steps")
         img_synth = image_synth_factory(inp.get("image_backend", ""))
+        seed_int = int(seed) if seed is not None else None
+        steps_int = int(steps) if steps is not None else None
 
         try:
-            b64 = img_synth.generate_b64(
-                prompt,
-                aspect_ratio=aspect,
-                seed=int(seed) if seed is not None else None,
-                steps=int(steps) if steps is not None else None,
-            )
-            return {
+            if size is not None:
+                b64 = img_synth.generate_b64(
+                    prompt,
+                    aspect_ratio=aspect,
+                    seed=seed_int,
+                    steps=steps_int,
+                    size=size,
+                )
+            else:
+                b64 = img_synth.generate_b64(
+                    prompt,
+                    aspect_ratio=aspect,
+                    seed=seed_int,
+                    steps=steps_int,
+                )
+            result = {
                 "image_b64": b64,
                 "prompt": prompt,
                 "aspect_ratio": aspect,
                 "image_model": img_synth._cfg.resolved_model(),  # pylint: disable=protected-access
                 "image_backend": img_synth._cfg.backend.value,  # pylint: disable=protected-access
             }
+            if size is not None:
+                result["size"] = size
+            return result
         except Exception as exc:  # noqa: BLE001  # pylint: disable=broad-exception-caught
             return {"error": f"image generation failed: {exc}"}
 

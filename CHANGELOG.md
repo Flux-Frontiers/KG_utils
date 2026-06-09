@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.4.3] - 2026-06-08
+
+### Added
+
+- **`_parse_size(size)`** — new helper in `kg_utils.synthesis._image` that parses an explicit
+  `"WIDTHxHEIGHT"` string into a `(width, height)` tuple; returns `None` for invalid input.
+
+- **`size` parameter on `ImageSynthesizer.generate()` and `generate_b64()`** — mflux backends
+  (`mflux-local`, `mflux-serve`) now accept an explicit `"WIDTHxHEIGHT"` size override that
+  takes priority over the aspect-ratio lookup table.  OpenAI backends ignore the parameter
+  (they accept only a fixed set of sizes).
+
+- **`size` parameter on `WorkerClient.imagine()`** — the RunPod `/runsync` payload now includes
+  `size` when provided, enabling callers to pass pixel dimensions to mflux workers.
+
+- **`size` handling in `handle_aux_ops`** (`kg_utils.worker.ops`) — `size` is extracted from
+  the worker input dict and forwarded to `generate_b64()`; when present it is also included in
+  the success response payload.
+
 ## [0.4.2] - 2026-06-08
 
 ### Added
