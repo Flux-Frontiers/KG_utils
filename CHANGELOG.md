@@ -42,10 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     and now asserts that `response_format` is absent from the OpenAI call kwargs (gpt-image-1
     does not accept this parameter)
 
-### Added
-
-### Removed
-
 ## [0.4.3] - 2026-06-08
 
 ### Changed
