@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import importlib
 import random
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
@@ -52,6 +53,29 @@ _GPT_IMAGE_SIZES: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
+# Size parsing
+# ---------------------------------------------------------------------------
+
+
+def _parse_size(size: str | None) -> tuple[int, int] | None:
+    """Parse an explicit ``"WIDTHxHEIGHT"`` string into an ``(width, height)`` pair.
+
+    :param size: Size string such as ``"768x512"`` (case-insensitive ``x``), or None.
+    :returns: ``(width, height)`` when *size* parses to two positive ints, else None.
+    """
+    if not size:
+        return None
+    try:
+        w_str, h_str = size.lower().split("x", 1)
+        width, height = int(w_str), int(h_str)
+    except (ValueError, AttributeError):
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    return width, height
+
+
+# ---------------------------------------------------------------------------
 # Synthesizer
 # ---------------------------------------------------------------------------
 
@@ -79,7 +103,10 @@ class ImageSynthesizer:
     def _load_mflux(self, model_name: str) -> Any:
         if self._mflux_model is not None and self._mflux_model_name == model_name:
             return self._mflux_model
-        from mflux.models.flux2.variants.txt2img.flux2_klein import Flux2Klein  # type: ignore
+
+        Flux2Klein = importlib.import_module(
+            "mflux.models.flux2.variants.txt2img.flux2_klein"
+        ).Flux2Klein
 
         self._mflux_model = Flux2Klein(model_path=model_name)
         self._mflux_model_name = model_name
@@ -97,6 +124,7 @@ class ImageSynthesizer:
         seed: int | None = None,
         steps: int | None = None,
         model: str | None = None,
+        size: str | None = None,
     ) -> PILImage:
         """Generate an image and return a PIL Image.
 
@@ -105,6 +133,9 @@ class ImageSynthesizer:
         :param seed: Random seed for reproducibility (random int if omitted).
         :param steps: Override inference steps (mflux backends only; ignored for OpenAI).
         :param model: Override the configured model for this single call.
+        :param size: Explicit ``"WIDTHxHEIGHT"`` override (mflux backends only). When given
+                     and valid, it takes priority over the *aspect_ratio* size table. OpenAI
+                     backends ignore it because they accept only a fixed set of sizes.
         :returns: PIL Image.
         """
         cfg = self._cfg
@@ -118,6 +149,7 @@ class ImageSynthesizer:
                 seed=seed,
                 steps=effective_steps,
                 aspect_ratio=aspect_ratio,
+                size=size,
             )
         elif cfg.backend == ImageBackend.MFLUX_SERVE:
             return self._generate_via_server(
@@ -126,6 +158,7 @@ class ImageSynthesizer:
                 seed=seed,
                 steps=effective_steps,
                 aspect_ratio=aspect_ratio,
+                size=size,
             )
         else:
             return self._generate_openai(
@@ -142,6 +175,7 @@ class ImageSynthesizer:
         seed: int | None = None,
         steps: int | None = None,
         model: str | None = None,
+        size: str | None = None,
     ) -> str:
         """Generate an image and return it as a base64-encoded PNG string.
 
@@ -152,9 +186,12 @@ class ImageSynthesizer:
         :param seed: Random seed for reproducibility.
         :param steps: Override inference steps (mflux backends only).
         :param model: Override the configured model for this single call.
+        :param size: Explicit ``"WIDTHxHEIGHT"`` override (mflux backends only).
         :returns: Base64-encoded PNG string.
         """
-        img = self.generate(prompt, aspect_ratio=aspect_ratio, seed=seed, steps=steps, model=model)
+        img = self.generate(
+            prompt, aspect_ratio=aspect_ratio, seed=seed, steps=steps, model=model, size=size
+        )
         buf = BytesIO()
         img.save(buf, format="PNG")
         return base64.b64encode(buf.getvalue()).decode()
@@ -171,8 +208,9 @@ class ImageSynthesizer:
         seed: int | None,
         steps: int,
         aspect_ratio: str,
+        size: str | None = None,
     ) -> PILImage:
-        width, height = _MFLUX_SIZES.get(aspect_ratio, _MFLUX_SIZES["3:2"])
+        width, height = _parse_size(size) or _MFLUX_SIZES.get(aspect_ratio, _MFLUX_SIZES["3:2"])
         effective_seed = seed if seed is not None else random.randint(0, 2**31 - 1)
         flux = self._load_mflux(model)
         result = flux.generate_image(
@@ -194,11 +232,12 @@ class ImageSynthesizer:
         seed: int | None,
         steps: int,
         aspect_ratio: str,
+        size: str | None = None,
     ) -> PILImage:
         import httpx
         from PIL import Image  # type: ignore[import-unresolved]
 
-        width, height = _MFLUX_SIZES.get(aspect_ratio, _MFLUX_SIZES["3:2"])
+        width, height = _parse_size(size) or _MFLUX_SIZES.get(aspect_ratio, _MFLUX_SIZES["3:2"])
         payload: dict[str, Any] = {
             "prompt": prompt,
             "n": 1,

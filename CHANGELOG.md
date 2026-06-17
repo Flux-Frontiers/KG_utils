@@ -7,13 +7,122 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-06-17
+
 ### Added
+
+- **`load_sentence_transformer(model_name, device=...)`** — explicit device override with
+  precedence: explicit arg > `KG_EMBED_DEVICE` env > CUDA→MPS→CPU auto-detect. The env channel
+  lets spawn-based embedding workers (which inherit `os.environ` but can't easily take a Python
+  arg) be pinned to a device — without it, N parallel workers each auto-select MPS and stack N
+  GPU allocations into an OOM. This is what makes CPU multiprocessing embedding safe on Apple
+  Silicon.
 
 ### Changed
 
-### Removed
+- **`embedder.py`** — replaced `from X import Y` lazy imports with `importlib.import_module()`
+  for `sentence_transformers`, `transformers.logging`, `torch`, and `numpy`.  `importlib` returns
+  `Any`, so `ty` no longer flags these optional heavy dependencies as unresolved imports.
+
+- **`synthesis/_image.py`** — same `importlib.import_module()` pattern for the `mflux` loader;
+  removes the old `# type: ignore` override which is no longer needed.
 
 ### Fixed
+
+- **CI `type-check` and `test` jobs** — both jobs now install `--extras "semantic" --extras
+  "synthesis"` so that `sentence-transformers`, `transformers`, `torch`, `lancedb`, `httpx`,
+  `openai`, and `pillow` are present in the CI virtualenv, matching local pre-commit behaviour.
+
+- **`tests/test_synthesis_image.py`** — corrected four test assertions that still referenced
+  the old `dall-e-3` default:
+  - expected model updated from `dall-e-3` → `gpt-image-1`
+  - landscape size updated from `1792x1024` → `1536x1024`
+  - portrait size updated from `1024x1792` → `1024x1536`
+  - `test_generate_openai_requests_b64_json` renamed to `test_generate_openai_does_not_set_response_format`
+    and now asserts that `response_format` is absent from the OpenAI call kwargs (gpt-image-1
+    does not accept this parameter)
+
+### Added
+
+### Removed
+
+## [0.4.3] - 2026-06-08
+
+### Changed
+
+- **`embedder.py`** — replaced `from X import Y` lazy imports with `importlib.import_module()`
+  for `sentence_transformers`, `transformers.logging`, `torch`, and `numpy`.  `importlib` returns
+  `Any`, so `ty` no longer flags these optional heavy dependencies as unresolved imports.
+
+- **`synthesis/_image.py`** — same `importlib.import_module()` pattern for the `mflux` loader;
+  removes the old `# type: ignore` override which is no longer needed.
+
+### Fixed
+
+- **CI `type-check` and `test` jobs** — both jobs now install `--extras "semantic" --extras
+  "synthesis"` so that `sentence-transformers`, `transformers`, `torch`, `lancedb`, `httpx`,
+  `openai`, and `pillow` are present in the CI virtualenv, matching local pre-commit behaviour.
+
+- **`tests/test_synthesis_image.py`** — corrected four test assertions that still referenced
+  the old `dall-e-3` default:
+  - expected model updated from `dall-e-3` → `gpt-image-1`
+  - landscape size updated from `1792x1024` → `1536x1024`
+  - portrait size updated from `1024x1792` → `1024x1536`
+  - `test_generate_openai_requests_b64_json` renamed to `test_generate_openai_does_not_set_response_format`
+    and now asserts that `response_format` is absent from the OpenAI call kwargs (gpt-image-1
+    does not accept this parameter)
+
+## [0.4.3] - 2026-06-08
+
+### Added
+
+- **`_parse_size(size)`** — new helper in `kg_utils.synthesis._image` that parses an explicit
+  `"WIDTHxHEIGHT"` string into a `(width, height)` tuple; returns `None` for invalid input.
+
+- **`size` parameter on `ImageSynthesizer.generate()` and `generate_b64()`** — mflux backends
+  (`mflux-local`, `mflux-serve`) now accept an explicit `"WIDTHxHEIGHT"` size override that
+  takes priority over the aspect-ratio lookup table.  OpenAI backends ignore the parameter
+  (they accept only a fixed set of sizes).
+
+- **`size` parameter on `WorkerClient.imagine()`** — the RunPod `/runsync` payload now includes
+  `size` when provided, enabling callers to pass pixel dimensions to mflux workers.
+
+- **`size` handling in `handle_aux_ops`** (`kg_utils.worker.ops`) — `size` is extracted from
+  the worker input dict and forwarded to `generate_b64()`; when present it is also included in
+  the success response payload.
+
+## [0.4.2] - 2026-06-08
+
+### Added
+
+- **`kg_utils.retrieval`** — new sub-package for shared retrieval helpers:
+  - `hit_to_dict(hit, include_diary_timestamp)` — serializes a KGRAG hit object into a
+    plain dictionary; optionally includes a `timestamp` field for diary-kind hits.
+  - `attach_content_by_sqlite(hits, kg_sqlite_map)` — batched SQLite lookups that hydrate
+    `content` on hit dicts in-place; missing or unreadable databases are silently skipped.
+
+- **`kg_utils.worker`** — new sub-package centralizing RunPod `/runsync` protocol helpers:
+  - `WorkerClient` — small HTTP client wrapping `list_models`, `rewrite`, `imagine`, and
+    `query` operations with per-call `httpx.Timeout` tuning.
+  - `WorkerError` — application-level error raised on structured worker failure payloads.
+  - `decode_worker_response` / `extract_worker_error` — decode and surface RunPod error
+    payloads in both `status: FAILED` and soft `output.error` forms.
+  - `handle_aux_ops` — shared handler dispatch for `models`, `rewrite`, and `imagine`
+    operations; eliminates duplicated logic across Streamlit worker handlers.
+
+- **`kg_utils.synthesis.factory`** — synthesis backend factory helpers for per-request
+  backend overrides, exported via `kg_utils.synthesis`:
+  - `normalize_openai_base_url(endpoint)` — normalizes an endpoint string to end with `/v1`.
+  - `text_synth_for_backend(backend, fallback)` — constructs a `TextSynthesizer` for the
+    requested backend using env vars (`SYNTH_ENDPOINT`, `VLLM_*`, `OLLAMA_ENDPOINT`,
+    `OPENAI_API_KEY`); returns `fallback` for unknown or empty values.
+  - `image_synth_for_backend(backend, fallback)` — constructs an `ImageSynthesizer` for
+    `openai`, `mflux-serve`, or `mflux-local` backends from env vars; returns `fallback`
+    for unknown or empty values.
+
+### Changed
+
+- **`.gitignore`** — exclude `.claude/` project memory and settings directories.
 
 ## [0.4.1] - 2026-06-08
 

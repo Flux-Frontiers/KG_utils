@@ -64,7 +64,7 @@ jobs:
           key: typecheck-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --with dev --no-interaction
+        run: poetry install --with dev --extras "semantic" --extras "synthesis" --no-interaction
 
       - name: Run ty
         run: poetry run ty check src/
@@ -94,7 +94,7 @@ jobs:
           key: test-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --with dev --no-interaction
+        run: poetry install --with dev --extras "semantic" --extras "synthesis" --no-interaction
 
       - name: Run tests
         run: poetry run pytest -m "not integration"
