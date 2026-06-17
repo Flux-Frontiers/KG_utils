@@ -320,8 +320,8 @@ def test_generate_openai_uses_resolved_model(tiny_png_b64: str) -> None:
         synth.generate("prompt")
         call_kwargs = mock_client.images.generate.call_args[1]
 
-    # Default model for OpenAI backend is dall-e-3
-    assert call_kwargs["model"] == "dall-e-3"
+    # Default model for OpenAI backend is gpt-image-1
+    assert call_kwargs["model"] == "gpt-image-1"
 
 
 def test_generate_openai_model_override(tiny_png_b64: str) -> None:
@@ -353,7 +353,7 @@ def test_generate_openai_landscape_size(tiny_png_b64: str) -> None:
         synth.generate("prompt", aspect_ratio="3:2")
         call_kwargs = mock_client.images.generate.call_args[1]
 
-    assert call_kwargs["size"] == "1792x1024"
+    assert call_kwargs["size"] == "1536x1024"
 
 
 def test_generate_openai_portrait_size(tiny_png_b64: str) -> None:
@@ -369,10 +369,10 @@ def test_generate_openai_portrait_size(tiny_png_b64: str) -> None:
         synth.generate("prompt", aspect_ratio="2:3")
         call_kwargs = mock_client.images.generate.call_args[1]
 
-    assert call_kwargs["size"] == "1024x1792"
+    assert call_kwargs["size"] == "1024x1536"
 
 
-def test_generate_openai_requests_b64_json(tiny_png_b64: str) -> None:
+def test_generate_openai_does_not_set_response_format(tiny_png_b64: str) -> None:
     mock_data = MagicMock()
     mock_data.b64_json = tiny_png_b64
     mock_resp = MagicMock()
@@ -385,7 +385,7 @@ def test_generate_openai_requests_b64_json(tiny_png_b64: str) -> None:
         synth.generate("prompt")
         call_kwargs = mock_client.images.generate.call_args[1]
 
-    assert call_kwargs["response_format"] == "b64_json"
+    assert "response_format" not in call_kwargs
 
 
 def test_generate_openai_returns_pil_image(tiny_png_b64: str) -> None:

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import importlib
 import random
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
@@ -102,7 +103,10 @@ class ImageSynthesizer:
     def _load_mflux(self, model_name: str) -> Any:
         if self._mflux_model is not None and self._mflux_model_name == model_name:
             return self._mflux_model
-        from mflux.models.flux2.variants.txt2img.flux2_klein import Flux2Klein  # type: ignore
+
+        Flux2Klein = importlib.import_module(
+            "mflux.models.flux2.variants.txt2img.flux2_klein"
+        ).Flux2Klein
 
         self._mflux_model = Flux2Klein(model_path=model_name)
         self._mflux_model_name = model_name

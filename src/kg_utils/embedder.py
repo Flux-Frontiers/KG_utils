@@ -34,11 +34,11 @@ License: Elastic 2.0
 
 from __future__ import annotations
 
+import importlib
 import os
 from typing import Any
 
 from kg_utils.embed import DEFAULT_MODEL, KNOWN_MODELS, resolve_model_path
-
 
 # ---------------------------------------------------------------------------
 # Abstract base
@@ -75,7 +75,7 @@ class Embedder:
 # ---------------------------------------------------------------------------
 
 
-def load_sentence_transformer(model_name: str = DEFAULT_MODEL) -> Any:
+def load_sentence_transformer(model_name: str = DEFAULT_MODEL, device: str | None = None) -> Any:
     """Load a ``SentenceTransformer`` with the canonical safe-load sequence.
 
     Resolution order:
@@ -90,13 +90,22 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL) -> Any:
     retry loops leave stale thread state that causes SIGBUS on the first
     ``encode()`` call.
 
+    Device precedence: explicit *device* arg > ``KG_EMBED_DEVICE`` env >
+    auto-detect.  The env var exists because ``spawn``-based embedding workers
+    inherit ``os.environ`` but can't easily receive a Python arg — without a way
+    to pin the device, each worker auto-selects MPS and N parallel workers stack
+    N GPU allocations into an OOM.  So CPU multiprocessing embedding on Apple
+    Silicon is only safe with this knob.
+
     :param model_name: HuggingFace model ID or KNOWN_MODELS alias.
+    :param device: Explicit device (``"cpu"``/``"mps"``/``"cuda"``).  ``None``
+        falls back to ``KG_EMBED_DEVICE`` then CUDA→MPS→CPU auto-detect.
     :return: Loaded ``SentenceTransformer`` instance.
     """
-    from sentence_transformers import SentenceTransformer  # pylint: disable=import-outside-toplevel
+    SentenceTransformer = importlib.import_module("sentence_transformers").SentenceTransformer
 
     try:
-        from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
+        hf_logging = importlib.import_module("transformers.logging")
 
         hf_logging.set_verbosity_error()
         # TQDM_DISABLE alone misses transformers' _tqdm_active gate
@@ -106,9 +115,18 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL) -> Any:
 
     os.environ["TQDM_DISABLE"] = "1"
 
-    import torch  # pylint: disable=import-outside-toplevel
+    torch = importlib.import_module("torch")
 
-    if torch.cuda.is_available():
+    # Device precedence: explicit arg > KG_EMBED_DEVICE env > auto-detect.
+    # The env var lets spawn-based embedding workers (which inherit os.environ
+    # but can't easily receive a Python arg) pin to e.g. CPU — without it each
+    # worker auto-selects MPS and N parallel workers stack N GPU allocations →
+    # MPS OOM. The override is why CPU multiprocessing embedding is safe on
+    # Apple Silicon.
+    sel = (device or os.environ.get("KG_EMBED_DEVICE", "")).strip().lower()
+    if sel:
+        device = sel
+    elif torch.cuda.is_available():
         device = "cuda"
     else:
         try:
@@ -158,7 +176,7 @@ class SentenceTransformerEmbedder(Embedder):
 
     def __init__(self, model_name: str = DEFAULT_MODEL) -> None:
         try:
-            from transformers import logging as hf_logging  # pylint: disable=import-outside-toplevel
+            hf_logging = importlib.import_module("transformers.logging")
 
             hf_logging.set_verbosity_error()
             hf_logging.disable_progress_bar()
@@ -188,7 +206,7 @@ class SentenceTransformerEmbedder(Embedder):
         :param texts: Input strings.
         :param encode_batch_size: Passed to ``model.encode()`` — tune down if OOM on MPS.
         """
-        import numpy as np  # pylint: disable=import-outside-toplevel
+        np = importlib.import_module("numpy")
 
         vecs = self.model.encode(
             texts,
@@ -200,7 +218,7 @@ class SentenceTransformerEmbedder(Embedder):
 
     def embed_query(self, query: str) -> list[float]:
         """Embed a single query string into a float32 vector."""
-        import numpy as np  # pylint: disable=import-outside-toplevel
+        np = importlib.import_module("numpy")
 
         vec = self.model.encode([query], normalize_embeddings=True)[0]
         return list(np.asarray(vec, dtype="float32").tolist())
@@ -233,7 +251,7 @@ def wrap_embedder(st_model: Any, model_name: str = DEFAULT_MODEL) -> Embedder:
     :param model_name: Model name stored as metadata on the wrapper.
     :return: An :class:`Embedder` that delegates all calls to *st_model*.
     """
-    import numpy as np  # pylint: disable=import-outside-toplevel
+    np = importlib.import_module("numpy")
 
     resolved = KNOWN_MODELS.get(model_name, model_name)
     _dim_fn = getattr(st_model, "get_embedding_dimension", None) or getattr(
