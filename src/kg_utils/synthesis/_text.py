@@ -98,6 +98,31 @@ class TextSynthesizer:
     # Public API
     # ------------------------------------------------------------------
 
+    def complete(
+        self,
+        messages: list[dict],
+        *,
+        model: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.7,
+    ) -> str | None:
+        """Run a raw chat completion against the configured backend.
+
+        General-purpose entry point for callers that build their own message
+        list — summarization, classification, arbitrary prompting — rather than
+        using :meth:`synthesize_rag` or :meth:`rewrite_for_image`. Applies the
+        same oMLX thinking suppression and ``<think>`` stripping as the other
+        public methods.
+
+        :param messages: OpenAI-style chat messages (``[{"role": ..., "content": ...}]``).
+        :param model: Override the configured model for this single call.
+        :param max_tokens: Override the configured ``max_tokens`` for this call.
+        :param temperature: Sampling temperature (lower = more deterministic).
+        :returns: The completion text with thinking stripped, or ``None`` on
+                  failure or empty output.
+        """
+        return self._complete(messages, model=model, max_tokens=max_tokens, temperature=temperature)
+
     def list_models(self) -> list[str]:
         """Return the model IDs available at the configured endpoint.
 

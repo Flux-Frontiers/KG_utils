@@ -104,6 +104,114 @@ def test_strip_thinking_only_block_returns_empty() -> None:
 
 
 # ---------------------------------------------------------------------------
+# complete — general-purpose chat completion
+# ---------------------------------------------------------------------------
+
+
+def test_complete_returns_content() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("Summary text.")
+        synth = _make_synth()
+        result = synth.complete([{"role": "user", "content": "Summarize this."}])
+    assert result == "Summary text."
+
+
+def test_complete_strips_think_blocks() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion(
+            "<think>reasoning</think>Clean summary."
+        )
+        synth = _make_synth()
+        result = synth.complete([{"role": "user", "content": "q"}])
+    assert result == "Clean summary."
+
+
+def test_complete_returns_none_when_llm_raises() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.side_effect = RuntimeError("connection refused")
+        synth = _make_synth()
+        result = synth.complete([{"role": "user", "content": "q"}])
+    assert result is None
+
+
+def test_complete_returns_none_for_empty_completion() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("")
+        synth = _make_synth()
+        result = synth.complete([{"role": "user", "content": "q"}])
+    assert result is None
+
+
+def test_complete_passes_messages_verbatim() -> None:
+    messages = [
+        {"role": "system", "content": "You summarize."},
+        {"role": "user", "content": "Fold this conversation."},
+    ]
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("ok")
+        synth = _make_synth()
+        synth.complete(messages)
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert call_kwargs["messages"] == messages
+
+
+def test_complete_model_override_passed_to_llm() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("ok")
+        synth = _make_synth()
+        synth.complete([{"role": "user", "content": "q"}], model="config-override")
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert call_kwargs["model"] == "config-override"
+
+
+def test_complete_uses_config_model_when_no_override() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("ok")
+        synth = _make_synth(model="cfg-model")
+        synth.complete([{"role": "user", "content": "q"}])
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert call_kwargs["model"] == "cfg-model"
+
+
+def test_complete_max_tokens_and_temperature_override() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("ok")
+        synth = _make_synth()
+        synth.complete([{"role": "user", "content": "q"}], max_tokens=64, temperature=0.2)
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert call_kwargs["max_tokens"] == 64
+    assert call_kwargs["temperature"] == 0.2
+
+
+def test_complete_omlx_passes_extra_body() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("ok")
+        synth = _make_synth(TextBackend.OMLX, suppress_thinking=True)
+        synth.complete([{"role": "user", "content": "q"}])
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert call_kwargs["extra_body"]["think"] is False
+
+
+def test_complete_ollama_no_extra_body() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("ok")
+        synth = _make_synth(TextBackend.OLLAMA)
+        synth.complete([{"role": "user", "content": "q"}])
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert "extra_body" not in call_kwargs
+
+
+# ---------------------------------------------------------------------------
 # synthesize_rag — input validation
 # ---------------------------------------------------------------------------
 

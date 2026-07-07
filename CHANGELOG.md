@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-07-07
+
+### Added
+
+- **`TextSynthesizer.complete(messages, *, model=None, max_tokens=None, temperature=0.7)`** —
+  public general-purpose chat-completion entry point for callers that build their own message
+  list (summarization, classification, arbitrary prompting) instead of using `synthesize_rag`
+  or `rewrite_for_image`. Applies the same oMLX thinking suppression and `<think>` stripping as
+  the other public methods. Promotes the previously private `_complete` to stable public API so
+  downstream KG modules can drive oMLX/Ollama/OpenAI backends without reaching into internals.
+
 ## [0.4.4] - 2026-06-17
 
 ### Added
