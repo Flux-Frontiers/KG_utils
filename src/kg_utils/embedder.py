@@ -40,6 +40,14 @@ from typing import Any
 
 from kg_utils.embed import DEFAULT_MODEL, KNOWN_MODELS, resolve_model_path
 
+#: Default per-call encode batch fed to ``model.encode(batch_size=...)``.
+#: Transformer attention memory scales with ``batch x seq^2``, so a large batch
+#: on long (near-max-sequence) chunks can allocate many GB per call and OOM /
+#: stall MPS.  Throughput is flat above ~128 on both CPU and MPS for the models
+#: in use, so 128 is the safe default; raise it only for a large-VRAM CUDA GPU
+#: with short sequences.
+DEFAULT_ENCODE_BATCH: int = 128
+
 # ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
@@ -53,10 +61,14 @@ class Embedder:
 
     dim: int
 
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+    def embed_texts(
+        self, texts: list[str], encode_batch_size: int = DEFAULT_ENCODE_BATCH
+    ) -> list[list[float]]:
         """Embed a list of strings into float32 vectors.
 
         :param texts: Input strings.
+        :param encode_batch_size: Per-call ``model.encode`` batch (default
+            :data:`DEFAULT_ENCODE_BATCH`); memory scales with ``batch x seq^2``.
         :return: One float32 vector per input.
         """
         raise NotImplementedError
@@ -200,11 +212,15 @@ class SentenceTransformerEmbedder(Embedder):
         )
         self.dim: int = (_dim_fn() if _dim_fn is not None else None) or 384
 
-    def embed_texts(self, texts: list[str], encode_batch_size: int = 512) -> list[list[float]]:
+    def embed_texts(
+        self, texts: list[str], encode_batch_size: int = DEFAULT_ENCODE_BATCH
+    ) -> list[list[float]]:
         """Embed a list of strings into float32 vectors.
 
         :param texts: Input strings.
-        :param encode_batch_size: Passed to ``model.encode()`` — tune down if OOM on MPS.
+        :param encode_batch_size: Per-call ``model.encode`` batch (default
+            :data:`DEFAULT_ENCODE_BATCH`).  Memory scales with ``batch x seq^2``;
+            tune down further if OOM on MPS, up only for large-VRAM CUDA.
         """
         np = importlib.import_module("numpy")
 
@@ -263,10 +279,12 @@ def wrap_embedder(st_model: Any, model_name: str = DEFAULT_MODEL) -> Embedder:
         model_name: str = resolved
         dim: int = _dim
 
-        def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        def embed_texts(
+            self, texts: list[str], encode_batch_size: int = DEFAULT_ENCODE_BATCH
+        ) -> list[list[float]]:
             vecs = st_model.encode(
                 texts,
-                batch_size=512,
+                batch_size=encode_batch_size,
                 normalize_embeddings=True,
                 show_progress_bar=False,
             )
