@@ -1,41 +1,30 @@
-# Release Notes — v0.4.4
+# Release Notes — v0.4.6
 
-> Released: 2026-06-17
+> Released: 2026-07-09
 
-## [0.4.4] - 2026-06-17
+This patch lowers the default embedding batch size so large builds no longer exhaust
+memory on Apple Silicon and CPU. If you build knowledge graphs over corpora with long
+text chunks, this is the difference between a build that completes and one that stalls
+or is killed by the OS.
 
-### Added
+## What changed
 
-- **`load_sentence_transformer(model_name, device=...)`** — explicit device override with
-  precedence: explicit arg > `KG_EMBED_DEVICE` env > CUDA→MPS→CPU auto-detect. The env channel
-  lets spawn-based embedding workers (which inherit `os.environ` but can't easily take a Python
-  arg) be pinned to a device — without it, N parallel workers each auto-select MPS and stack N
-  GPU allocations into an OOM. This is what makes CPU multiprocessing embedding safe on Apple
-  Silicon.
+**Bounded encode memory by default.** The per-call encode batch used inside
+`Embedder.embed_texts`, `SentenceTransformerEmbedder.embed_texts`, and the `wrap_embedder`
+wrapper now defaults to 128 instead of 512, backed by a new module constant
+`DEFAULT_ENCODE_BATCH`. Transformer attention memory scales with `batch × sequence²`, so a
+batch of 512 over near-max-length chunks can allocate many gigabytes per `model.encode`
+call — enough to peak at 25–32 GB on a 528k-node build and stall or OOM the MPS backend.
+Throughput on CPU and MPS is flat above ~128 for the models in use, so the smaller default
+costs nothing in practice. The `wrap_embedder` path previously hardcoded `batch_size=512`
+with no override; it now honors the same knob as everything else.
 
-### Changed
+## Upgrading
 
-- **`embedder.py`** — replaced `from X import Y` lazy imports with `importlib.import_module()`
-  for `sentence_transformers`, `transformers.logging`, `torch`, and `numpy`.  `importlib` returns
-  `Any`, so `ty` no longer flags these optional heavy dependencies as unresolved imports.
-
-- **`synthesis/_image.py`** — same `importlib.import_module()` pattern for the `mflux` loader;
-  removes the old `# type: ignore` override which is no longer needed.
-
-### Fixed
-
-- **CI `type-check` and `test` jobs** — both jobs now install `--extras "semantic" --extras
-  "synthesis"` so that `sentence-transformers`, `transformers`, `torch`, `lancedb`, `httpx`,
-  `openai`, and `pillow` are present in the CI virtualenv, matching local pre-commit behaviour.
-
-- **`tests/test_synthesis_image.py`** — corrected four test assertions that still referenced
-  the old `dall-e-3` default:
-  - expected model updated from `dall-e-3` → `gpt-image-1`
-  - landscape size updated from `1792x1024` → `1536x1024`
-  - portrait size updated from `1024x1792` → `1024x1536`
-  - `test_generate_openai_requests_b64_json` renamed to `test_generate_openai_does_not_set_response_format`
-    and now asserts that `response_format` is absent from the OpenAI call kwargs (gpt-image-1
-    does not accept this parameter)
+Nothing is required — the safer default applies automatically. `embed_texts` now accepts a
+uniform optional `encode_batch_size` parameter across the base class, the concrete
+`SentenceTransformerEmbedder`, and the wrapped embedder. Raise it (e.g. back to 512) only if
+you are running on a large-VRAM CUDA GPU with short sequences and want maximum throughput.
 
 ---
 
