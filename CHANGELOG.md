@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-07-09
+
+### Changed
+
+- **`embedder`: default per-call encode batch lowered 512 → 128.** New module constant `DEFAULT_ENCODE_BATCH = 128` now backs `Embedder.embed_texts`, `SentenceTransformerEmbedder.embed_texts`, and the `wrap_embedder` `_WrappedEmbedder.embed_texts` (which previously **hardcoded** `batch_size=512` with no way to override). Transformer attention memory scales with `batch × seq²`, so a large batch on long (near-max-sequence) chunks allocates many GB per `model.encode` call and OOMs / stalls MPS — observed as a 25–32 GB peak on a 528k-node build in a downstream module. Throughput is flat above ~128 on CPU and MPS for the models in use, so this is free; raise `encode_batch_size` only for a large-VRAM CUDA GPU with short sequences. `embed_texts` now takes a uniform optional `encode_batch_size` parameter across the base class, concrete, and wrapped implementations.
+
 ## [0.4.5] - 2026-07-07
 
 ### Added
