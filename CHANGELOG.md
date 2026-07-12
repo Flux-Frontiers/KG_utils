@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`kg_utils.corpus_embedder.CorpusEmbedder` / `EmbeddingCache`.** Canonical home for the
+  spawn-safe, multi-worker corpus embedding engine that had been independently forked at
+  least three times (doc_kg, memory_kg, diary_kg) — most recently causing a real production
+  incident (a 683k-node consolidated build OOM'd on Apple Silicon; see
+  `gutenberg_kg/SUMMARY.md`, 2026-06-16/17) that had to be root-caused and fixed in doc_kg
+  before the same bug resurfaced, unfixed, in memory_kg's independent copy. Carries forward
+  doc_kg's proven fixes: a GPU→single-process guard (`embed()` never fans out to parallel
+  workers when the resolved device is `mps`/`cuda` — a GPU allocator can't be shared across
+  `spawn` workers, so N workers would stack N allocations into an OOM), shard recycling
+  (`_RECYCLE_SHARD=25_000` + `Pool(maxtasksperchild=1)`, so long-lived workers don't
+  accumulate allocator/heap/GC state across a large run), gzip cache support, and per-batch
+  progress reporting. Downstream modules should import `CorpusEmbedder` from here instead of
+  keeping their own copy.
+- **`kg_utils.embedder.resolve_device(device=None)`.** Public device-resolution helper
+  (explicit arg > `KG_EMBED_DEVICE` env > auto-detect), extracted from the logic
+  `load_sentence_transformer` already had inline since 0.4.4. Exists so callers that need to
+  gate a *decision* (e.g. `CorpusEmbedder`'s parallel-vs-single-process fan-out) on the
+  resolved device can do so without loading a model first. `load_sentence_transformer` now
+  calls this instead of duplicating the precedence logic.
+- `semantic` extra now includes `rich>=13.0.0` (used by `CorpusEmbedder`'s parallel progress
+  bar).
+
 ## [0.4.6] - 2026-07-09
 
 ### Changed
