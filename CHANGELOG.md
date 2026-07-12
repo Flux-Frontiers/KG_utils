@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`kg_utils.corpus_embedder.CorpusEmbedder` / `EmbeddingCache`.** Canonical home for the
+  spawn-safe, multi-worker corpus embedding engine that had been independently forked at
+  least three times (doc_kg, memory_kg, diary_kg) — most recently causing a real production
+  incident (a 683k-node consolidated build OOM'd on Apple Silicon; see
+  `gutenberg_kg/SUMMARY.md`, 2026-06-16/17) that had to be root-caused and fixed in doc_kg
+  before the same bug resurfaced, unfixed, in memory_kg's independent copy. Carries forward
+  doc_kg's proven fixes: a GPU→single-process guard (`embed()` never fans out to parallel
+  workers when the resolved device is `mps`/`cuda` — a GPU allocator can't be shared across
+  `spawn` workers, so N workers would stack N allocations into an OOM), shard recycling
+  (`_RECYCLE_SHARD=25_000` + `Pool(maxtasksperchild=1)`, so long-lived workers don't
+  accumulate allocator/heap/GC state across a large run), gzip cache support, and per-batch
+  progress reporting. Downstream modules should import `CorpusEmbedder` from here instead of
+  keeping their own copy.
+- **`kg_utils.embedder.resolve_device(device=None)`.** Public device-resolution helper
+  (explicit arg > `KG_EMBED_DEVICE` env > auto-detect), extracted from the logic
+  `load_sentence_transformer` already had inline since 0.4.4. Exists so callers that need to
+  gate a *decision* (e.g. `CorpusEmbedder`'s parallel-vs-single-process fan-out) on the
+  resolved device can do so without loading a model first. `load_sentence_transformer` now
+  calls this instead of duplicating the precedence logic.
+- `semantic` extra now includes `rich>=13.0.0` (used by `CorpusEmbedder`'s parallel progress
+  bar).
+
+### Changed
+
+- **`kg_utils.semantic` unified onto `kg_utils.embed`/`kg_utils.embedder` instead of carrying
+  its own copy of the model registry and embedder classes.** `semantic.py` pre-dated
+  `embed.py`/`embedder.py` and had drifted into a fourth independent embedding implementation
+  inside kg_utils itself (after doc_kg, memory_kg, and diary_kg's separate forks of
+  `CorpusEmbedder`) — its own `Embedder` base class, its own `_KNOWN_MODELS`/
+  `resolve_model_path`/`_kg_model_cache_dir`, and a `SentenceTransformerEmbedder` with **no
+  device awareness at all**: no `device` parameter, no `KG_EMBED_DEVICE` support, model
+  construction had no `device=` argument. pycode_kg is the only consumer, and got none of the
+  device-pinning work landed in `kg_utils.embedder`. Now:
+  - `DEFAULT_MODEL` and `resolve_model_path` are re-exported from `kg_utils.embed` (removed
+    the duplicate `_KNOWN_MODELS`/`_kg_model_cache_dir`/local `resolve_model_path`).
+  - `Embedder` and `SentenceTransformerEmbedder` are re-exported from `kg_utils.embedder`
+    (removed the local class definitions). `SemanticIndex` only ever called
+    `embedder.embed_texts(texts)`/`embed_query(query)`/`.dim` — fully compatible with the
+    `kg_utils.embedder` versions (which add an optional `encode_batch_size` kwarg with a
+    default, so no call-site change). Consumers now get `KG_EMBED_DEVICE` support for free.
+  - **Security tightening, not just consolidation:** the old `SentenceTransformerEmbedder`
+    always passed `trust_remote_code=True` to every model load. The unified version gates
+    that on `"nomic-ai/" in model_name` (matching `kg_utils.embedder`'s existing, narrower
+    policy) — arbitrary-code execution from a model repo's custom code is now opt-in per
+    known-safe model family, not unconditional.
+  - `_local_model_path()` — a **private** symbol pycode_kg's `cmd_model.py`/`cmd_init.py`
+    import directly for the `download-model` CLI command — is kept as a thin
+    backward-compat wrapper around `resolve_model_path(model_name, local_fallback=Path.cwd()
+    / ".kgcache" / "models")`, preserving its exact prior resolution (CWD-relative
+    `.kgcache/models`, `KGRAG_MODEL_DIR` override) so pycode_kg's on-disk model cache
+    location doesn't move.
+  - New `tests/test_semantic.py` — this module had **zero** prior test coverage; added
+    re-export identity tests and `_local_model_path` fallback/override coverage.
+
 ## [0.4.6] - 2026-07-09
 
 ### Changed

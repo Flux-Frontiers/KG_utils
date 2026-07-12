@@ -10,7 +10,9 @@ Sub-packages / modules:
     kg_utils.embed      — Embedder protocol, DEFAULT_MODEL, KNOWN_MODELS,
                           kg_model_cache_dir(), resolve_model_path().
     kg_utils.embedder   — Concrete SentenceTransformerEmbedder, get_embedder(),
-                          wrap_embedder(), load_sentence_transformer().
+                          wrap_embedder(), load_sentence_transformer(), resolve_device().
+    kg_utils.corpus_embedder — CorpusEmbedder, EmbeddingCache: multi-process,
+                          device-safe corpus embedding engine.
     kg_utils.synthesis  — Unified text + image synthesis: TextSynthesizer, ImageSynthesizer.
                           Backends: omlx | ollama | openai (text);
                                     mflux-local | mflux-serve | openai (image).
@@ -24,4 +26,4 @@ Optional extras
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
-__version__ = "0.4.6"
+__version__ = "0.4.7"

@@ -15,6 +15,12 @@ SentenceTransformerEmbedder
     model is cached locally — prevents HuggingFace HEAD requests that leave
     stale thread/network state and cause SIGBUS on MPS.
 
+resolve_device(device)
+    Resolve the embedding device: explicit arg > ``KG_EMBED_DEVICE`` env >
+    auto-detect. Public so callers can gate parallelism decisions (e.g.
+    ``kg_utils.corpus_embedder.CorpusEmbedder``'s GPU-can't-fan-out guard) on
+    the resolved device *before* loading a model.
+
 load_sentence_transformer(model_name)
     Raw ``SentenceTransformer`` factory with the canonical safe-load sequence.
     Use when you need the bare model object (e.g. multi-process workers that
@@ -83,6 +89,42 @@ class Embedder:
 
 
 # ---------------------------------------------------------------------------
+# Device resolution
+# ---------------------------------------------------------------------------
+
+
+def resolve_device(device: str | None = None) -> str | None:
+    """Resolve the embedding device: explicit arg > ``KG_EMBED_DEVICE`` env > auto-detect.
+
+    The env channel lets ``spawn``-based embedding workers (which inherit
+    ``os.environ`` but can't easily receive a Python arg) be pinned to e.g.
+    CPU — without it, N parallel workers each auto-select MPS and stack N
+    GPU allocations into an OOM. This is what makes CPU multiprocessing
+    embedding safe on Apple Silicon, and it's why callers that need to gate
+    fan-out decisions (parallel vs. single-process) resolve the device via
+    this function *before* constructing a model.
+
+    :param device: Explicit device override (``"cpu"``/``"mps"``/``"cuda"``),
+        or ``None``.
+    :return: Resolved device string, or ``None`` if torch is unavailable (in
+        which case callers should treat it as "let the loader decide").
+    """
+    sel = (device or os.environ.get("KG_EMBED_DEVICE", "")).strip().lower()
+    if sel:
+        return sel
+    try:
+        torch = importlib.import_module("torch")
+    except ImportError:
+        return None
+    if torch.cuda.is_available():
+        return "cuda"
+    try:
+        return "mps" if torch.backends.mps.is_available() else "cpu"
+    except AttributeError:
+        return "cpu"
+
+
+# ---------------------------------------------------------------------------
 # Canonical model loader
 # ---------------------------------------------------------------------------
 
@@ -127,24 +169,9 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL, device: str | Non
 
     os.environ["TQDM_DISABLE"] = "1"
 
-    torch = importlib.import_module("torch")
-
-    # Device precedence: explicit arg > KG_EMBED_DEVICE env > auto-detect.
-    # The env var lets spawn-based embedding workers (which inherit os.environ
-    # but can't easily receive a Python arg) pin to e.g. CPU — without it each
-    # worker auto-selects MPS and N parallel workers stack N GPU allocations →
-    # MPS OOM. The override is why CPU multiprocessing embedding is safe on
-    # Apple Silicon.
-    sel = (device or os.environ.get("KG_EMBED_DEVICE", "")).strip().lower()
-    if sel:
-        device = sel
-    elif torch.cuda.is_available():
-        device = "cuda"
-    else:
-        try:
-            device = "mps" if torch.backends.mps.is_available() else "cpu"
-        except AttributeError:
-            device = "cpu"
+    # torch is a hard requirement of this function (SentenceTransformer needs
+    # it below); resolve_device()'s own ImportError guard never fires here.
+    device = resolve_device(device) or "cpu"
 
     resolved = KNOWN_MODELS.get(model_name, model_name)
     trust_remote = "nomic-ai/" in resolved
