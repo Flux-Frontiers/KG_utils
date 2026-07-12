@@ -123,6 +123,26 @@ def _embed_shard(args: tuple) -> tuple[int, list[list[float]]]:
     return worker_id, [np.asarray(v, dtype="float32").tolist() for v in all_vecs]
 
 
+class _InlineProgress:
+    """In-process stand-in for the multiprocessing progress queue.
+
+    Lets :func:`_embed_shard` report per-batch progress when it runs in the
+    main process (sequential/GPU path) — same ``put`` protocol, no queue.
+
+    :param progress: Live ``rich.progress.Progress`` instance.
+    :param task_id: Task to advance.
+    """
+
+    def __init__(self, progress, task_id) -> None:
+        self._progress = progress
+        self._task_id = task_id
+
+    def put(self, item: int | None) -> None:
+        """Advance the bar by *item* texts; ignore the end-of-shard sentinel."""
+        if item is not None:
+            self._progress.advance(self._task_id, item)
+
+
 # ============================================================================
 # Embedding cache
 # ============================================================================
@@ -167,7 +187,11 @@ class CorpusEmbedder:
     """Multi-process corpus embedding engine.
 
     :param model_name: HuggingFace model name.
-    :param n_workers: Number of parallel workers (default: CPU count / 2).
+    :param n_workers: Number of parallel workers (default: ``min(4, cpu_count // 2)``).
+        Each CPU worker loads its own full model copy plus a torch runtime
+        (~1.2 GB for bge-small, more for mpnet-class models), so raise this
+        past 4 only when memory allows — throughput is I/O + accumulator
+        bound well before then.
     :param batch_size: Per-worker batch size.
     :param device: Embedding device (``"cpu"``/``"mps"``/``"cuda"``).  ``None``
         resolves via ``KG_EMBED_DEVICE`` then auto-detect.  A GPU device forces
@@ -185,7 +209,7 @@ class CorpusEmbedder:
     ) -> None:
         """Configure the embedding engine; workers are spawned lazily during :meth:`embed`."""
         self.model_name = model_name
-        self.n_workers = n_workers or max(1, (os.cpu_count() or 2) // 2)
+        self.n_workers = n_workers or min(4, max(1, (os.cpu_count() or 2) // 2))
         self.batch_size = batch_size
         self.device = resolve_device(device)
 
@@ -250,7 +274,38 @@ class CorpusEmbedder:
 
     def _embed_sequential(self, texts: list[str]) -> list[list[float]]:
         """Embed in the main process (small inputs, single worker, or GPU device)."""
-        _, vectors = _embed_shard((texts, self.model_name, self.batch_size, 0, None, self.device))
+        from rich.progress import (  # pylint: disable=import-outside-toplevel
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+            TimeRemainingColumn,
+        )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+        ) as progress:
+            task = progress.add_task(
+                f"  Embedding (single process, {self.device or 'auto'})",
+                total=len(texts),
+            )
+            _, vectors = _embed_shard(
+                (
+                    texts,
+                    self.model_name,
+                    self.batch_size,
+                    0,
+                    _InlineProgress(progress, task),
+                    self.device,
+                )
+            )
         return vectors
 
     def _embed_parallel(self, texts: list[str]) -> list[list[float]]:
