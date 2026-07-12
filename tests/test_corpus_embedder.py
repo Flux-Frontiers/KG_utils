@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from kg_utils.corpus_embedder import CorpusEmbedder, EmbeddingCache, _embed_shard
+from kg_utils.corpus_embedder import CorpusEmbedder, EmbeddingCache, _embed_shard, _InlineProgress
 from kg_utils.embedder import resolve_device
 
 # ---------------------------------------------------------------------------
@@ -167,6 +167,55 @@ def test_corpus_embedder_device_defaults_to_resolved_value(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Default n_workers is capped, not unbounded cpu_count // 2 — each CPU worker
+# loads a full model copy, so high-core-count machines risk OOM otherwise.
+# ---------------------------------------------------------------------------
+
+
+def test_default_n_workers_capped_at_four_on_high_core_machines(monkeypatch):
+    monkeypatch.setattr("kg_utils.corpus_embedder.os.cpu_count", lambda: 20)
+    embedder = CorpusEmbedder()
+    assert embedder.n_workers == 4
+
+
+def test_default_n_workers_below_cap_on_low_core_machines(monkeypatch):
+    monkeypatch.setattr("kg_utils.corpus_embedder.os.cpu_count", lambda: 4)
+    embedder = CorpusEmbedder()
+    assert embedder.n_workers == 2
+
+
+def test_default_n_workers_floors_at_one(monkeypatch):
+    monkeypatch.setattr("kg_utils.corpus_embedder.os.cpu_count", lambda: None)
+    embedder = CorpusEmbedder()
+    assert embedder.n_workers == 1
+
+
+def test_explicit_n_workers_not_capped(monkeypatch):
+    monkeypatch.setattr("kg_utils.corpus_embedder.os.cpu_count", lambda: 20)
+    embedder = CorpusEmbedder(n_workers=8)
+    assert embedder.n_workers == 8
+
+
+# ---------------------------------------------------------------------------
+# _InlineProgress — put() protocol adapter used by the sequential/GPU path
+# ---------------------------------------------------------------------------
+
+
+def test_inline_progress_put_advances_the_bar():
+    progress = MagicMock()
+    adapter = _InlineProgress(progress, task_id="task-1")
+    adapter.put(5)
+    progress.advance.assert_called_once_with("task-1", 5)
+
+
+def test_inline_progress_put_none_sentinel_is_noop():
+    progress = MagicMock()
+    adapter = _InlineProgress(progress, task_id="task-1")
+    adapter.put(None)
+    progress.advance.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # GPU devices force single-process embedding (the OOM-prevention guard)
 # ---------------------------------------------------------------------------
 
@@ -289,3 +338,24 @@ def test_embed_shard_reports_progress(tmp_path):
     # 3 batches of size <= 2 (2, 2, 1) plus a trailing None sentinel.
     assert queue.put.call_count == 4
     assert queue.put.call_args_list[-1].args == (None,)
+
+
+@pytest.mark.integration
+def test_embed_sequential_wires_inline_progress_and_returns_vectors(tmp_path):
+    """_embed_sequential (the single-process/GPU path) shows a live progress
+    bar via _InlineProgress instead of running silently — same _embed_shard,
+    just handed an in-process adapter instead of None."""
+    texts = ["a", "b", "c"]
+    embedder = CorpusEmbedder(model_name="BAAI/bge-small-en-v1.5", device="cpu")
+    fake_st = _make_fake_st()
+    fake_st.encode.side_effect = lambda batch, **kw: np.zeros((len(batch), 4), dtype="float32")
+    missing = tmp_path / "nonexistent"
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=missing),
+        patch("sentence_transformers.SentenceTransformer", return_value=fake_st),
+    ):
+        vectors = embedder._embed_sequential(texts)
+
+    assert len(vectors) == 3
+    assert len(vectors[0]) == 4
