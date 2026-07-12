@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Removed
+
+### Fixed
+
+## [0.4.8] - 2026-07-12
+
+### Changed
+
 - **`kg_utils.corpus_embedder.CorpusEmbedder` default `n_workers` capped at `min(4, cpu_count // 2)`**,
   down from an unbounded `cpu_count // 2`. Each CPU worker loads its own full model copy plus a torch
   runtime (~1.2 GB for bge-small, more for mpnet-class models); on a 20-core machine the old default
@@ -22,10 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `_InlineProgress` adapter that speaks `_embed_shard`'s existing progress-queue `put()` protocol —
   previously this path (small corpora, or any `mps`/`cuda` run, which always forces single-process)
   embedded silently with no feedback. Same source as the worker-count fix above.
-
-### Removed
-
-### Fixed
 
 ## [0.4.7] - 2026-07-11
 

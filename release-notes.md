@@ -1,45 +1,33 @@
-# Release Notes — v0.4.7
+# Release Notes — v0.4.8
 
-> Released: 2026-07-11
+> Released: 2026-07-12
 
-This release ends the era of forked embedding engines: the spawn-safe, multi-worker corpus
-embedder that doc_kg, memory_kg, and diary_kg each carried as an independent copy now lives
-in kg_utils as `CorpusEmbedder`, with every hard-won production fix included. Downstream
-modules should delete their local copies and import from here.
+A focused follow-up to 0.4.7's `CorpusEmbedder` centralization: this release tames the
+default memory footprint of parallel CPU embedding and gives the single-process path the
+progress feedback it was missing. Both fixes were ported from doc_kg's `feat/embedderworker`
+branch — landing them here means every consumer of the shared implementation gets them at
+once, which is exactly why the engine was centralized.
 
 ## What changed
 
-**Centralized corpus embedding engine.** The new `kg_utils.corpus_embedder` module provides
-`CorpusEmbedder` and `EmbeddingCache` as the canonical implementation of parallel corpus
-embedding. It carries forward the fixes proven in doc_kg after the June 683k-node OOM
-incident: a GPU→single-process guard (never fan out to spawn workers when the resolved
-device is MPS or CUDA), shard recycling so long-lived workers don't accumulate allocator
-state, gzip cache support, and per-batch progress reporting. The same bug had already
-resurfaced unfixed in a sibling module's copy — with one shared implementation, a fix lands
-once.
+**Default worker count capped at 4.** `CorpusEmbedder` previously defaulted to
+`cpu_count // 2` workers, unbounded. Each CPU worker loads its own full model copy plus a
+torch runtime (~1.2 GB for bge-small, more for larger models), so on a 20-core machine the
+old default spawned 10 workers and peaked around 21.5 GB RSS on a real 241-book corpus
+build — well past the point where throughput stops improving, since large runs are I/O and
+accumulator bound long before that. The default is now `min(4, cpu_count // 2)`; passing an
+explicit `n_workers` behaves exactly as before.
 
-**Public device resolution.** `kg_utils.embedder.resolve_device()` exposes the device
-precedence logic (explicit argument > `KG_EMBED_DEVICE` > auto-detect) that
-`load_sentence_transformer` has used internally since 0.4.4, so callers can gate decisions
-on the resolved device — such as `CorpusEmbedder`'s parallel-vs-single-process choice —
-without loading a model first.
-
-**`kg_utils.semantic` unified onto the shared embedder stack.** `semantic.py` had drifted
-into a fourth independent embedding implementation, with no device awareness at all. Its
-model registry and embedder classes are now re-exports from `kg_utils.embed` and
-`kg_utils.embedder`, giving its consumers (pycode_kg) `KG_EMBED_DEVICE` support for free.
-This also tightens security: `trust_remote_code=True` is no longer passed unconditionally
-to every model load — it is gated to the known-safe `nomic-ai/` model family. The private
-`_local_model_path` helper that pycode_kg imports directly is preserved as a
-backward-compatible wrapper, so its on-disk model cache location doesn't move.
+**Progress bar on the single-process path.** Small corpora — and every `mps`/`cuda` run,
+which always forces single-process — previously embedded silently. A new internal adapter
+lets the sequential path drive the same per-batch progress reporting the parallel workers
+use, so GPU runs now show live feedback instead of appearing hung.
 
 ## Upgrading
 
-No breaking changes. `pip install --upgrade kgmodule-utils` (the `semantic` extra now pulls
-in `rich`, used by the parallel progress bar). Modules maintaining their own `CorpusEmbedder`
-fork should migrate to `from kg_utils.corpus_embedder import CorpusEmbedder` and delete the
-local copy. If you relied on `semantic.SentenceTransformerEmbedder` loading arbitrary models
-with `trust_remote_code=True`, that now only applies to `nomic-ai/` models.
+Nothing required. `pip install --upgrade kgmodule-utils`. If you were relying on the old
+unbounded worker default for maximum parallelism on a many-core machine, pass
+`n_workers` explicitly — the cap only applies to the default.
 
 ---
 
