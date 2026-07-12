@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.4.7] - 2026-07-11
+
+### Added
+
 - **`kg_utils.corpus_embedder.CorpusEmbedder` / `EmbeddingCache`.** Canonical home for the
   spawn-safe, multi-worker corpus embedding engine that had been independently forked at
   least three times (doc_kg, memory_kg, diary_kg) — most recently causing a real production

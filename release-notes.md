@@ -1,30 +1,45 @@
-# Release Notes — v0.4.6
+# Release Notes — v0.4.7
 
-> Released: 2026-07-09
+> Released: 2026-07-11
 
-This patch lowers the default embedding batch size so large builds no longer exhaust
-memory on Apple Silicon and CPU. If you build knowledge graphs over corpora with long
-text chunks, this is the difference between a build that completes and one that stalls
-or is killed by the OS.
+This release ends the era of forked embedding engines: the spawn-safe, multi-worker corpus
+embedder that doc_kg, memory_kg, and diary_kg each carried as an independent copy now lives
+in kg_utils as `CorpusEmbedder`, with every hard-won production fix included. Downstream
+modules should delete their local copies and import from here.
 
 ## What changed
 
-**Bounded encode memory by default.** The per-call encode batch used inside
-`Embedder.embed_texts`, `SentenceTransformerEmbedder.embed_texts`, and the `wrap_embedder`
-wrapper now defaults to 128 instead of 512, backed by a new module constant
-`DEFAULT_ENCODE_BATCH`. Transformer attention memory scales with `batch × sequence²`, so a
-batch of 512 over near-max-length chunks can allocate many gigabytes per `model.encode`
-call — enough to peak at 25–32 GB on a 528k-node build and stall or OOM the MPS backend.
-Throughput on CPU and MPS is flat above ~128 for the models in use, so the smaller default
-costs nothing in practice. The `wrap_embedder` path previously hardcoded `batch_size=512`
-with no override; it now honors the same knob as everything else.
+**Centralized corpus embedding engine.** The new `kg_utils.corpus_embedder` module provides
+`CorpusEmbedder` and `EmbeddingCache` as the canonical implementation of parallel corpus
+embedding. It carries forward the fixes proven in doc_kg after the June 683k-node OOM
+incident: a GPU→single-process guard (never fan out to spawn workers when the resolved
+device is MPS or CUDA), shard recycling so long-lived workers don't accumulate allocator
+state, gzip cache support, and per-batch progress reporting. The same bug had already
+resurfaced unfixed in a sibling module's copy — with one shared implementation, a fix lands
+once.
+
+**Public device resolution.** `kg_utils.embedder.resolve_device()` exposes the device
+precedence logic (explicit argument > `KG_EMBED_DEVICE` > auto-detect) that
+`load_sentence_transformer` has used internally since 0.4.4, so callers can gate decisions
+on the resolved device — such as `CorpusEmbedder`'s parallel-vs-single-process choice —
+without loading a model first.
+
+**`kg_utils.semantic` unified onto the shared embedder stack.** `semantic.py` had drifted
+into a fourth independent embedding implementation, with no device awareness at all. Its
+model registry and embedder classes are now re-exports from `kg_utils.embed` and
+`kg_utils.embedder`, giving its consumers (pycode_kg) `KG_EMBED_DEVICE` support for free.
+This also tightens security: `trust_remote_code=True` is no longer passed unconditionally
+to every model load — it is gated to the known-safe `nomic-ai/` model family. The private
+`_local_model_path` helper that pycode_kg imports directly is preserved as a
+backward-compatible wrapper, so its on-disk model cache location doesn't move.
 
 ## Upgrading
 
-Nothing is required — the safer default applies automatically. `embed_texts` now accepts a
-uniform optional `encode_batch_size` parameter across the base class, the concrete
-`SentenceTransformerEmbedder`, and the wrapped embedder. Raise it (e.g. back to 512) only if
-you are running on a large-VRAM CUDA GPU with short sequences and want maximum throughput.
+No breaking changes. `pip install --upgrade kgmodule-utils` (the `semantic` extra now pulls
+in `rich`, used by the parallel progress bar). Modules maintaining their own `CorpusEmbedder`
+fork should migrate to `from kg_utils.corpus_embedder import CorpusEmbedder` and delete the
+local copy. If you relied on `semantic.SentenceTransformerEmbedder` loading arbitrary models
+with `trust_remote_code=True`, that now only applies to `nomic-ai/` models.
 
 ---
 
