@@ -31,6 +31,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `semantic` extra now includes `rich>=13.0.0` (used by `CorpusEmbedder`'s parallel progress
   bar).
 
+### Changed
+
+- **`kg_utils.semantic` unified onto `kg_utils.embed`/`kg_utils.embedder` instead of carrying
+  its own copy of the model registry and embedder classes.** `semantic.py` pre-dated
+  `embed.py`/`embedder.py` and had drifted into a fourth independent embedding implementation
+  inside kg_utils itself (after doc_kg, memory_kg, and diary_kg's separate forks of
+  `CorpusEmbedder`) — its own `Embedder` base class, its own `_KNOWN_MODELS`/
+  `resolve_model_path`/`_kg_model_cache_dir`, and a `SentenceTransformerEmbedder` with **no
+  device awareness at all**: no `device` parameter, no `KG_EMBED_DEVICE` support, model
+  construction had no `device=` argument. pycode_kg is the only consumer, and got none of the
+  device-pinning work landed in `kg_utils.embedder`. Now:
+  - `DEFAULT_MODEL` and `resolve_model_path` are re-exported from `kg_utils.embed` (removed
+    the duplicate `_KNOWN_MODELS`/`_kg_model_cache_dir`/local `resolve_model_path`).
+  - `Embedder` and `SentenceTransformerEmbedder` are re-exported from `kg_utils.embedder`
+    (removed the local class definitions). `SemanticIndex` only ever called
+    `embedder.embed_texts(texts)`/`embed_query(query)`/`.dim` — fully compatible with the
+    `kg_utils.embedder` versions (which add an optional `encode_batch_size` kwarg with a
+    default, so no call-site change). Consumers now get `KG_EMBED_DEVICE` support for free.
+  - **Security tightening, not just consolidation:** the old `SentenceTransformerEmbedder`
+    always passed `trust_remote_code=True` to every model load. The unified version gates
+    that on `"nomic-ai/" in model_name` (matching `kg_utils.embedder`'s existing, narrower
+    policy) — arbitrary-code execution from a model repo's custom code is now opt-in per
+    known-safe model family, not unconditional.
+  - `_local_model_path()` — a **private** symbol pycode_kg's `cmd_model.py`/`cmd_init.py`
+    import directly for the `download-model` CLI command — is kept as a thin
+    backward-compat wrapper around `resolve_model_path(model_name, local_fallback=Path.cwd()
+    / ".kgcache" / "models")`, preserving its exact prior resolution (CWD-relative
+    `.kgcache/models`, `KGRAG_MODEL_DIR` override) so pycode_kg's on-disk model cache
+    location doesn't move.
+  - New `tests/test_semantic.py` — this module had **zero** prior test coverage; added
+    re-export identity tests and `_local_model_path` fallback/override coverage.
+
 ## [0.4.6] - 2026-07-09
 
 ### Changed
