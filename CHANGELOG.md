@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.4.9] - 2026-07-13
+
+### Added
+
 - **`CorpusEmbedder.embed_to_cache(texts, metadata, *, out_path)` — stream shard vectors to
   disk, bounding peak memory by shard size instead of corpus size.** `embed()` holds every
   completed shard's vectors in the parent as nested Python float lists (~5–6× the raw float32
@@ -27,12 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bit-identical to `embed()` in a 2-worker spawn smoke test). Part files are cleaned up on
   failure. `embed()` is unchanged for callers that want an in-memory `EmbeddingCache`.
   Supersedes gutenberg_kg's per-genre build workaround once wired in downstream.
-
-### Changed
-
-### Removed
-
-### Fixed
 
 ## [0.4.8] - 2026-07-12
 
