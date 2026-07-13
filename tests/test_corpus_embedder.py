@@ -4,13 +4,21 @@
 
 from __future__ import annotations
 
+import gzip
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-from kg_utils.corpus_embedder import CorpusEmbedder, EmbeddingCache, _embed_shard, _InlineProgress
+from kg_utils.corpus_embedder import (
+    CorpusEmbedder,
+    EmbeddingCache,
+    _embed_shard,
+    _embed_shard_to_file,
+    _InlineProgress,
+)
 from kg_utils.embedder import resolve_device
 
 # ---------------------------------------------------------------------------
@@ -359,3 +367,247 @@ def test_embed_sequential_wires_inline_progress_and_returns_vectors(tmp_path):
 
     assert len(vectors) == 3
     assert len(vectors[0]) == 4
+
+
+# ---------------------------------------------------------------------------
+# embed_to_cache — streaming JSONL cache (bounded peak memory)
+# ---------------------------------------------------------------------------
+
+
+def _make_indexed_st():
+    """Fake SentenceTransformer whose vectors encode each text's trailing index,
+    so tests can assert id↔vector alignment survives sharding and merge."""
+    fake = _make_fake_st()
+    fake.encode.side_effect = lambda batch, **kw: np.array(
+        [[float(t.rsplit(" ", 1)[-1])] * 4 for t in batch], dtype="float32"
+    )
+    return fake
+
+
+def _write_empty_and_return_dim(_texts, _rows, out_path):
+    """Routing-test stand-in for _stream_*: touch out_path, report dim 4."""
+    out_path.write_text("")
+    return 4
+
+
+def test_embed_to_cache_forces_sequential_on_gpu(tmp_path):
+    """The GPU fan-out guard applies to the streaming path too."""
+    embedder = CorpusEmbedder(n_workers=4, device="mps")
+    texts = [f"text {i}" for i in range(200)]
+    out = tmp_path / "cache.jsonl"
+
+    with (
+        patch.object(
+            embedder, "_stream_sequential", side_effect=_write_empty_and_return_dim
+        ) as seq,
+        patch.object(embedder, "_stream_parallel") as par,
+    ):
+        result = embedder.embed_to_cache(texts, out_path=out)
+
+    seq.assert_called_once()
+    par.assert_not_called()
+    assert result == out
+
+
+def test_embed_to_cache_uses_parallel_on_cpu_with_enough_texts(tmp_path):
+    embedder = CorpusEmbedder(n_workers=4, device="cpu")
+    texts = [f"text {i}" for i in range(200)]
+    out = tmp_path / "cache.jsonl"
+
+    with (
+        patch.object(embedder, "_stream_sequential") as seq,
+        patch.object(embedder, "_stream_parallel", side_effect=_write_empty_and_return_dim) as par,
+    ):
+        embedder.embed_to_cache(texts, out_path=out)
+
+    par.assert_called_once()
+    seq.assert_not_called()
+
+
+def test_embed_to_cache_empty_texts_writes_header_only(tmp_path):
+    embedder = CorpusEmbedder(n_workers=1, device="cpu")
+    out = embedder.embed_to_cache([], out_path=tmp_path / "cache.jsonl")
+
+    lines = out.read_text().splitlines()
+    assert len(lines) == 1
+    meta = json.loads(lines[0])["__meta__"]
+    assert meta["dim"] == 0
+    assert meta["n_vectors"] == 0
+
+
+def test_finalize_cache_merges_parts_in_order_and_deletes_them(tmp_path):
+    """Parts are concatenated in shard order (= original input order) and
+    removed as consumed — a silent reorder would corrupt id↔vector alignment."""
+    embedder = CorpusEmbedder(n_workers=1, device="cpu")
+    parts = []
+    for i in range(3):
+        p = tmp_path / f"cache.jsonl.part-{i:05d}"
+        p.write_text(f'{{"id":"{i}"}}\n')
+        parts.append(p)
+    out = tmp_path / "cache.jsonl"
+
+    embedder._finalize_cache(out, parts, dim=4, n_vectors=3)
+
+    lines = out.read_text().splitlines()
+    meta = json.loads(lines[0])["__meta__"]
+    assert meta["version"] == 1
+    assert meta["dim"] == 4
+    assert [json.loads(line)["id"] for line in lines[1:]] == ["0", "1", "2"]
+    assert not any(p.exists() for p in parts)
+
+
+def test_stream_sequential_cleans_up_part_on_failure(tmp_path):
+    embedder = CorpusEmbedder(n_workers=1, device="cpu")
+
+    def boom(args):
+        Path(args[7]).write_text("partial\n")
+        raise RuntimeError("boom")
+
+    with (
+        patch("kg_utils.corpus_embedder._embed_shard_to_file", side_effect=boom),
+        pytest.raises(RuntimeError),
+    ):
+        embedder._stream_sequential(["a"], [{"id": "0"}], tmp_path / "cache.jsonl")
+
+    assert not list(tmp_path.glob("*.part-*"))
+
+
+def test_stream_parallel_falls_back_to_sequential_on_pool_failure(tmp_path):
+    embedder = CorpusEmbedder(n_workers=2, device="cpu")
+    texts = [f"t {i}" for i in range(4)]
+    rows = [{"id": str(i)} for i in range(4)]
+
+    with (
+        patch(
+            "kg_utils.corpus_embedder.multiprocessing.Manager",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch.object(embedder, "_stream_sequential", return_value=4) as seq,
+    ):
+        dim = embedder._stream_parallel(texts, rows, tmp_path / "cache.jsonl")
+
+    assert dim == 4
+    seq.assert_called_once()
+
+
+@pytest.mark.integration
+def test_embed_shard_to_file_streams_rows_and_returns_path(tmp_path):
+    """The streaming worker writes header-less JSONL rows in input order and
+    returns the part path (not the vectors)."""
+    texts = ["text 0", "text 1", "text 2"]
+    rows = [{"id": f"node:{i}", "kind": "chunk", "name": f"n{i}"} for i in range(3)]
+    part = tmp_path / "cache.jsonl.part-00000"
+    fake_st = _make_indexed_st()
+    missing = tmp_path / "nonexistent"
+    queue = MagicMock()
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=missing),
+        patch("sentence_transformers.SentenceTransformer", return_value=fake_st),
+    ):
+        worker_id, path, dim = _embed_shard_to_file(
+            (texts, rows, "BAAI/bge-small-en-v1.5", 2, 3, queue, "cpu", str(part))
+        )
+
+    assert (worker_id, path, dim) == (3, str(part), 4)
+    parsed = [json.loads(line) for line in part.read_text().splitlines()]
+    assert len(parsed) == 3  # rows only — the parent writes the header
+    assert [r["id"] for r in parsed] == ["node:0", "node:1", "node:2"]
+    assert [r["vector"][0] for r in parsed] == [0.0, 1.0, 2.0]
+    assert parsed[0]["text"] == "text 0"
+    # per-batch progress counts plus the end-of-shard sentinel
+    assert queue.put.call_args_list[-1].args == (None,)
+
+
+@pytest.mark.integration
+def test_embed_shard_to_file_nomic_prefix_only_for_encoding(tmp_path):
+    """Nomic's task prefix is applied to the encoded text but rows keep the original."""
+    seen: list[str] = []
+    fake_st = _make_fake_st()
+
+    def encode(batch, **kw):
+        seen.extend(batch)
+        return np.zeros((len(batch), 4), dtype="float32")
+
+    fake_st.encode.side_effect = encode
+    part = tmp_path / "cache.jsonl.part-00000"
+    missing = tmp_path / "nonexistent"
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=missing),
+        patch("sentence_transformers.SentenceTransformer", return_value=fake_st),
+    ):
+        _embed_shard_to_file(
+            (["hello"], [{"id": "0"}], "nomic-ai/nomic-embed-text-v1", 8, 0, None, "cpu", str(part))
+        )
+
+    assert seen == ["search_document: hello"]
+    assert json.loads(part.read_text().splitlines()[0])["text"] == "hello"
+
+
+@pytest.mark.integration
+def test_embed_to_cache_sequential_end_to_end(tmp_path):
+    """Known sequence in → same sequence out: header, canonical row fields,
+    extra metadata keys preserved, no leftover part files."""
+    texts = [f"text {i}" for i in range(5)]
+    metadata = [{"id": f"node:{i}", "kind": "chunk", "extra": i} for i in range(5)]
+    embedder = CorpusEmbedder(model_name="BAAI/bge-small-en-v1.5", n_workers=1, device="cpu")
+    fake_st = _make_indexed_st()
+    missing = tmp_path / "nonexistent"
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=missing),
+        patch("sentence_transformers.SentenceTransformer", return_value=fake_st),
+    ):
+        out = embedder.embed_to_cache(texts, metadata, out_path=tmp_path / "cache.jsonl")
+
+    lines = out.read_text().splitlines()
+    meta = json.loads(lines[0])["__meta__"]
+    assert meta["version"] == 1
+    assert meta["model"] == "BAAI/bge-small-en-v1.5"
+    assert meta["dim"] == 4
+    assert meta["n_vectors"] == 5
+
+    rows_out = [json.loads(line) for line in lines[1:]]
+    assert [r["id"] for r in rows_out] == [f"node:{i}" for i in range(5)]
+    assert [r["vector"][0] for r in rows_out] == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert rows_out[0]["title"] == ""
+    assert rows_out[0]["file_path"] == ""
+    assert rows_out[2]["extra"] == 2
+    assert not list(tmp_path.glob("*.part-*"))
+
+
+@pytest.mark.integration
+def test_embed_to_cache_default_ids_are_input_indices(tmp_path):
+    texts = [f"text {i}" for i in range(3)]
+    embedder = CorpusEmbedder(model_name="BAAI/bge-small-en-v1.5", n_workers=1, device="cpu")
+    fake_st = _make_indexed_st()
+    missing = tmp_path / "nonexistent"
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=missing),
+        patch("sentence_transformers.SentenceTransformer", return_value=fake_st),
+    ):
+        out = embedder.embed_to_cache(texts, out_path=tmp_path / "cache.jsonl")
+
+    rows_out = [json.loads(line) for line in out.read_text().splitlines()[1:]]
+    assert [r["id"] for r in rows_out] == ["0", "1", "2"]
+
+
+@pytest.mark.integration
+def test_embed_to_cache_gzip_output(tmp_path):
+    texts = [f"text {i}" for i in range(4)]
+    embedder = CorpusEmbedder(model_name="BAAI/bge-small-en-v1.5", n_workers=1, device="cpu")
+    fake_st = _make_indexed_st()
+    missing = tmp_path / "nonexistent"
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=missing),
+        patch("sentence_transformers.SentenceTransformer", return_value=fake_st),
+    ):
+        out = embedder.embed_to_cache(texts, out_path=tmp_path / "cache.jsonl.gz")
+
+    with gzip.open(out, "rt", encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    assert json.loads(lines[0])["__meta__"]["dim"] == 4
+    assert [json.loads(line)["vector"][0] for line in lines[1:]] == [0.0, 1.0, 2.0, 3.0]
