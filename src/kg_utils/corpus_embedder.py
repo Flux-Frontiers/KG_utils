@@ -33,6 +33,10 @@ Usage::
     cache = embedder.embed(texts, metadata)
     CorpusEmbedder.save_cache(cache, Path("embeddings.json"))
 
+    # Large corpora: stream vectors to disk instead of holding them in RAM —
+    # peak memory is bounded by shard size, not corpus size.
+    embedder.embed_to_cache(texts, metadata, out_path=Path("embeddings.jsonl"))
+
 Author: Eric G. Suchanek, PhD
 License: Elastic 2.0
 """
@@ -44,6 +48,7 @@ import json
 import logging
 import multiprocessing
 import os
+import shutil
 import threading
 import time
 from dataclasses import dataclass, field
@@ -121,6 +126,68 @@ def _embed_shard(args: tuple) -> tuple[int, list[list[float]]]:
         progress_queue.put(None)  # sentinel: shard complete
 
     return worker_id, [np.asarray(v, dtype="float32").tolist() for v in all_vecs]
+
+
+def _embed_shard_to_file(args: tuple) -> tuple[int, str, int]:
+    """Worker function: embed a shard, streaming rows to a JSONL part file.
+
+    Streaming variant of :func:`_embed_shard` backing
+    :meth:`CorpusEmbedder.embed_to_cache`. Each batch's rows are written to
+    *part_path* as they are produced and only the file *path* travels back to
+    the parent — never the vectors — so worker RAM is bounded by one batch and
+    parent RAM by one I/O buffer, regardless of corpus size.
+
+    :param args: Tuple of ``(texts, rows, model_name, batch_size, worker_id,
+        progress_queue, device, part_path)``. *rows* are per-text metadata
+        dicts (``id``/``kind``/``name``/``title``/``file_path`` …) aligned
+        with *texts*; the worker adds ``text`` and ``vector`` to each and
+        writes one JSON line per text (no header — the parent writes that).
+        Remaining fields behave as in :func:`_embed_shard`.
+    :return: ``(worker_id, part_path, dim)`` so callers can reassemble parts
+        in order without ever holding vectors.
+    """
+    texts, rows, model_name, batch_size, worker_id, progress_queue, device, part_path = args
+
+    # Suppress noisy logging in workers
+    logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+    logging.getLogger("transformers").setLevel(logging.WARNING)
+
+    model = load_sentence_transformer(model_name)
+    if device:
+        model = model.to(device)
+
+    # Nomic v1 requires a task prefix for asymmetric retrieval mode. The
+    # prefix affects encoding only — rows keep the original text.
+    encode_texts = texts
+    if "nomic-ai/" in model_name:
+        encode_texts = [f"search_document: {t}" for t in texts]
+
+    dim = 0
+    with open(part_path, "w", encoding="utf-8") as f:
+        for i in range(0, len(encode_texts), batch_size):
+            vecs = model.encode(
+                encode_texts[i : i + batch_size],
+                convert_to_numpy=True,
+                show_progress_bar=False,
+                normalize_embeddings=True,
+            )
+            vecs = np.asarray(vecs, dtype="float32")
+            dim = int(vecs.shape[1])
+            # Only one row's float list exists at a time (transient, ~KB) —
+            # the 5–6× nested-list blowup came from holding the whole corpus
+            # that way, which streaming eliminates.
+            for text, row, vec in zip(
+                texts[i : i + batch_size], rows[i : i + batch_size], vecs, strict=True
+            ):
+                out_row = {**row, "text": text, "vector": vec.tolist()}
+                f.write(json.dumps(out_row, ensure_ascii=False, separators=(",", ":")) + "\n")
+            if progress_queue is not None:
+                progress_queue.put(len(vecs))
+
+    if progress_queue is not None:
+        progress_queue.put(None)  # sentinel: shard complete
+
+    return worker_id, str(part_path), dim
 
 
 class _InlineProgress:
@@ -272,6 +339,82 @@ class CorpusEmbedder:
             metadata=metadata,
         )
 
+    def embed_to_cache(
+        self,
+        texts: list[str],
+        metadata: list[dict] | None = None,
+        *,
+        out_path: Path,
+        sample_n: int | None = None,
+    ) -> Path:
+        """Embed texts, streaming the results to a JSONL cache on disk.
+
+        Streaming counterpart to :meth:`embed` for corpora too large to hold
+        in RAM: completed shards go to per-shard part files and are merged in
+        input order, so peak memory is bounded by *shard* size rather than
+        corpus size (``embed()`` holds every vector until the run finishes —
+        for a ~689k-node corpus that climbed past 10 GB RSS and into swap).
+
+        The output is the JSONL cache format doc_kg's ``build_from_cache``
+        already reads: a ``__meta__`` header line, then one row per text —
+        ``id, kind, name, title, file_path, text, vector`` (plus any extra
+        metadata keys) — in the original input order.
+
+        :param texts: Texts to embed.
+        :param metadata: Optional per-text metadata (aligned with texts).
+            ``id``/``kind``/``name``/``title``/``file_path`` keys populate the
+            canonical row fields; ``id`` defaults to the text's input index.
+        :param out_path: Output path. A ``.gz`` suffix writes gzip-compressed.
+        :param sample_n: If set, evenly sample N texts before embedding.
+        :return: *out_path*.
+        """
+        if metadata is None:
+            metadata = [{} for _ in texts]
+
+        # Temporal sampling if requested
+        if sample_n and sample_n < len(texts):
+            indices = [round(i * (len(texts) - 1) / (sample_n - 1)) for i in range(sample_n)]
+            indices = sorted(set(indices))
+            texts = [texts[i] for i in indices]
+            metadata = [metadata[i] for i in indices]
+
+        rows: list[dict] = []
+        for i, meta in enumerate(metadata):
+            row = dict(meta)
+            row.setdefault("id", str(i))
+            for key in ("kind", "name", "title", "file_path"):
+                row.setdefault(key, "")
+            rows.append(row)
+
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not texts:
+            self._finalize_cache(out_path, [], dim=0, n_vectors=0)
+            return out_path
+
+        t0 = time.monotonic()
+
+        # Same fan-out guard as embed(): GPU devices never fan out.
+        on_gpu = (self.device or "") in {"mps", "cuda"}
+        if len(texts) < 50 or self.n_workers <= 1 or on_gpu:
+            dim = self._stream_sequential(texts, rows, out_path)
+        else:
+            dim = self._stream_parallel(texts, rows, out_path)
+
+        elapsed = time.monotonic() - t0
+        size_mb = out_path.stat().st_size / 1_048_576
+        logger.info(
+            "Embedded %d texts (%d-dim) to %s (%.0f MB) in %.1fs with %d workers",
+            len(texts),
+            dim,
+            out_path,
+            size_mb,
+            elapsed,
+            self.n_workers,
+        )
+        return out_path
+
     def _embed_sequential(self, texts: list[str]) -> list[list[float]]:
         """Embed in the main process (small inputs, single worker, or GPU device)."""
         from rich.progress import (  # pylint: disable=import-outside-toplevel
@@ -397,6 +540,195 @@ class CorpusEmbedder:
         for i in range(n_shards):
             all_vectors.extend(results[i])
         return all_vectors
+
+    def _stream_sequential(self, texts: list[str], rows: list[dict], out_path: Path) -> int:
+        """Embed in the main process, streaming rows through a single part file.
+
+        :return: Embedding dimension.
+        """
+        from rich.progress import (  # pylint: disable=import-outside-toplevel
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+            TimeRemainingColumn,
+        )
+
+        part = self._part_path(out_path, 0)
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+            ) as progress:
+                task = progress.add_task(
+                    f"  Embedding (single process, {self.device or 'auto'})",
+                    total=len(texts),
+                )
+                _, _, dim = _embed_shard_to_file(
+                    (
+                        texts,
+                        rows,
+                        self.model_name,
+                        self.batch_size,
+                        0,
+                        _InlineProgress(progress, task),
+                        self.device,
+                        str(part),
+                    )
+                )
+            self._finalize_cache(out_path, [part], dim=dim, n_vectors=len(texts))
+        finally:
+            part.unlink(missing_ok=True)
+        return dim
+
+    def _stream_parallel(self, texts: list[str], rows: list[dict], out_path: Path) -> int:
+        """Embed using the multiprocessing pool, streaming each shard to its own part file.
+
+        Workers return part *paths*, not vectors, so the parent never holds more
+        than one I/O buffer of vector data; parts are merged in shard order (=
+        original input order) by :meth:`_finalize_cache`.
+
+        :return: Embedding dimension.
+        """
+        from rich.progress import (  # pylint: disable=import-outside-toplevel
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+            TimeRemainingColumn,
+        )
+
+        # Same sharding/recycling cadence as _embed_parallel (see there).
+        per_worker = (len(texts) + self.n_workers - 1) // self.n_workers
+        shard_size = max(self.batch_size, min(_RECYCLE_SHARD, per_worker))
+        starts = list(range(0, len(texts), shard_size))
+        n_shards = len(starts)
+        # Parts land next to out_path (same filesystem → cheap concat).
+        part_paths = [self._part_path(out_path, i) for i in range(n_shards)]
+
+        # Use spawn to avoid fork-unsafe tokenizer/CUDA issues
+        ctx = multiprocessing.get_context("spawn")
+        results: dict[int, str] = {}
+        dim = 0
+        stop_event = threading.Event()
+
+        try:
+            try:
+                # Manager.Queue() is a proxy — picklable across spawn boundary
+                with multiprocessing.Manager() as manager:
+                    progress_queue = manager.Queue()
+                    shards = [
+                        (
+                            texts[start : start + shard_size],
+                            rows[start : start + shard_size],
+                            self.model_name,
+                            self.batch_size,
+                            i,
+                            progress_queue,
+                            self.device,
+                            str(part_paths[i]),
+                        )
+                        for i, start in enumerate(starts)
+                    ]
+
+                    # maxtasksperchild=1 → a fresh worker per shard (see _embed_parallel).
+                    with (
+                        ctx.Pool(processes=self.n_workers, maxtasksperchild=1) as pool,
+                        Progress(
+                            SpinnerColumn(),
+                            TextColumn("[progress.description]{task.description}"),
+                            BarColumn(),
+                            MofNCompleteColumn(),
+                            TimeElapsedColumn(),
+                            TimeRemainingColumn(),
+                        ) as progress,
+                    ):
+                        task = progress.add_task(
+                            f"  Embedding → {out_path.name} "
+                            f"({self.n_workers} workers, {n_shards} recycled shards)",
+                            total=len(texts),
+                        )
+
+                        def _drain() -> None:
+                            """Consume per-batch counts from the queue, advance the bar."""
+                            done = 0
+                            while done < n_shards and not stop_event.is_set():
+                                try:
+                                    item = progress_queue.get(timeout=0.05)
+                                except Exception:  # queue.Empty or OS error
+                                    continue
+                                if item is None:
+                                    done += 1
+                                else:
+                                    progress.advance(task, item)
+
+                        drain_thread = threading.Thread(target=_drain, daemon=True)
+                        drain_thread.start()
+
+                        for worker_id, part, shard_dim in pool.imap_unordered(
+                            _embed_shard_to_file, shards
+                        ):
+                            results[worker_id] = part
+                            dim = dim or shard_dim
+
+                        drain_thread.join(timeout=5.0)
+
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                stop_event.set()
+                logger.warning("Multiprocessing failed (%s), falling back to sequential", exc)
+                return self._stream_sequential(texts, rows, out_path)
+            finally:
+                stop_event.set()
+
+            self._finalize_cache(
+                out_path,
+                [Path(results[i]) for i in range(n_shards)],
+                dim=dim,
+                n_vectors=len(texts),
+            )
+            return dim
+        finally:
+            for p in part_paths:
+                p.unlink(missing_ok=True)
+
+    @staticmethod
+    def _part_path(out_path: Path, shard_id: int) -> Path:
+        """Return the temp part-file path for *shard_id*, next to *out_path*."""
+        return out_path.with_name(f"{out_path.name}.part-{shard_id:05d}")
+
+    def _finalize_cache(
+        self, out_path: Path, parts: list[Path], *, dim: int, n_vectors: int
+    ) -> None:
+        """Write the ``__meta__`` header, then concatenate *parts* in shard order.
+
+        Parts are plain-text JSONL fragments already in original input order;
+        each is deleted as soon as it has been copied, so parent RAM stays at
+        one I/O buffer and extra disk peaks at roughly one corpus copy.
+        """
+        header = {
+            "__meta__": {
+                "version": 1,
+                "model": self.model_name,
+                "dim": dim,
+                "n_vectors": n_vectors,
+                "created_at": datetime.now(tz=UTC).isoformat(),
+            }
+        }
+        open_fn = gzip.open if out_path.suffix == ".gz" else open
+        with open_fn(out_path, "wt", encoding="utf-8") as out:
+            out.write(json.dumps(header, ensure_ascii=False, separators=(",", ":")) + "\n")
+            for part in parts:
+                with open(part, encoding="utf-8") as f:
+                    shutil.copyfileobj(f, out, 1_048_576)
+                part.unlink()
 
     @staticmethod
     def save_cache(cache: EmbeddingCache, path: Path) -> None:

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`CorpusEmbedder.embed_to_cache(texts, metadata, *, out_path)` — stream shard vectors to
+  disk, bounding peak memory by shard size instead of corpus size.** `embed()` holds every
+  completed shard's vectors in the parent as nested Python float lists (~5–6× the raw float32
+  bytes) until the whole run finishes, so peak RAM scales with total corpus size — on the
+  688,852-node Gutenberg consolidated build the parent climbed past 10 GB RSS, drove the
+  machine to 45 GB of swap, and per-row embed time rose ~14× mid-run. The new streaming mode
+  has each worker write its shard directly to a JSONL part file next to *out_path* (batch by
+  batch — worker RAM is bounded by one batch) and return the *path*, not the vectors; the
+  parent then concatenates parts in shard order (preserving exact input order, which the
+  id↔vector alignment of `build_from_cache` relies on) behind a `__meta__` header line. The
+  output is drop-in for doc_kg's `build_from_cache`/`_build_from_jsonl_cache` JSONL format
+  (`id, kind, name, title, file_path, text, vector` per row; `.gz` suffix writes gzip).
+  Preserves all load-bearing behavior: the GPU→single-process guard, `maxtasksperchild=1` +
+  `_RECYCLE_SHARD` worker recycling, sequential fallback on pool failure, and identical
+  embedding results (same model, normalization, and nomic task-prefixing — verified
+  bit-identical to `embed()` in a 2-worker spawn smoke test). Part files are cleaned up on
+  failure. `embed()` is unchanged for callers that want an in-memory `EmbeddingCache`.
+  Supersedes gutenberg_kg's per-genre build workaround once wired in downstream.
+
 ### Changed
 
 ### Removed
