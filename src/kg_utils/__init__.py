@@ -26,4 +26,4 @@ Optional extras
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
-__version__ = "0.4.8"
+__version__ = "0.4.9"
