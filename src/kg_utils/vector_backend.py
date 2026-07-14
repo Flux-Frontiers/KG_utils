@@ -400,10 +400,11 @@ class SqliteVecBackend:
     # -- lifecycle ------------------------------------------------------
 
     def _connect(self) -> Any:
+        import importlib  # pylint: disable=import-outside-toplevel
         import sqlite3  # pylint: disable=import-outside-toplevel
 
         try:
-            import sqlite_vec  # pylint: disable=import-outside-toplevel
+            sqlite_vec = importlib.import_module("sqlite_vec")
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
                 "SqliteVecBackend requires sqlite-vec: pip install 'kgmodule-utils[sqlite-vec]'"
