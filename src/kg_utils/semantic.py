@@ -33,16 +33,22 @@ from typing import TYPE_CHECKING, Any
 
 from kg_utils.embed import DEFAULT_MODEL, resolve_model_path
 from kg_utils.embedder import Embedder, SentenceTransformerEmbedder
+from kg_utils.vector_backend import LanceDBBackend, SqliteVecBackend, VectorBackend
 
 __all__ = [
     "DEFAULT_MODEL",
     "Embedder",
+    "LanceDBBackend",
     "SeedHit",
     "SemanticIndex",
     "SentenceTransformerEmbedder",
+    "SqliteVecBackend",
+    "VectorBackend",
     "resolve_model_path",
     "suppress_ingestion_logging",
 ]
+
+_META_COLUMNS = ("kind", "name", "qualname", "module_path")
 
 if TYPE_CHECKING:
     from kg_utils.store import GraphStore
@@ -125,10 +131,14 @@ class SemanticIndex:
     stores the vectors in LanceDB.  The index is derived and disposable — it
     can be rebuilt from SQLite at any time without data loss.
 
-    :param lancedb_dir: Directory for the LanceDB database.
+    :param lancedb_dir: Directory for the LanceDB database (used only when the
+        default LanceDB backend is constructed; ignored if *backend* is given).
     :param embedder: Embedding backend. Defaults to :class:`SentenceTransformerEmbedder`.
     :param table: LanceDB table name.
     :param index_kinds: Node kinds to embed.
+    :param backend: Vector store backend. Defaults to a :class:`LanceDBBackend`
+        over *lancedb_dir* — pass a :class:`SqliteVecBackend` to store vectors in
+        ``sqlite-vec`` instead.
     """
 
     def __init__(
@@ -138,12 +148,13 @@ class SemanticIndex:
         embedder: Embedder | None = None,
         table: str = _DEFAULT_TABLE,
         index_kinds: Sequence[str] = _DEFAULT_KINDS,
+        backend: VectorBackend | None = None,
     ) -> None:
         self.lancedb_dir = Path(lancedb_dir)
         self.embedder: Embedder = embedder or SentenceTransformerEmbedder()
         self.table_name = table
         self.index_kinds = tuple(index_kinds)
-        self._tbl = None
+        self._backend: VectorBackend | None = backend
 
     # ------------------------------------------------------------------
     # Build
@@ -169,18 +180,14 @@ class SemanticIndex:
             suppress_ingestion_logging()
 
         nodes = self._read_nodes(store)
-        tbl = self._open_table(wipe=wipe)
+        backend = self._get_backend()
+        backend.open(wipe=wipe)
 
         indexed = 0
         for i in range(0, len(nodes), batch_size):
             chunk = nodes[i : i + batch_size]
             texts = [_build_index_text(n) for n in chunk]
             vecs = self.embedder.embed_texts(texts)
-
-            ids = [n["id"] for n in chunk]
-            if ids:
-                pred = " OR ".join([f"id = '{_escape(nid)}'" for nid in ids])
-                tbl.delete(pred)
 
             rows = [
                 {
@@ -194,10 +201,12 @@ class SemanticIndex:
                 }
                 for n, text, vec in zip(chunk, texts, vecs)
             ]
-            tbl.add(rows)
-            indexed += len(rows)
+            indexed += backend.upsert(rows, batch_size=len(rows))
 
-        self._tbl = tbl
+        # No-op unless the backend is a LanceDBBackend with ANN enabled.
+        if isinstance(backend, LanceDBBackend):
+            backend.maybe_create_ann_index(quiet=quiet)
+
         return {
             "indexed_rows": indexed,
             "dim": self.embedder.dim,
@@ -210,16 +219,19 @@ class SemanticIndex:
     # Search
     # ------------------------------------------------------------------
 
-    def search(self, query: str, k: int = 8) -> list[SeedHit]:
+    def search(self, query: str, k: int = 8, *, where: str | None = None) -> list[SeedHit]:
         """Semantic vector search.
 
         :param query: Natural-language query string.
         :param k: Number of results to return.
+        :param where: Optional SQL predicate over the metadata columns, applied
+            as a true prefilter (the ``k`` nearest are drawn from the matching
+            subset). Unifies this signature with doc_kg's ``SemanticIndex``.
         :return: List of :class:`SeedHit` ordered by ascending distance.
         """
-        tbl = self._get_table()
+        backend = self._get_backend()
         qvec = self.embedder.embed_query(query)
-        raw = tbl.search(qvec).limit(k).to_list()
+        raw = backend.search(qvec, k, where=where)
 
         hits: list[SeedHit] = []
         for rank, row in enumerate(raw):
@@ -244,47 +256,20 @@ class SemanticIndex:
     def _read_nodes(self, store: GraphStore) -> list[dict[str, Any]]:
         return store.query_nodes(kinds=list(self.index_kinds))
 
-    def _open_table(self, *, wipe: bool = False) -> Any:
-        import lancedb  # pylint: disable=import-outside-toplevel
-        import numpy as np  # pylint: disable=import-outside-toplevel
+    def _get_backend(self) -> VectorBackend:
+        """Return the vector backend, constructing the default LanceDB one lazily.
 
-        self.lancedb_dir.mkdir(parents=True, exist_ok=True)
-        db = lancedb.connect(str(self.lancedb_dir))
-
-        if self.table_name in db.list_tables().tables:
-            if wipe:
-                db.drop_table(self.table_name)
-            else:
-                try:
-                    return db.open_table(self.table_name)
-                except Exception as exc:  # noqa: BLE001
-                    logging.getLogger(__name__).warning(
-                        "LanceDB table %r appears corrupt (%s); dropping and recreating.",
-                        self.table_name,
-                        exc,
-                    )
-                    db.drop_table(self.table_name)
-
-        dummy = {
-            "id": "__dummy__",
-            "kind": "dummy",
-            "name": "__dummy__",
-            "qualname": "",
-            "module_path": "",
-            "text": "__dummy__",
-            "vector": np.zeros((self.embedder.dim,), dtype="float32").tolist(),
-        }
-        tbl = db.create_table(self.table_name, data=[dummy])
-        tbl.delete("id = '__dummy__'")
-        return tbl
-
-    def _get_table(self) -> Any:
-        if self._tbl is None:
-            import lancedb  # pylint: disable=import-outside-toplevel
-
-            db = lancedb.connect(str(self.lancedb_dir))
-            self._tbl = db.open_table(self.table_name)
-        return self._tbl
+        Deferred so the embedder's ``dim`` (which may load the model) is only
+        touched when the index is actually built or searched.
+        """
+        if self._backend is None:
+            self._backend = LanceDBBackend(
+                self.lancedb_dir,
+                table=self.table_name,
+                dim=self.embedder.dim,
+                meta_columns=_META_COLUMNS,
+            )
+        return self._backend
 
     def __repr__(self) -> str:
         return (

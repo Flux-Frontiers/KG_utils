@@ -15,6 +15,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.5.0] - 2026-07-14
+
+### Added
+
+- **`kg_utils.vector_backend` — a pluggable `VectorBackend` storage seam under
+  `SemanticIndex`.** Two implementations ship: `LanceDBBackend` (the historical
+  default; dummy-row table bootstrap, `delete`-then-`add` upsert with the
+  fresh-table fast path, optional IVF ANN gated on row count) and
+  `SqliteVecBackend` (exact brute-force `sqlite-vec`/`vec0` store with a
+  `vec_meta` + `vec_nodes` twin-table layout, row-aligned by `rowid`, so a SQL
+  `where` compiles to a true prefilter). Neither backend hardcodes domain
+  columns — the owning index declares its `meta_columns`. The sqlite store is
+  9–11× smaller than LanceDB and exact (recall 1.0) at comparable latency.
+- **`SqliteVecBackend` supports fp32 and int8** (`dtype=`), the latter wrapping
+  blobs with `vec_int8()` on both insert and match (a raw blob is silently
+  parsed as float32).
+- `sqlite-vec` optional extra: `pip install 'kgmodule-utils[sqlite-vec]'`
+  (pinned `==0.1.9`, pre-1.0).
+
+### Changed
+
+- **`SemanticIndex.__init__` gains a `backend=` parameter** (defaults to a
+  lazily-constructed `LanceDBBackend`, so existing callers are unaffected).
+  The LanceDB table plumbing (`_open_table`/`_get_table`) moved into
+  `LanceDBBackend`.
+- **`SemanticIndex.search()` gains a `where: str | None` prefilter parameter**,
+  unifying its signature with doc_kg's heavier `SemanticIndex`.
+
 ## [0.4.9] - 2026-07-13
 
 ### Added
