@@ -1,41 +1,40 @@
-# Release Notes — v0.4.9
+# Release Notes — v0.6.0
 
-> Released: 2026-07-13
+> Released: 2026-07-15
 
-This release closes out the corpus-embedding memory saga: `CorpusEmbedder` can now stream
-vectors to disk as shards complete, so peak memory is bounded by shard size instead of
-corpus size. The 689k-node Gutenberg consolidated build — which previously drove the parent
-process past 10 GB RSS and the machine into 45 GB of swap before being killed — can run
-single-pass on CPU again, retiring the per-genre build workaround.
+This release finishes wiring the pluggable vector store introduced in 0.5.0 into the part of
+the SDK every domain module actually uses. In 0.5.0 the `VectorBackend` seam existed on
+`SemanticIndex`, but only doc_kg's heavier subclass could reach it — the fleet-wide
+`KGModule` base still hardcoded LanceDB. Now any KG module can choose its vector store with a
+single constructor argument, and the exact `sqlite-vec` backend becomes a first-class option
+across the fleet without a line of plumbing per package.
 
 ## What changed
 
-**Streaming embed-to-cache.** The new `embed_to_cache(texts, metadata, *, out_path)` method
-is the streaming counterpart to `embed()`. In parallel mode, each spawn worker writes its
-shard's rows batch-by-batch to a temp part file next to the output and returns the file
-path — never the vectors — and the parent merges parts in shard order behind a `__meta__`
-header once the pool drains. Output order exactly matches input order, and part files are
-cleaned up on failure. The single-process path (small inputs, or any GPU run) streams
-through the same worker with the usual progress bar.
+**Backend selection on `KGModule`.** The base class gains a `vector_backend` setting that
+threads straight through to the `SemanticIndex` it builds. Pass `"lancedb"` (the default —
+existing consumers are untouched), `"sqlite-vec"` for the exact, disk-light store, or
+`"auto"` to let the module decide: sqlite-vec for a fresh knowledge graph, and lancedb only
+when an un-migrated LanceDB store already exists on disk, so established corpora keep working
+without a migration. sqlite-vec vectors live in a `vectors.sqlite` sidecar beside the
+LanceDB directory.
 
-**Drop-in cache format.** The output is the JSONL cache format doc_kg's `build_from_cache`
-already reads — one row per text with `id, kind, name, title, file_path, text, vector`,
-extra metadata keys preserved, gzip via a `.gz` suffix — so downstream index-from-cache
-paths consume it without changes.
+**Introspection without loading a model.** `KGModule.stats()` now reports the resolved
+`vector_backend` name. Resolution is purely path-based — it inspects what is on disk and
+never loads the embedding model — so it is cheap to call anywhere.
 
-**Everything load-bearing is preserved.** The GPU→single-process guard, worker recycling
-(`maxtasksperchild=1` + shard cadence), sequential fallback on pool failure, and the
-embedding results themselves are unchanged — a 2-worker spawn smoke test confirmed vectors
-bit-identical to the in-memory `embed()` path. `embed()` itself is untouched for callers
-that want an in-memory `EmbeddingCache`.
+**Reusable selection helpers.** The new `resolve_backend_name()` and `make_backend()`
+factories in `kg_utils.vector_backend` back the selection logic and are usable on their own,
+outside the pipeline. `kg_utils.semantic.META_COLUMNS` is now a public alias for domain
+packages that construct backends directly.
 
 ## Upgrading
 
-Nothing required; `embed()` behaves exactly as before. To take advantage of bounded memory
-on large corpora, switch full-corpus builds to
-`embedder.embed_to_cache(texts, metadata, out_path=Path("embeddings.jsonl"))` and feed the
-resulting file to your existing index-from-cache path. Downstream wiring for gutenberg_kg's
-`build-corpus` and doc_kg's `precompute_embeddings` lands separately.
+Nothing required. The default backend stays `lancedb` and existing behavior is unchanged. To
+adopt the exact store, add the optional dependency (`pip install 'kgmodule-utils[sqlite-vec]'`)
+and construct your module with `vector_backend="sqlite-vec"` (or `"auto"` once your package
+declares the extra). A knowledge graph built under one backend is not read by the other —
+rebuild when you switch.
 
 ---
 
