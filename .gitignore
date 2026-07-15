@@ -224,3 +224,6 @@ commit.txt
 
 # Claude Code project memory and settings
 .claude/
+
+# macOS
+.DS_Store

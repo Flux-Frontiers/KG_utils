@@ -42,6 +42,7 @@ from typing import Any, cast
 
 from kg_utils.semantic import (
     DEFAULT_MODEL,
+    META_COLUMNS,
     Embedder,
     SemanticIndex,
     SentenceTransformerEmbedder,
@@ -50,6 +51,7 @@ from kg_utils.semantic import (
 from kg_utils.store import DEFAULT_RELS, GraphStore
 from kg_utils.extractor import KGExtractor
 from kg_utils.specs import BuildStats, EdgeSpec, NodeSpec, QueryResult, SnippetPack
+from kg_utils.vector_backend import VectorBackend, make_backend, resolve_backend_name
 
 
 # ---------------------------------------------------------------------------
@@ -303,6 +305,15 @@ class KGModule(ABC):
     :param lancedb_dir: LanceDB directory (defaults to ``.<kind>kg/lancedb``).
     :param model: Sentence-transformer model name for embedding.
     :param table: LanceDB table name.
+    :param vector_backend: ``"lancedb"`` (default), ``"sqlite-vec"``, or ``"auto"``.
+        The fleet-wide default stays ``lancedb`` so existing consumers of this
+        base class are unaffected unless they opt in. ``"sqlite-vec"`` is exact
+        (recall 1.0) and stores vectors in a ``vectors.sqlite`` sidecar next to
+        ``lancedb_dir``; it requires the ``sqlite-vec`` optional dependency
+        (``pip install 'kgmodule-utils[sqlite-vec]'``). ``"auto"`` picks
+        ``sqlite-vec`` for a fresh KG and ``lancedb`` only when an un-migrated
+        LanceDB store already exists on disk — pass it explicitly once your
+        domain package declares the ``sqlite-vec`` extra.
     """
 
     #: Override in subclass to change the default artefact directory name.
@@ -316,13 +327,16 @@ class KGModule(ABC):
         *,
         model: str = DEFAULT_MODEL,
         table: str = "kg_nodes",
+        vector_backend: str = "lancedb",
     ) -> None:
         self.repo_root = Path(repo_root).resolve()
         _dir = self.repo_root / self._default_dir
         self.db_path = Path(db_path) if db_path is not None else _dir / "graph.sqlite"
         self.lancedb_dir = Path(lancedb_dir) if lancedb_dir is not None else _dir / "lancedb"
+        self.vectors_path = _dir / "vectors.sqlite"
         self.model_name = model
         self.table_name = table
+        self.vector_backend = vector_backend
 
         self._store: GraphStore | None = None
         self._index: SemanticIndex | None = None
@@ -376,16 +390,47 @@ class KGModule(ABC):
 
     @property
     def index(self) -> SemanticIndex:
-        """LanceDB semantic index (lazy-initialised)."""
+        """Semantic vector index (lazy-initialised) over the resolved backend."""
         if self._index is None:
             extractor = self.make_extractor()
+            backend = self._make_vector_backend()
             self._index = SemanticIndex(
                 self.lancedb_dir,
                 embedder=self.embedder,
                 table=self.table_name,
                 index_kinds=extractor.meaningful_node_kinds(),
+                backend=backend,
             )
         return self._index
+
+    def _make_vector_backend(self) -> VectorBackend:
+        """Resolve :attr:`vector_backend` and construct the concrete backend.
+
+        Deferred so ``self.embedder.dim`` (which may load the model) is only
+        touched when the index is actually built or searched.
+        """
+        resolved = resolve_backend_name(
+            self.vector_backend,
+            lancedb_dir=self.lancedb_dir,
+            sqlite_path=self.vectors_path,
+        )
+        return make_backend(
+            resolved,
+            lancedb_dir=self.lancedb_dir,
+            sqlite_path=self.vectors_path,
+            table=self.table_name,
+            dim=self.embedder.dim,
+            meta_columns=self.index_meta_columns(),
+        )
+
+    def index_meta_columns(self) -> tuple[str, ...]:
+        """Metadata columns persisted alongside each vector.
+
+        Override in a subclass whose extractor emits differently-shaped nodes.
+
+        :return: Column names (default: the code-KG shape).
+        """
+        return META_COLUMNS
 
     # ------------------------------------------------------------------
     # Build
@@ -810,11 +855,21 @@ class KGModule(ABC):
         return self.store.callers_of(node_id, rel=rel)
 
     def stats(self) -> dict[str, Any]:
-        """Return store statistics (node/edge counts by kind/relation).
+        """Return store statistics plus the resolved vector backend name.
 
-        :return: Dictionary from :meth:`~kg_utils.store.GraphStore.stats`.
+        Resolving the backend name only inspects paths on disk — it never
+        loads the embedding model.
+
+        :return: Dictionary from :meth:`~kg_utils.store.GraphStore.stats`,
+            plus a ``vector_backend`` key (``"lancedb"`` or ``"sqlite-vec"``).
         """
-        return self.store.stats()
+        s = self.store.stats()
+        s["vector_backend"] = resolve_backend_name(
+            self.vector_backend,
+            lancedb_dir=self.lancedb_dir,
+            sqlite_path=self.vectors_path,
+        )
+        return s
 
     def node(self, node_id: str) -> dict[str, Any] | None:
         """Fetch a single node by ID from the store.

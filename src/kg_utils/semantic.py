@@ -39,6 +39,7 @@ __all__ = [
     "DEFAULT_MODEL",
     "Embedder",
     "LanceDBBackend",
+    "META_COLUMNS",
     "SeedHit",
     "SemanticIndex",
     "SentenceTransformerEmbedder",
@@ -48,7 +49,9 @@ __all__ = [
     "suppress_ingestion_logging",
 ]
 
-_META_COLUMNS = ("kind", "name", "qualname", "module_path")
+#: Metadata columns persisted alongside each vector for code-shaped KGs.
+META_COLUMNS = ("kind", "name", "qualname", "module_path")
+_META_COLUMNS = META_COLUMNS
 
 if TYPE_CHECKING:
     from kg_utils.store import GraphStore
