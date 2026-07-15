@@ -4,6 +4,7 @@
 [![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21364005.svg)](https://doi.org/10.5281/zenodo.21364005)
 
 # kgmodule-utils
 
@@ -282,9 +283,11 @@ poetry run pytest
 
 If you use kgmodule-utils in research or a project, please cite it:
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21364005.svg)](https://doi.org/10.5281/zenodo.21364005)
+
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.5.0) [Software]. Flux-Frontiers. https://github.com/Flux-Frontiers/KG_utils
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.5.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21364005
 
 **BibTeX**
 
@@ -296,6 +299,7 @@ If you use kgmodule-utils in research or a project, please cite it:
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},
+  doi       = {10.5281/zenodo.21364005},
 }
 ```
 
