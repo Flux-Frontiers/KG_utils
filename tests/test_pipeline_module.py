@@ -312,3 +312,27 @@ def test_lazy_embedder_created_on_access(corpus: Path) -> None:
     assert kg._embedder is None
     _ = kg.embedder
     assert kg._embedder is not None
+
+
+# ---------------------------------------------------------------------------
+# vector_backend selection
+# ---------------------------------------------------------------------------
+
+
+class TestVectorBackendSelection:
+    def test_default_is_lancedb(self, corpus: Path) -> None:
+        kg = _TextKG(corpus)
+        assert kg.vector_backend == "lancedb"
+
+    def test_stats_reports_resolved_backend(self, kg: _TextKG) -> None:
+        assert kg.stats()["vector_backend"] == "lancedb"
+
+    def test_sqlite_vec_backend_builds_and_searches(self, corpus: Path) -> None:
+        sqlite_vec = pytest.importorskip("sqlite_vec")
+        del sqlite_vec
+        kg = _TextKG(corpus, vector_backend="sqlite-vec")
+        kg.build(wipe=True)
+        assert kg.stats()["vector_backend"] == "sqlite-vec"
+        assert kg.vectors_path.exists()
+        result = kg.query("vector embeddings")
+        assert result.seeds > 0

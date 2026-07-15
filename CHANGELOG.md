@@ -15,6 +15,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.6.0] - 2026-07-15
+
+### Added
+
+- **`KGModule.vector_backend`** — the fleet-wide `kg_utils.pipeline.KGModule`
+  base class now threads backend selection through to the `SemanticIndex` it
+  builds, closing the gap left by 0.5.0's `VectorBackend` seam (which only
+  reached doc_kg's heavier subclass). Accepts `"lancedb"` (default, unchanged
+  behavior for existing consumers), `"sqlite-vec"`, or `"auto"` (picks
+  sqlite-vec for a fresh KG, lancedb only when an un-migrated LanceDB store
+  already exists on disk). `KGModule.stats()` now reports the resolved
+  `vector_backend` name (path-based; never loads the embedding model).
+  New `kg_utils.vector_backend.resolve_backend_name()` / `make_backend()`
+  factory helpers back the selection and are reusable outside the pipeline.
+- `kg_utils.semantic.META_COLUMNS` — public alias for the code-KG metadata
+  column tuple, for domain packages that construct backends directly.
+
+### Changed
+
+### Removed
+
+### Fixed
+
 ## [0.5.0] - 2026-07-14
 
 ### Added

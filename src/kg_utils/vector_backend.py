@@ -581,3 +581,62 @@ class SqliteVecBackend:
 
 def _escape(s: str) -> str:
     return s.replace("'", "''")
+
+
+# ---------------------------------------------------------------------------
+# Backend selection
+# ---------------------------------------------------------------------------
+
+
+def resolve_backend_name(
+    requested: str,
+    *,
+    lancedb_dir: str | Path,
+    sqlite_path: str | Path,
+) -> str:
+    """Resolve a ``vector_backend`` setting of ``"auto"`` to a concrete name.
+
+    ``"auto"`` picks ``sqlite-vec`` for a fresh KG (neither store exists yet)
+    or one already converted, and ``lancedb`` only when an un-migrated LanceDB
+    store is already on disk — so existing corpora keep working untouched.
+    ``"lancedb"`` and ``"sqlite-vec"`` pass through unchanged.
+
+    :param requested: ``"auto"``, ``"lancedb"``, or ``"sqlite-vec"``.
+    :param lancedb_dir: Directory a LanceDB store would live in.
+    :param sqlite_path: Path a sqlite-vec sidecar store would live at.
+    :return: ``"lancedb"`` or ``"sqlite-vec"``.
+    """
+    if requested != "auto":
+        return requested
+    if Path(sqlite_path).exists():
+        return "sqlite-vec"
+    if Path(lancedb_dir).exists() and any(Path(lancedb_dir).iterdir()):
+        return "lancedb"
+    return "sqlite-vec"
+
+
+def make_backend(
+    name: str,
+    *,
+    lancedb_dir: str | Path,
+    sqlite_path: str | Path,
+    table: str,
+    dim: int,
+    meta_columns: Sequence[str],
+) -> VectorBackend:
+    """Construct the concrete :class:`VectorBackend` for a resolved backend name.
+
+    :param name: ``"lancedb"`` or ``"sqlite-vec"`` (see :func:`resolve_backend_name`).
+    :param lancedb_dir: Directory for the LanceDB store.
+    :param sqlite_path: Path for the sqlite-vec sidecar store.
+    :param table: LanceDB table name (ignored for sqlite-vec).
+    :param dim: Embedding dimensionality.
+    :param meta_columns: Metadata columns the owning index declares.
+    :return: A :class:`LanceDBBackend` or :class:`SqliteVecBackend`.
+    :raises ValueError: If *name* is not one of the two known backends.
+    """
+    if name == "sqlite-vec":
+        return SqliteVecBackend(sqlite_path, dim=dim, meta_columns=meta_columns)
+    if name == "lancedb":
+        return LanceDBBackend(lancedb_dir, table=table, dim=dim, meta_columns=meta_columns)
+    raise ValueError(f"Unknown vector backend {name!r}; expected 'lancedb' or 'sqlite-vec'")
