@@ -1,27 +1,25 @@
-# Release Notes — v0.6.1
+# Release Notes — v0.6.2
 
 > Released: 2026-07-15
 
-A point fix for the sqlite-vec backend introduced in 0.6.0: the vector store's sidecar path
-was computed from the wrong base, so any caller that passed an explicit `lancedb_dir` — which
-is every pycodekg CLI command — wrote the store to one place and looked for it in another.
-Building then querying such a knowledge graph failed with `unable to open database file`.
-If you shipped a sqlite-vec integration on 0.6.0, upgrade to 0.6.1.
+A packaging fix that unbreaks installation for downstream consumers. Through 0.6.1 the type
+checker `ty` had leaked into kgmodule-utils' **runtime** dependencies as its only hard entry,
+so every `pip install kgmodule-utils` dragged in `ty` under a tight `>=0.0.44,<0.0.45` pin —
+enough to break dependency resolution in any project that pins `ty` differently. If a
+downstream install started failing to resolve after adopting 0.6.x, this is the fix.
 
 ## What changed
 
-**Sidecar path follows the LanceDB directory.** `KGModule.vectors_path` now derives from
-`lancedb_dir.parent` (`<kg-dir>/vectors.sqlite`) instead of `repo_root/<_default_dir>`. An
-explicit `lancedb_dir` — common when a CLI passes a placeholder `repo_root` — now relocates
-the sqlite-vec store with it, matching doc_kg's `sqlite_vectors_path()` convention. The
-default-path case is unchanged. Regression tests cover explicit-path construction and the
-build-then-fresh-instance query flow that exposed the bug.
+**`ty` removed from runtime dependencies.** The package's `[project].dependencies` list held
+exactly one entry — `ty` — which never belonged there: every genuine runtime dependency lives
+in an optional extra (`semantic`, `synthesis`, `sqlite-vec`, …). Installing the package now
+pulls in nothing mandatory beyond the standard library, and `ty` stays in the dev group where
+it is actually used. No source, API, or behavior change.
 
 ## Upgrading
 
-Drop-in for 0.6.0. No API change and no rebuild needed for the default LanceDB backend. If
-you built a sqlite-vec store under 0.6.0 with an explicit `lancedb_dir`, its sidecar landed
-in the wrong directory — rebuild once on 0.6.1 so the store and its lookup path agree.
+Drop-in for 0.6.x. If a downstream project failed to resolve because of the `ty` pin, upgrade
+to 0.6.2 and the conflict disappears. Nothing else to do.
 
 ---
 

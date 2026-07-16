@@ -10,7 +10,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.6.1"
+version = "0.6.2"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = { text = "Elastic-2.0" }

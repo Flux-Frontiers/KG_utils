@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.6.2] - 2026-07-15
+
+### Fixed
+
 - **Removed `ty` from the package's runtime dependencies.** The type checker
   had leaked into the main `dependencies` list (it was the *only* entry —
   every real runtime dep lives in extras), forcing all consumers to install
