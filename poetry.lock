@@ -4786,7 +4786,7 @@ version = "0.0.44"
 description = "An extremely fast Python type checker, written in Rust."
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "dev"]
+groups = ["dev"]
 files = [
     {file = "ty-0.0.44-py3-none-linux_armv6l.whl", hash = "sha256:272d31e7ad49b1dc5e8465a9fe700354e14c755b40d9c75f08f031d786903df3"},
     {file = "ty-0.0.44-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:b92c4ddd7a3daf2049715edec9dc70cf6fd31a5a318ee647258f90dd75495eed"},
@@ -4898,4 +4898,4 @@ synthesis-mflux = ["httpx", "mflux", "openai", "pillow"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "a9c3d524a98aab633bf6341f7830ff1a78fa5bf536d74ea39cb7b400ccfb210e"
+content-hash = "b5f7af8d0f08251653752766ef244825ff307faf880c37c54c9c5e52f729bd1c"
