@@ -333,7 +333,9 @@ class KGModule(ABC):
         _dir = self.repo_root / self._default_dir
         self.db_path = Path(db_path) if db_path is not None else _dir / "graph.sqlite"
         self.lancedb_dir = Path(lancedb_dir) if lancedb_dir is not None else _dir / "lancedb"
-        self.vectors_path = _dir / "vectors.sqlite"
+        # Sidecar sits next to the lancedb dir (fleet convention: <kg-dir>/vectors.sqlite),
+        # so an explicit lancedb_dir relocates the sqlite-vec store with it.
+        self.vectors_path = self.lancedb_dir.parent / "vectors.sqlite"
         self.model_name = model
         self.table_name = table
         self.vector_backend = vector_backend

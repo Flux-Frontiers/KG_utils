@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.6.1] - 2026-07-15
+
+### Fixed
+
+- **`KGModule.vectors_path` now derives from `lancedb_dir.parent`, not
+  `repo_root/_default_dir`.** When a caller passed `lancedb_dir` explicitly
+  (as every pycodekg CLI command does, sometimes with a placeholder
+  `repo_root`), the sqlite-vec sidecar path pointed at a nonexistent
+  `<repo_root>/<_default_dir>/vectors.sqlite`, so `query` failed with
+  `sqlite3.OperationalError: unable to open database file` against a store
+  the build had just written. The sidecar now always sits next to the
+  lancedb dir (`<kg-dir>/vectors.sqlite`), matching doc_kg's
+  `sqlite_vectors_path()` convention. Regression tests cover explicit-path
+  construction and the build-then-fresh-instance-query CLI flow.
+
 ## [0.6.0] - 2026-07-15
 
 ### Added

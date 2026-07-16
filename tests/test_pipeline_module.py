@@ -336,3 +336,32 @@ class TestVectorBackendSelection:
         assert kg.vectors_path.exists()
         result = kg.query("vector embeddings")
         assert result.seeds > 0
+
+    def test_vectors_path_follows_explicit_lancedb_dir(self, corpus: Path, tmp_path: Path) -> None:
+        # CLI callers pass lancedb_dir explicitly (often with a placeholder
+        # repo_root); the sidecar must sit next to that dir, not under
+        # repo_root/_default_dir.
+        kg = _TextKG(
+            corpus,
+            db_path=tmp_path / "kg" / "graph.sqlite",
+            lancedb_dir=tmp_path / "kg" / "lancedb",
+        )
+        assert kg.vectors_path == tmp_path / "kg" / "vectors.sqlite"
+
+    def test_sqlite_vec_build_then_fresh_instance_queries(
+        self, corpus: Path, tmp_path: Path
+    ) -> None:
+        # Build and query through two separate KG instances with explicit
+        # paths — the exact CLI flow (build-lancedb then query) that broke
+        # when vectors_path was derived from repo_root/_default_dir.
+        pytest.importorskip("sqlite_vec")
+        paths = {
+            "db_path": tmp_path / "kg" / "graph.sqlite",
+            "lancedb_dir": tmp_path / "kg" / "lancedb",
+        }
+        builder = _TextKG(corpus, vector_backend="sqlite-vec", **paths)
+        builder.build(wipe=True)
+
+        reader = _TextKG(corpus, vector_backend="sqlite-vec", **paths)
+        result = reader.query("vector embeddings")
+        assert result.seeds > 0
