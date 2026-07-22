@@ -10,7 +10,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.6.2"
+version = "0.6.3"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = { text = "Elastic-2.0" }
@@ -41,6 +41,11 @@ semantic = [
 # wheels exist for macOS arm64 + Linux x86_64 (no compile step).
 sqlite-vec = [
     "sqlite-vec==0.1.9",
+]
+# ONNX Runtime inference backend for load_sentence_transformer
+# (KG_EMBED_BACKEND=onnx). optimum pulls in onnx + onnxruntime.
+onnx = [
+    "optimum[onnxruntime]>=1.24.0",
 ]
 synthesis = [
     "httpx>=0.27.0",

@@ -16,6 +16,7 @@ from kg_utils.embedder import (
     SentenceTransformerEmbedder,
     get_embedder,
     load_sentence_transformer,
+    resolve_backend,
     wrap_embedder,
 )
 
@@ -115,6 +116,80 @@ def test_load_falls_back_to_network_on_os_error(tmp_path) -> None:
     assert result is not None
     assert mock_st.call_count == 2
     assert mock_st.call_args_list[1].kwargs.get("local_files_only") is not True
+
+
+# ---------------------------------------------------------------------------
+# Backend resolution (KG_EMBED_BACKEND)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_backend_defaults_to_torch(monkeypatch) -> None:
+    monkeypatch.delenv("KG_EMBED_BACKEND", raising=False)
+    assert resolve_backend() == "torch"
+
+
+def test_resolve_backend_arg_beats_env(monkeypatch) -> None:
+    monkeypatch.setenv("KG_EMBED_BACKEND", "onnx")
+    assert resolve_backend() == "onnx"
+    assert resolve_backend("torch") == "torch"
+
+
+def test_resolve_backend_rejects_unknown(monkeypatch) -> None:
+    monkeypatch.setenv("KG_EMBED_BACKEND", "tensorrt")
+    with pytest.raises(ValueError, match="tensorrt"):
+        resolve_backend()
+
+
+@pytest.mark.integration
+def test_load_default_backend_is_torch(tmp_path, monkeypatch) -> None:
+    """Without the env var, SentenceTransformer gets backend='torch' (today's path)."""
+    fake_model_dir = tmp_path / "BAAI" / "bge-small-en-v1.5"
+    fake_model_dir.mkdir(parents=True)
+    monkeypatch.delenv("KG_EMBED_BACKEND", raising=False)
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=fake_model_dir),
+        patch("sentence_transformers.SentenceTransformer", return_value=MagicMock()) as mock_st,
+    ):
+        load_sentence_transformer("bge-small")
+    assert mock_st.call_args.kwargs.get("backend") == "torch"
+
+
+@pytest.mark.integration
+def test_load_onnx_backend_pins_cpu_and_skips_to(tmp_path, monkeypatch) -> None:
+    """KG_EMBED_BACKEND=onnx flows into the constructor, forces cpu, and skips .to()."""
+    fake_model_dir = tmp_path / "BAAI" / "bge-small-en-v1.5"
+    fake_model_dir.mkdir(parents=True)
+    monkeypatch.setenv("KG_EMBED_BACKEND", "onnx")
+    monkeypatch.setenv("KG_EMBED_DEVICE", "mps")  # must be ignored for onnx
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=fake_model_dir),
+        patch("sentence_transformers.SentenceTransformer", return_value=MagicMock()) as mock_st,
+    ):
+        model = load_sentence_transformer("bge-small")
+
+    assert mock_st.call_args.kwargs.get("backend") == "onnx"
+    assert mock_st.call_args.kwargs.get("device") == "cpu"
+    model.to.assert_not_called()  # .to(device) is the torch-only path
+
+
+@pytest.mark.integration
+def test_load_onnx_import_error_names_extra(tmp_path, monkeypatch) -> None:
+    """A missing optimum/onnxruntime surfaces as an ImportError naming the extra."""
+    fake_model_dir = tmp_path / "BAAI" / "bge-small-en-v1.5"
+    fake_model_dir.mkdir(parents=True)
+    monkeypatch.setenv("KG_EMBED_BACKEND", "onnx")
+
+    with (
+        patch("kg_utils.embedder.resolve_model_path", return_value=fake_model_dir),
+        patch(
+            "sentence_transformers.SentenceTransformer",
+            side_effect=ImportError("optimum is not installed"),
+        ),
+        pytest.raises(ImportError, match=r"kgmodule-utils\[onnx\]"),
+    ):
+        load_sentence_transformer("bge-small")
 
 
 # ---------------------------------------------------------------------------

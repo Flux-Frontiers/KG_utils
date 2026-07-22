@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`KG_EMBED_BACKEND` env knob + `resolve_backend()`** —
+  `load_sentence_transformer()` can now run the same model through ONNX
+  Runtime (`KG_EMBED_BACKEND=onnx`, or the new `backend` parameter) via
+  sentence-transformers' native `backend="onnx"` support. Defaults to
+  `torch` (behavior unchanged); ONNX always executes on CPU so spawn-based
+  worker pools stay safe on Apple Silicon; a missing dependency raises an
+  ImportError naming the new **`onnx` extra**
+  (`pip install "kgmodule-utils[onnx]"`). Unknown backend names raise
+  `ValueError`.
+
 ### Changed
 
 ### Removed

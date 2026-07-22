@@ -21,6 +21,11 @@ resolve_device(device)
     ``kg_utils.corpus_embedder.CorpusEmbedder``'s GPU-can't-fan-out guard) on
     the resolved device *before* loading a model.
 
+resolve_backend(backend)
+    Resolve the inference backend: explicit arg > ``KG_EMBED_BACKEND`` env >
+    ``"torch"``. ``"onnx"`` runs the same model through ONNX Runtime
+    (requires the ``onnx`` extra) and always executes on CPU.
+
 load_sentence_transformer(model_name)
     Raw ``SentenceTransformer`` factory with the canonical safe-load sequence.
     Use when you need the bare model object (e.g. multi-process workers that
@@ -124,12 +129,37 @@ def resolve_device(device: str | None = None) -> str | None:
         return "cpu"
 
 
+_VALID_BACKENDS = ("torch", "onnx")
+
+
+def resolve_backend(backend: str | None = None) -> str:
+    """Resolve the embedding inference backend: explicit arg > ``KG_EMBED_BACKEND`` env > ``"torch"``.
+
+    Same env-channel rationale as :func:`resolve_device` — ``spawn``-based
+    embedding workers inherit ``os.environ`` but can't receive a Python arg,
+    so the env var is how a whole worker pool gets switched to ONNX Runtime.
+
+    :param backend: Explicit backend override (``"torch"``/``"onnx"``), or ``None``.
+    :return: Resolved backend name.
+    :raises ValueError: On an unrecognized backend name — failing loud beats
+        silently embedding on the wrong engine.
+    """
+    sel = (backend or os.environ.get("KG_EMBED_BACKEND", "")).strip().lower() or "torch"
+    if sel not in _VALID_BACKENDS:
+        raise ValueError(
+            f"Unknown embedding backend {sel!r} (KG_EMBED_BACKEND); expected one of {_VALID_BACKENDS}"
+        )
+    return sel
+
+
 # ---------------------------------------------------------------------------
 # Canonical model loader
 # ---------------------------------------------------------------------------
 
 
-def load_sentence_transformer(model_name: str = DEFAULT_MODEL, device: str | None = None) -> Any:
+def load_sentence_transformer(
+    model_name: str = DEFAULT_MODEL, device: str | None = None, backend: str | None = None
+) -> Any:
     """Load a ``SentenceTransformer`` with the canonical safe-load sequence.
 
     Resolution order:
@@ -151,9 +181,18 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL, device: str | Non
     N GPU allocations into an OOM.  So CPU multiprocessing embedding on Apple
     Silicon is only safe with this knob.
 
+    Backend precedence: explicit *backend* arg > ``KG_EMBED_BACKEND`` env >
+    ``"torch"``.  ``"onnx"`` runs the same model through ONNX Runtime via
+    sentence-transformers' native ``backend="onnx"`` support (requires the
+    ``onnx`` extra) and always executes on CPU — the device arg/env is
+    ignored for it, so CPU-parallel worker pools stay safe on Apple Silicon.
+
     :param model_name: HuggingFace model ID or KNOWN_MODELS alias.
     :param device: Explicit device (``"cpu"``/``"mps"``/``"cuda"``).  ``None``
         falls back to ``KG_EMBED_DEVICE`` then CUDA→MPS→CPU auto-detect.
+        Ignored when the resolved backend is ``"onnx"`` (always CPU).
+    :param backend: Explicit backend (``"torch"``/``"onnx"``).  ``None`` falls
+        back to ``KG_EMBED_BACKEND`` then ``"torch"``.
     :return: Loaded ``SentenceTransformer`` instance.
     """
     SentenceTransformer = importlib.import_module("sentence_transformers").SentenceTransformer
@@ -169,33 +208,38 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL, device: str | Non
 
     os.environ["TQDM_DISABLE"] = "1"
 
+    backend = resolve_backend(backend)
     # torch is a hard requirement of this function (SentenceTransformer needs
     # it below); resolve_device()'s own ImportError guard never fires here.
-    device = resolve_device(device) or "cpu"
+    # ONNX Runtime executes on CPU — letting mps/cuda auto-detect through
+    # would mis-pin it.
+    device = "cpu" if backend == "onnx" else (resolve_device(device) or "cpu")
+
+    def _load(name_or_path: str, **kwargs: Any) -> Any:
+        try:
+            return SentenceTransformer(name_or_path, backend=backend, device=device, **kwargs)
+        except ImportError as exc:
+            if backend == "onnx":
+                raise ImportError(
+                    "KG_EMBED_BACKEND=onnx requires the onnx extra: "
+                    'pip install "kgmodule-utils[onnx]"'
+                ) from exc
+            raise
 
     resolved = KNOWN_MODELS.get(model_name, model_name)
     trust_remote = "nomic-ai/" in resolved
     local_path = resolve_model_path(resolved)
 
     if local_path.exists():
-        model = SentenceTransformer(
-            str(local_path),
-            local_files_only=True,
-            trust_remote_code=trust_remote,
-            device=device,
-        )
+        model = _load(str(local_path), local_files_only=True, trust_remote_code=trust_remote)
     else:
         try:
-            model = SentenceTransformer(
-                resolved,
-                local_files_only=True,
-                trust_remote_code=trust_remote,
-                device=device,
-            )
+            model = _load(resolved, local_files_only=True, trust_remote_code=trust_remote)
         except OSError:
-            model = SentenceTransformer(resolved, trust_remote_code=trust_remote, device=device)
+            model = _load(resolved, trust_remote_code=trust_remote)
 
-    model = model.to(device)
+    if backend == "torch":
+        model = model.to(device)
     return model
 
 
