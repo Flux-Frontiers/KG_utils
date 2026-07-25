@@ -10,7 +10,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.6.2"
+version = "0.7.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = { text = "Elastic-2.0" }
@@ -36,6 +36,11 @@ semantic = [
     "sentence-transformers>=5.4.1",
     "torch>=2.5.1",
     "transformers>=4.40.0,<4.57",
+]
+# Shared graph rendering (kg_utils.viz).  Kept out of the core so the
+# zero-dependency install stays zero-dependency.
+viz = [
+    "pyvis>=0.3.2",
 ]
 # Exact pin: sqlite-vec is pre-1.0, breaking minors are possible. Prebuilt
 # wheels exist for macOS arm64 + Linux x86_64 (no compile step).

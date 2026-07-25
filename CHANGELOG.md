@@ -9,11 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`kg_utils.viz` — shared graph rendering (new `viz` extra).** One
+  implementation of the interactive HTML graph, previously duplicated per
+  module. Domain differences arrive as data rather than code: a `GraphTheme`
+  names a domain's node kinds and edge relations, a `TooltipSpec` names the
+  fields worth showing. Only `id`, `kind` and `name` are assumed common — code
+  nodes carry `qualname`/`module_path`, document nodes carry `title`/`file_path`,
+  metabolic nodes carry `formula`/`ec_number`, and all three render through the
+  same path. `build_graph_html` also accepts a plain callable instead of a spec
+  for markup the spec cannot express.
+
+  The output inlines vis-network, so a page opens from `file://` and survives
+  embedding in a `srcdoc` iframe. pyvis's default `cdn_resources="local"` breaks
+  both: it emits relative asset paths that cannot resolve without a base URL, so
+  the graph renders only when cdnjs happens to be reachable and otherwise fails
+  silently with `vis is not defined`. It also writes a `lib/` directory into the
+  working directory on every render.
+
+  `select_nodes` decides which nodes survive a display cap. Seeding on the most
+  central nodes and expanding to their neighbours, rather than taking the top N,
+  keeps the result connected: measured on a 10k-node code graph at a cap of 150,
+  top-N-by-centrality stranded 47 nodes with no edges and halved the edge count.
+
+  Requires `pip install 'kgmodule-utils[viz]'`. The core install stays
+  zero-dependency — nothing in `kg_utils/__init__.py` imports it.
+
+- **`kg_utils.analysis.scores` — read persisted centrality back out of SQLite.**
+  `available_metrics`, `load_scores`, and a `ScoreSet` exposing raw score, dense
+  rank, percentile and range scaling. Stdlib only. Ranks are derived on load
+  rather than read from the stored `rank` column, which may reflect a truncated
+  ranking, so `centrality_scores` and `node_metrics` behave identically despite
+  the latter having no rank column.
+
 ### Changed
 
 ### Removed
 
 ### Fixed
+
+- **Node text could break out of the rendered page.** Graph node data is
+  embedded in a `<script>` block, so a node whose text contained `</script>`
+  would terminate that block during HTML parsing and inject whatever followed.
+  The payload now escapes `<`, `>` and `&` as unicode sequences. This affected
+  the per-module renderers this code was consolidated from.
 
 ## [0.6.2] - 2026-07-15
 
