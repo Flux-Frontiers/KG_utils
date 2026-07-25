@@ -305,15 +305,14 @@ class KGModule(ABC):
     :param lancedb_dir: LanceDB directory (defaults to ``.<kind>kg/lancedb``).
     :param model: Sentence-transformer model name for embedding.
     :param table: LanceDB table name.
-    :param vector_backend: ``"lancedb"`` (default), ``"sqlite-vec"``, or ``"auto"``.
-        The fleet-wide default stays ``lancedb`` so existing consumers of this
-        base class are unaffected unless they opt in. ``"sqlite-vec"`` is exact
-        (recall 1.0) and stores vectors in a ``vectors.sqlite`` sidecar next to
-        ``lancedb_dir``; it requires the ``sqlite-vec`` optional dependency
-        (``pip install 'kgmodule-utils[sqlite-vec]'``). ``"auto"`` picks
-        ``sqlite-vec`` for a fresh KG and ``lancedb`` only when an un-migrated
-        LanceDB store already exists on disk — pass it explicitly once your
-        domain package declares the ``sqlite-vec`` extra.
+    :param vector_backend: ``"auto"`` (default), ``"sqlite-vec"``, or ``"lancedb"``.
+        ``"auto"`` picks ``sqlite-vec`` for a fresh or already-migrated KG and
+        ``lancedb`` only when an un-migrated LanceDB store already exists on disk,
+        so existing corpora keep working untouched. ``"sqlite-vec"`` forces the
+        exact (recall 1.0) sqlite-vec store, kept in a ``vectors.sqlite`` sidecar
+        next to ``lancedb_dir``. Both require the ``sqlite-vec`` optional
+        dependency, bundled in the ``semantic`` extra. ``"lancedb"`` forces the
+        legacy LanceDB store.
     """
 
     #: Override in subclass to change the default artefact directory name.
@@ -327,7 +326,7 @@ class KGModule(ABC):
         *,
         model: str = DEFAULT_MODEL,
         table: str = "kg_nodes",
-        vector_backend: str = "lancedb",
+        vector_backend: str = "auto",
     ) -> None:
         self.repo_root = Path(repo_root).resolve()
         _dir = self.repo_root / self._default_dir
