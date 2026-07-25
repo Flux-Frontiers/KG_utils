@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **README documents `kg_utils.viz` and `kg_utils.analysis`.** Features list,
+  a `[viz]` install snippet, API-reference tables, and the source tree now cover
+  the two modules added in 0.7.0.
+
 ### Removed
 
 ### Fixed

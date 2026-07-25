@@ -35,6 +35,8 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 - **`kg_utils.embed`** — `Embedder` protocol, `DEFAULT_MODEL`, `KNOWN_MODELS`, `resolve_model_path()`
 - **`kg_utils.snapshots`** — `Snapshot`, `SnapshotManager`, `SnapshotManifest` for temporal metric tracking
 - **`kg_utils.synthesis`** — Unified text + image synthesis: oMLX, Ollama, and OpenAI text backends; mflux-local, mflux-serve, and DALL-E image backends; all env-var configurable
+- **`kg_utils.viz`** — Shared interactive-HTML graph rendering (`viz` extra): `build_graph_html()`, `select_nodes()`, `GraphTheme`, `TooltipSpec` — one renderer for code, document, and metabolic graphs, with domain differences supplied as data
+- **`kg_utils.analysis`** — Read persisted centrality back out of SQLite: `load_scores()`, `available_metrics()`, `ScoreSet` (raw score, dense rank, percentile, range scaling); stdlib only
 
 ---
 
@@ -64,6 +66,12 @@ pip install 'kgmodule-utils[synthesis]'
 
 ```bash
 pip install 'kgmodule-utils[synthesis-mflux]'
+```
+
+### With interactive graph rendering (pyvis / vis-network)
+
+```bash
+pip install 'kgmodule-utils[viz]'
 ```
 
 ### In a Poetry project
@@ -214,6 +222,25 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 | `text_synthesizer_from_env()` | Convenience: config + synthesizer in one call |
 | `image_synthesizer_from_env()` | Convenience: config + synthesizer in one call |
 
+### `kg_utils.viz`
+
+> Requires the `viz` extra.
+
+| Class / function | Description |
+|---|---|
+| `build_graph_html()` | Render nodes + edges to a self-contained interactive HTML page (vis-network inlined) |
+| `select_nodes()` | Cap a display graph while keeping it connected — seed on central nodes, expand to neighbours |
+| `GraphTheme` | Names a domain's node kinds and edge relations (`KindStyle`, `with_alpha()`) |
+| `TooltipSpec` | Names the node fields worth showing in a tooltip (`TooltipRow`) |
+
+### `kg_utils.analysis`
+
+| Class / function | Description |
+|---|---|
+| `load_scores()` | Read a centrality metric back out of SQLite into a `ScoreSet` |
+| `available_metrics()` | List the centrality metrics persisted in a graph store (`MetricRef`) |
+| `ScoreSet` | Per-node raw score, dense rank, percentile, and range scaling (`Scaler`) |
+
 ---
 
 ## Project Structure
@@ -238,11 +265,19 @@ KG_utils/
 │       │   ├── __init__.py
 │       │   ├── models.py     # Snapshot, SnapshotManifest, PruneResult
 │       │   └── manager.py    # SnapshotManager
-│       └── synthesis/
-│           ├── __init__.py   # Public API + factory functions
-│           ├── _config.py    # TextBackend, ImageBackend, TextConfig, ImageConfig, env factories
-│           ├── _text.py      # TextSynthesizer
-│           └── _image.py     # ImageSynthesizer
+│       ├── synthesis/
+│       │   ├── __init__.py   # Public API + factory functions
+│       │   ├── _config.py    # TextBackend, ImageBackend, TextConfig, ImageConfig, env factories
+│       │   ├── _text.py      # TextSynthesizer
+│       │   └── _image.py     # ImageSynthesizer
+│       ├── viz/              # Shared graph rendering (viz extra)
+│       │   ├── __init__.py   # build_graph_html, select_nodes, GraphTheme, TooltipSpec
+│       │   ├── graph_html.py # Interactive HTML renderer (vis-network inlined)
+│       │   ├── theme.py      # GraphTheme, KindStyle, with_alpha
+│       │   └── tooltip.py    # TooltipSpec, TooltipRow
+│       └── analysis/
+│           ├── __init__.py   # load_scores, available_metrics, ScoreSet
+│           └── scores.py     # Read persisted centrality out of SQLite
 └── tests/
     ├── test_store.py               # GraphStore unit tests
     ├── test_pipeline_utils.py      # Pipeline utility function tests
