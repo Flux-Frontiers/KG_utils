@@ -18,6 +18,10 @@ Sub-packages / modules:
                                     mflux-local | mflux-serve | openai (image).
     kg_utils.worker     — RunPod worker protocol helpers and WorkerClient for /runsync calls.
     kg_utils.retrieval  — Shared retrieval helpers: hit_to_dict, attach_content_by_sqlite.
+    kg_utils.analysis   — ScoreSet, load_scores, available_metrics: persisted
+                          centrality read back for ranking and visual encoding.
+    kg_utils.viz        — GraphTheme, TooltipSpec, build_graph_html, select_nodes:
+                          shared interactive graph rendering (needs the 'viz' extra).
 
 Optional extras
 ---------------
@@ -26,4 +30,4 @@ Optional extras
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
-__version__ = "0.6.2"
+__version__ = "0.7.0"
