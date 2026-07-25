@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.7.0] - 2026-07-25
+
+### Added
+
 - **`kg_utils.viz` — shared graph rendering (new `viz` extra).** One
   implementation of the interactive HTML graph, previously duplicated per
   module. Domain differences arrive as data rather than code: a `GraphTheme`
