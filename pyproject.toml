@@ -34,6 +34,7 @@ semantic = [
     "numpy>=1.24.0",
     "rich>=13.0.0",
     "sentence-transformers>=5.4.1",
+    "sqlite-vec==0.1.9",
     "torch>=2.5.1",
     "transformers>=4.40.0,<4.57",
 ]

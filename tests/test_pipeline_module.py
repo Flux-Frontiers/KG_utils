@@ -1,6 +1,7 @@
 """Integration tests for the concrete KGModule pipeline (build → query → pack).
 
-These tests require sentence-transformers and lancedb (the 'semantic' extra).
+These tests require the 'semantic' extra (sentence-transformers + sqlite-vec;
+the default "auto" backend now builds via sqlite-vec).
 They are marked with pytest.mark.integration so they can be skipped in lean CI.
 """
 
@@ -320,12 +321,13 @@ def test_lazy_embedder_created_on_access(corpus: Path) -> None:
 
 
 class TestVectorBackendSelection:
-    def test_default_is_lancedb(self, corpus: Path) -> None:
+    def test_default_is_auto(self, corpus: Path) -> None:
         kg = _TextKG(corpus)
-        assert kg.vector_backend == "lancedb"
+        assert kg.vector_backend == "auto"
 
     def test_stats_reports_resolved_backend(self, kg: _TextKG) -> None:
-        assert kg.stats()["vector_backend"] == "lancedb"
+        # Default "auto" resolves to sqlite-vec for a freshly built KG.
+        assert kg.stats()["vector_backend"] == "sqlite-vec"
 
     def test_sqlite_vec_backend_builds_and_searches(self, corpus: Path) -> None:
         sqlite_vec = pytest.importorskip("sqlite_vec")

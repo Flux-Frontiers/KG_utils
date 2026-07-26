@@ -18,7 +18,7 @@
 
 ## Overview
 
-kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through LanceDB vector indexing and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
+kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through pluggable vector indexing (sqlite-vec by default, LanceDB optional) and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
 
 Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [DocKG](https://github.com/Flux-Frontiers/doc_kg), and others — subclasses `KGModule` from here and implements exactly three methods: `make_extractor()`, `kind()`, and `analyze()`.
 
@@ -29,7 +29,8 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 - **`kg_utils.specs`** — `NodeSpec`, `EdgeSpec`, `BuildStats`, `QueryResult`, `SnippetPack` dataclasses
 - **`kg_utils.extractor`** — `KGExtractor` ABC: `extract()`, `node_kinds()`, `edge_kinds()`, `coverage_metric()`
 - **`kg_utils.store`** — `GraphStore`: SQLite-backed node/edge store with BFS expansion, symbol resolution, caller lookup, and provenance recording
-- **`kg_utils.semantic`** — `SemanticIndex` (LanceDB), `SentenceTransformerEmbedder`, `SeedHit`, model registry, `resolve_model_path()`
+- **`kg_utils.semantic`** — `SemanticIndex`, `SentenceTransformerEmbedder`, `SeedHit`, model registry, `resolve_model_path()`
+- **`kg_utils.vector_backend`** — `VectorBackend` protocol with `SqliteVecBackend` (default, exact recall) and `LanceDBBackend` (legacy); `make_backend()`, `resolve_backend_name()`
 - **`kg_utils.pipeline`** — `KGModule`: full build → query → pack pipeline base with hybrid semantic + lexical reranking and snippet extraction
 - **`kg_utils.embedder`** — `get_embedder()`, `wrap_embedder()`, `load_sentence_transformer()` factory functions
 - **`kg_utils.embed`** — `Embedder` protocol, `DEFAULT_MODEL`, `KNOWN_MODELS`, `resolve_model_path()`
@@ -50,7 +51,7 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 pip install kgmodule-utils
 ```
 
-### With semantic search (LanceDB + sentence-transformers)
+### With semantic search (sqlite-vec + sentence-transformers)
 
 ```bash
 pip install 'kgmodule-utils[semantic]'
@@ -186,7 +187,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class / function | Description |
 |---|---|
-| `SemanticIndex` | LanceDB vector index: `build()`, `search()` |
+| `SemanticIndex` | Vector index over a pluggable backend (sqlite-vec default, LanceDB optional): `build()`, `search()` |
 | `SentenceTransformerEmbedder` | Local embedding via sentence-transformers |
 | `resolve_model_path()` | Resolve model name / alias to local cache path |
 | `suppress_ingestion_logging()` | Silence verbose HF / tqdm output during ingestion |
@@ -257,10 +258,19 @@ KG_utils/
 │       ├── extractor.py      # KGExtractor ABC
 │       ├── store.py          # GraphStore (SQLite)
 │       ├── semantic.py       # SemanticIndex, SentenceTransformerEmbedder, SeedHit
+│       ├── vector_backend.py # VectorBackend protocol, SqliteVecBackend (default), LanceDBBackend
 │       ├── pipeline.py       # KGModule concrete base class
 │       ├── module.py         # Re-export shim
 │       ├── embed.py          # Embedder protocol, model registry
 │       ├── embedder.py       # SentenceTransformerEmbedder factory functions
+│       ├── corpus_embedder.py # CorpusEmbedder / EmbeddingCache: multi-worker corpus embedding
+│       ├── retrieval/        # Serialize + enrich KG hits (hit_to_dict, attach_content_by_sqlite)
+│       │   ├── __init__.py
+│       │   └── hits.py
+│       ├── worker/           # RunPod /runsync client (WorkerClient, decode/handle helpers)
+│       │   ├── __init__.py
+│       │   ├── client.py
+│       │   └── ops.py
 │       ├── snapshots/
 │       │   ├── __init__.py
 │       │   ├── models.py     # Snapshot, SnapshotManifest, PruneResult
@@ -269,7 +279,8 @@ KG_utils/
 │       │   ├── __init__.py   # Public API + factory functions
 │       │   ├── _config.py    # TextBackend, ImageBackend, TextConfig, ImageConfig, env factories
 │       │   ├── _text.py      # TextSynthesizer
-│       │   └── _image.py     # ImageSynthesizer
+│       │   ├── _image.py     # ImageSynthesizer
+│       │   └── factory.py    # Per-request backend override helpers
 │       ├── viz/              # Shared graph rendering (viz extra)
 │       │   ├── __init__.py   # build_graph_html, select_nodes, GraphTheme, TooltipSpec
 │       │   ├── graph_html.py # Interactive HTML renderer (vis-network inlined)
