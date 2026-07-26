@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Removed
+
+### Fixed
+
+## [0.8.0] - 2026-07-26
+
+### Added
+
+### Changed
+
 - **Default vector backend is now `"auto"` (was `"lancedb"`).** `KGModule`
   builds a fresh or already-migrated KG on `sqlite-vec` and only falls back to
   LanceDB when an un-migrated LanceDB store already exists on disk, so existing

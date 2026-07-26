@@ -1,46 +1,38 @@
-# Release Notes — v0.7.0
+# Release Notes — v0.8.0
 
-> Released: 2026-07-25
+> Released: 2026-07-26
 
-This release lifts two capabilities that had been living inside individual KG modules into the
-shared SDK: interactive graph rendering and reading persisted centrality scores back out of
-SQLite. The graph renderer in particular consolidates code that had been copy-pasted per
-domain — code, document and metabolic graphs now render through one implementation, with each
-domain's differences supplied as data rather than a fork.
+The default vector backend flips from LanceDB to sqlite-vec. `KGModule` now defaults to
+`vector_backend="auto"`, which builds a fresh or already-migrated knowledge graph on the exact
+(recall 1.0) sqlite-vec store and only falls back to LanceDB when an un-migrated LanceDB store
+is already present on disk. Existing corpora keep working untouched; new ones get the smaller,
+exact backend by default.
 
 ## What changed
 
-**Shared graph rendering (`kg_utils.viz`, new `viz` extra).** A single interactive-HTML graph
-renderer replaces the per-module copies. A `GraphTheme` names a domain's node kinds and edge
-relations and a `TooltipSpec` names the fields worth showing, so a code graph
-(`qualname`/`module_path`), a document graph (`title`/`file_path`) and a metabolic graph
-(`formula`/`ec_number`) all flow through the same path. The output inlines vis-network, so a
-page opens straight from `file://` and survives embedding in a `srcdoc` iframe — the previous
-pyvis default emitted relative asset paths that failed silently offline. `select_nodes` also
-keeps a display-capped graph connected by seeding on central nodes and expanding to
-neighbours rather than truncating to the top N. The core install stays zero-dependency;
-nothing in `kg_utils/__init__.py` imports the extra.
+**sqlite-vec is the default.** `"auto"` resolves to sqlite-vec for a fresh KG or one that has
+already been migrated (a `vectors.sqlite` sidecar exists), and to LanceDB only when an
+un-migrated LanceDB store is found on disk — so no existing store is stranded and nothing
+needs a manual migration step. Pass `vector_backend="lancedb"` to pin the old behaviour, or
+`"sqlite-vec"` to force the new store regardless of what is on disk. The `sqlite-vec`
+dependency is now bundled in the `semantic` extra, so the default works out of the box; its
+prebuilt wheels cover macOS (x86_64 + arm64), Linux (x86_64 + aarch64), and Windows.
 
-**Read centrality back out of SQLite (`kg_utils.analysis.scores`).** `available_metrics`,
-`load_scores`, and a `ScoreSet` exposing raw score, dense rank, percentile and range scaling —
-stdlib only. Ranks are derived on load rather than trusting a possibly-truncated stored `rank`
-column, so `centrality_scores` and `node_metrics` behave identically.
-
-**Rendering hardening.** Node data embedded in the page's `<script>` block now escapes `<`,
-`>` and `&` as unicode sequences, so a node whose text contained `</script>` can no longer
-terminate the block and inject markup. This affected every per-module renderer this code was
-consolidated from.
+**README back in sync with the package.** The 0.7.0 modules `kg_utils.viz` and
+`kg_utils.analysis` are now documented (features, install snippet, API tables), the source
+tree lists the previously-undocumented modules (`vector_backend`, `corpus_embedder`,
+`retrieval/`, `worker/`, `synthesis/factory`), and the prose reflects sqlite-vec as the
+default backend with LanceDB as the legacy option.
 
 ## Upgrading
 
-Nothing to do for existing code — the core install is unchanged and still pulls in no
-mandatory dependencies. To use the new graph renderer, install the extra:
+No action required. Existing LanceDB-backed KGs are detected by `"auto"` and keep working as
+before. To move a corpus onto sqlite-vec, rebuild it (the sidecar is written next to the
+LanceDB directory); once `vectors.sqlite` exists, `"auto"` uses it. If you construct
+`KGModule` and depend on LanceDB being the default, set `vector_backend="lancedb"` explicitly.
 
-```bash
-pip install 'kgmodule-utils[viz]'
-```
-
-The score reader (`kg_utils.analysis.scores`) needs no extra.
+Installing the `semantic` extra now also installs `sqlite-vec` — no separate
+`pip install 'kgmodule-utils[sqlite-vec]'` is needed for the default backend.
 
 ---
 
