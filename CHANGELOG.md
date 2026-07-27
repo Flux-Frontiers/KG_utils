@@ -11,9 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **README documents `kg_utils.viz` and `kg_utils.analysis`.** Features list,
-  a `[viz]` install snippet, API-reference tables, and the source tree now cover
-  the two modules added in 0.7.0.
+### Removed
+
+### Fixed
+
+## [0.8.0] - 2026-07-26
+
+### Added
+
+### Changed
+
+- **Default vector backend is now `"auto"` (was `"lancedb"`).** `KGModule`
+  builds a fresh or already-migrated KG on `sqlite-vec` and only falls back to
+  LanceDB when an un-migrated LanceDB store already exists on disk, so existing
+  corpora keep working untouched. The `sqlite-vec` dependency is now bundled in
+  the `semantic` extra. Pass `vector_backend="lancedb"` to keep the old default.
+- **README brought back in sync with the package.** Documents `kg_utils.viz`
+  and `kg_utils.analysis` (features list, `[viz]` install snippet, API tables);
+  fills in the previously-drifted source tree (`vector_backend`,
+  `corpus_embedder`, `retrieval/`, `worker/`, `synthesis/factory`); and reflects
+  sqlite-vec as the default vector backend with LanceDB as the legacy option.
 
 ### Removed
 

@@ -10,7 +10,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.7.0"
+version = "0.8.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = { text = "Elastic-2.0" }
@@ -34,6 +34,7 @@ semantic = [
     "numpy>=1.24.0",
     "rich>=13.0.0",
     "sentence-transformers>=5.4.1",
+    "sqlite-vec==0.1.9",
     "torch>=2.5.1",
     "transformers>=4.40.0,<4.57",
 ]
@@ -43,7 +44,9 @@ viz = [
     "pyvis>=0.3.2",
 ]
 # Exact pin: sqlite-vec is pre-1.0, breaking minors are possible. Prebuilt
-# wheels exist for macOS arm64 + Linux x86_64 (no compile step).
+# wheels ship for macOS (x86_64 + arm64), Linux (x86_64 + aarch64), and Windows
+# (amd64) — no compile step. Also bundled in the `semantic` extra since "auto"
+# defaults to sqlite-vec.
 sqlite-vec = [
     "sqlite-vec==0.1.9",
 ]
