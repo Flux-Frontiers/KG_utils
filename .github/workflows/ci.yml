@@ -64,7 +64,10 @@ jobs:
           key: typecheck-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --no-interaction
+        # lancedb only: vector_backend.py's LanceDBBackend still imports it
+        # lazily, so ty needs it physically installed to resolve the import,
+        # even though it's no longer part of the semantic extra (see pyproject).
+        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --extras "lancedb" --no-interaction
 
       - name: Run ty
         run: poetry run ty check src/

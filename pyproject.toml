@@ -1,8 +1,13 @@
-# pyproject.toml — kgmodule-utils: shared types and snapshot infrastructure for KG modules
+# pyproject.toml — kgmodule-utils: shared SDK layer for the KGModule ecosystem
 #
-# Zero-dependency (stdlib-only) package providing:
-#   kg_utils.types    — NodeSpec, EdgeSpec, KGExtractor, KGModule, etc.
+# The core install is zero-dependency (stdlib only):
+#   kg_utils.specs     — NodeSpec, EdgeSpec, KGExtractor, etc.
 #   kg_utils.snapshots — Snapshot, SnapshotManager, SnapshotManifest, etc.
+#   kg_utils.store     — SQLite-backed GraphStore
+#   kg_utils.module    — KGModule pipeline base
+#
+# Everything heavier is behind an extra: semantic, lancedb, sqlite-vec, viz,
+# synthesis, synthesis-mflux (see [project.optional-dependencies] below).
 
 [build-system]
 requires = ["poetry-core"]
@@ -10,10 +15,11 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.9.0"
+version = "0.10.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
-license = { text = "Elastic-2.0" }
+license = "Elastic-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "Eric G. Suchanek, PhD", email = "suchanek@flux-frontiers.com" }
 ]
@@ -29,10 +35,18 @@ requires-python = ">=3.12,<3.14"
 dependencies = []
 
 [project.optional-dependencies]
+# The embedding stack plus the default ("auto") backend, sqlite-vec. Does NOT
+# include lancedb — vector_backend.py's own docstring scopes lancedb to
+# LanceDBBackend only, and auto_resolve_backend() picks sqlite-vec for every
+# fresh or already-migrated store, falling back to lancedb only when an
+# un-migrated LanceDB store is already on disk. No adapter in the fleet uses
+# LanceDBBackend directly (pycode_kg imports SqliteVecBackend explicitly; doc_kg
+# declares lancedb as its own direct dependency rather than getting it from
+# here), so bundling it into every `semantic` install was pure dead weight —
+# see the lancedb extra below for the un-migrated-store case.
 semantic = [
-    "lancedb>=0.19.0",
     "numpy>=1.24.0",
-    "rich>=13.0.0",
+    "rich>=13.0.0,<15.0.0",
     "sentence-transformers>=5.4.1",
     "sqlite-vec==0.1.9",
     "torch>=2.5.1",
@@ -49,6 +63,12 @@ viz = [
 # defaults to sqlite-vec.
 sqlite-vec = [
     "sqlite-vec==0.1.9",
+]
+# LanceDBBackend only. Needed to read/migrate a pre-existing, un-migrated
+# LanceDB store — auto_resolve_backend() falls back to this when one is found
+# on disk. Not part of `semantic`; opt in explicitly if you have legacy data.
+lancedb = [
+    "lancedb>=0.19.0",
 ]
 synthesis = [
     "httpx>=0.27.0",
@@ -73,9 +93,7 @@ packages = [{include = "kg_utils", from = "src"}]
 # forces poetry's universal resolution to reconcile the transformers pin of
 # every *published* sibling against this project's own -- a deadlock, since
 # doc-kg and pycode-kg each depend on the other. Install them by hand:
-#   pip install doc-kg pycode-kg          # both on PyPI
-#   pip install 'kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git'
-#   pip install 'agent-kg @ git+https://github.com/Flux-Frontiers/agent_kg.git'
+#   pip install doc-kg pycode-kg   kg-rag agent-kg       # on PyPI
 
 [tool.poetry.group.dev]
 optional = true

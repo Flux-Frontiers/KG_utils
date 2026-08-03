@@ -20,7 +20,7 @@ description = "Reusable constraint types to use with typing.Annotated"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"lancedb\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53"},
     {file = "annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89"},
@@ -373,7 +373,7 @@ files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
-markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"synthesis\") and platform_system == \"Windows\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "platform_system == \"Windows\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"}
+markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"lancedb\" or extra == \"synthesis\") and platform_system == \"Windows\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "platform_system == \"Windows\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"}
 
 [[package]]
 name = "contourpy"
@@ -773,7 +773,7 @@ description = "A library to handle automated deprecations"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "extra == \"semantic\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"},
     {file = "deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff"},
@@ -1661,7 +1661,7 @@ description = "Lance Namespace interface and plugin registry"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"semantic\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "lance_namespace-0.9.0-py3-none-any.whl", hash = "sha256:f785ff10927e4ce0db69986576670fedd37f8a33521e8a4630c6be22db8061b2"},
     {file = "lance_namespace-0.9.0.tar.gz", hash = "sha256:f738b641cc615b17323baa4eb47900f184688739ee3d2ea9fe39396b9588e53d"},
@@ -1677,7 +1677,7 @@ description = "Lance Namespace Specification"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"semantic\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "lance_namespace_urllib3_client-0.9.0-py3-none-any.whl", hash = "sha256:be819c8cffb1e460a3a504dbf52d1ca009560a48e7202b8c4279998e4adf9fe4"},
     {file = "lance_namespace_urllib3_client-0.9.0.tar.gz", hash = "sha256:cf796fa5307fa4dde91fe4bec2af28b90ba79191852d4394e8fe44276538e40f"},
@@ -1696,7 +1696,7 @@ description = "lancedb"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"semantic\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "lancedb-0.34.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:c462f2e6f933cad659fd0179394eaab578acbc9151fe2ef41bc29b36ecca5058"},
     {file = "lancedb-0.34.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:48829e88e708947d0520454ab9e4f8efa35f3e3626469eadd3a6e061b89cb223"},
@@ -2216,7 +2216,7 @@ description = "Fundamental package for array computing in Python"
 optional = true
 python-versions = ">=3.12"
 groups = ["main"]
-markers = "(extra == \"synthesis-mflux\" or extra == \"semantic\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "numpy-2.5.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:2c889b56fe48b1018f764b0eec8df59ab654e9148aa91faa12596043500de277"},
     {file = "numpy-2.5.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:ab451b59c5643c570974c43aef780703ef1d3b4965d2be07afd530615a9358d1"},
@@ -2599,7 +2599,7 @@ files = [
     {file = "packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e"},
     {file = "packaging-26.2.tar.gz", hash = "sha256:ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661"},
 ]
-markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "parso"
@@ -2908,7 +2908,7 @@ description = "Python library for Apache Arrow"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"semantic\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pyarrow-24.0.0-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:7c2b98645d576a0b9616892ead22b64a83a5f043c5e2ca15ebcefcb5b70c80cb"},
     {file = "pyarrow-24.0.0-cp310-cp310-macosx_12_0_x86_64.whl", hash = "sha256:644a246325b8c69c595ad1dd4b463eba4b0cdb731370e4a86137d433208d6147"},
@@ -2982,7 +2982,7 @@ description = "Data validation using Python type hints"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"lancedb\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pydantic-2.13.4-py3-none-any.whl", hash = "sha256:45a282cde31d808236fd7ea9d919b128653c8b38b393d1c4ab335c62924d9aba"},
     {file = "pydantic-2.13.4.tar.gz", hash = "sha256:c40756b57adaa8b1efeeced5c196f3f3b7c435f90e84ea7f443901bec8099ef6"},
@@ -3005,7 +3005,7 @@ description = "Core functionality for Pydantic validation and serialization"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"lancedb\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pydantic_core-2.46.4-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:a396dcc17e5a0b164dbe026896245a4fa9ff402edca1dff0be3d53a517f74de4"},
     {file = "pydantic_core-2.46.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:da4b951fe36dc7c3a1ccb4e3cd1747c3542b8c9ceede8fc86cae054e764485f5"},
@@ -3214,7 +3214,7 @@ description = "Extensions to the standard Python datetime module"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"lancedb\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
     {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
@@ -3977,7 +3977,7 @@ description = "Python 2 and 3 compatibility utilities"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"lancedb\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
@@ -4184,7 +4184,7 @@ description = "Fast, Extensible Progress Meter"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"synthesis\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"lancedb\" or extra == \"synthesis\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "tqdm-4.68.4-py3-none-any.whl", hash = "sha256:5168118b2368f48c561afda8020fd79195b1bdb0bdf8086b88442c267a315dc2"},
     {file = "tqdm-4.68.4.tar.gz", hash = "sha256:19829c9673638f2a0b8617da4cdcb927e831cd88bcfcb6e78d42a4d1af131520"},
@@ -4381,7 +4381,7 @@ description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"synthesis\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"synthesis\" or extra == \"lancedb\" or python_version == \"3.13\") and (sys_platform == \"darwin\" or sys_platform == \"linux\") and (extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"lancedb\" or extra == \"synthesis\")"
 files = [
     {file = "typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
     {file = "typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"},
@@ -4394,7 +4394,7 @@ description = "Runtime typing introspection tools"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"lancedb\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "typing_inspection-0.4.2-py3-none-any.whl", hash = "sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7"},
     {file = "typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464"},
@@ -4410,7 +4410,7 @@ description = "HTTP library with thread-safe connection pooling, file post, and 
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"lancedb\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897"},
     {file = "urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c"},
@@ -4436,7 +4436,8 @@ files = [
 ]
 
 [extras]
-semantic = ["lancedb", "numpy", "rich", "sentence-transformers", "sqlite-vec", "torch", "transformers"]
+lancedb = ["lancedb"]
+semantic = ["numpy", "rich", "sentence-transformers", "sqlite-vec", "torch", "transformers"]
 sqlite-vec = ["sqlite-vec"]
 synthesis = ["httpx", "openai", "pillow"]
 synthesis-mflux = ["httpx", "mflux", "openai", "pillow"]
@@ -4445,4 +4446,4 @@ viz = ["pyvis"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "a72a0369308dc3ddc493259ca66c70bd7ec4aa3c0e5470d6eb9df7c6c2a4b966"
+content-hash = "2c57ef8291d5d5d34e8fd64a075c9bf152c35ea6aa2c8b48895390846c67bc55"

@@ -7,6 +7,10 @@ The design claim under test is that one renderer serves every KG domain, with
 the differences supplied as data. So the tests build *two* unrelated domains — a
 code graph and a document graph, whose node schemas share only ``id``, ``kind``
 and ``name`` — and assert both render correctly through the same code path.
+Author: Eric G. Suchanek, PhD
+Last Revision: 2026-08-03 10:51:09
+License: Elastic 2.0
+
 """
 
 from __future__ import annotations
@@ -135,11 +139,24 @@ def test_unknown_kind_falls_back_rather_than_vanishing() -> None:
 
 
 def test_output_is_self_contained() -> None:
-    """The page must render offline and inside a srcdoc iframe."""
+    """The page must render offline and inside a srcdoc iframe.
+
+    Host-agnostic on purpose: naming one CDN passes while the page still reaches
+    out to a different one, which is exactly how the pyvis Bootstrap tags went
+    unnoticed.  This form also fails on a host a future pyvis release introduces.
+    """
     html = build_graph_html(CODE_NODES, CODE_EDGES, theme=CODE_THEME)
-    assert "cdnjs.cloudflare.com/ajax/libs/vis-network" not in html
-    assert 'src="lib/bindings/utils.js"' not in html
+    for pattern in ('src="http', "src='http", 'href="http', "href='http", "@import"):
+        assert pattern not in html, f"external reference: {pattern}"
+    assert 'src="lib/' not in html
     assert len(html) > 500_000
+
+
+def test_bootstrap_shim_survives() -> None:
+    """The stripped CDN tags must leave their rules behind, not just vanish."""
+    html = build_graph_html(CODE_NODES, CODE_EDGES, theme=CODE_THEME)
+    assert ".card-body" in html
+    assert "box-sizing" in html
 
 
 def test_render_writes_nothing_to_the_working_directory(tmp_path, monkeypatch) -> None:
