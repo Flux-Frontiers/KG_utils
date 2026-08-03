@@ -10,7 +10,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.8.0"
+version = "0.10.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = { text = "Elastic-2.0" }
@@ -44,7 +44,7 @@ semantic = [
     "sentence-transformers>=5.4.1",
     "sqlite-vec==0.1.9",
     "torch>=2.5.1",
-    "transformers>=4.40.0,<4.57",
+    "transformers>=5.5.0,<6",
 ]
 # Shared graph rendering (kg_utils.viz).  Kept out of the core so the
 # zero-dependency install stays zero-dependency.
@@ -82,12 +82,14 @@ Repository = "https://github.com/Flux-Frontiers/kg_utils"
 [tool.poetry]
 packages = [{include = "kg_utils", from = "src"}]
 
-[tool.poetry.group.kgdeps]
-optional = true
-
-[tool.poetry.group.kgdeps.dependencies]
-pycode-kg = ">=0.18.1"
-doc-kg    = ">=0.15.2"
+# Cross-KG sibling packages (doc-kg, pycode-kg, agent-kg, kg-rag) are NOT
+# declared here. They are never imported by this package, and listing them
+# forces poetry's universal resolution to reconcile the transformers pin of
+# every *published* sibling against this project's own -- a deadlock, since
+# doc-kg and pycode-kg each depend on the other. Install them by hand:
+#   pip install doc-kg pycode-kg          # both on PyPI
+#   pip install 'kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git'
+#   pip install 'agent-kg @ git+https://github.com/Flux-Frontiers/agent_kg.git'
 
 [tool.poetry.group.dev]
 optional = true

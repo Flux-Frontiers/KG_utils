@@ -15,6 +15,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.10.0] - 2026-08-03
+
+### Removed
+
+- **BREAKING: `lancedb` is no longer part of the `semantic` extra.** It now has
+  its own `lancedb` extra. `auto_resolve_backend()` selects sqlite-vec for every
+  fresh or already-migrated store and falls back to LanceDB only when an
+  un-migrated LanceDB store is found on disk, and no adapter in the fleet uses
+  `LanceDBBackend` directly (pycode_kg imports `SqliteVecBackend` explicitly;
+  doc_kg declares `lancedb` as its own direct dependency), so shipping it in
+  every `[semantic]` install was dead weight. If you have an un-migrated LanceDB
+  store, install `kgmodule-utils[semantic,lancedb]`.
+
+### Changed
+
+- **Pinned `rich` to `>=13.0.0,<15.0.0`** rather than leaving the upper bound
+  open.
+- **CI typecheck installs the `lancedb` extra.** `vector_backend.py` still
+  imports lancedb lazily for `LanceDBBackend`, so `ty` needs it present to
+  resolve the import even though it left the `semantic` extra.
+
+### Added
+
+- **`docs/viz-bootstrap-selfcontainment.md`** — documents that
+  `kg_utils.viz.build_graph_html` output fetches Bootstrap from a CDN and so is
+  not self-contained offline. Documentation only; the fix is not yet applied.
+
+## [0.9.0] - 2026-07-28
+
+### Security
+
+- **Unpinned `transformers` to `>=5.5.0,<6`, clearing two high-severity
+  advisories.** The previous `<4.57` cap held the stack at 4.56.2, exposed to a
+  remote-code-execution advisory (fixed in 5.3.0) and an arbitrary-code-execution
+  flaw in the LightGlue model-loading path (fixed in 5.5.0). The cap had no
+  recorded rationale and no longer matched the fleet (doc-kg had already shipped
+  on transformers 5.6.2). Verified against 5.14.1: embeddings are bitwise
+  identical on bge-small, bge-large, and nomic-embed (including empty, unicode,
+  and CRLF inputs), a full index rebuild is byte-identical, and queries against a
+  4.x-built index return identical rankings — **no re-index required**.
+
+### Changed
+
+- **`transformers` now requires 5.x** (`>=5.5.0,<6`; was `>=4.40.0,<4.57`).
+  Installing the `semantic` extra pulls transformers 5; environments pinned to
+  transformers 4.x must upgrade. No API or embedding-output change.
+- **Dropped the optional `kgdeps` Poetry group (`pycode-kg`, `doc-kg`).** The two
+  siblings each declared the other, and because Poetry locks optional groups too,
+  any relaxed transformers pin deadlocked resolution against the published
+  siblings — neither could lock until the other released. Neither package is
+  imported here, so the dev-only convenience deps are removed (with manual install
+  instructions left in `pyproject.toml`), permanently breaking the cycle. Lock
+  refreshed to transformers 5.14.1, huggingface-hub 1.25.1, safetensors 0.8.0.
+
+### Fixed
+
+- **HF progress bars and logs no longer leak into builds and queries under
+  transformers 5.** transformers ≥5 removed the `transformers.logging` submodule
+  alias, so `import_module("transformers.logging")` raised `ModuleNotFoundError`,
+  which the surrounding `except` swallowed — silently disabling the
+  log/progress-bar suppression and leaking a "Loading weights" bar into every
+  build and query. Now imports `transformers.utils.logging`, which resolves on
+  both 4.x and 5.x.
+
 ## [0.8.0] - 2026-07-26
 
 ### Added

@@ -159,7 +159,9 @@ def load_sentence_transformer(model_name: str = DEFAULT_MODEL, device: str | Non
     SentenceTransformer = importlib.import_module("sentence_transformers").SentenceTransformer
 
     try:
-        hf_logging = importlib.import_module("transformers.logging")
+        # transformers >=5 dropped the ``transformers.logging`` submodule alias;
+        # ``transformers.utils.logging`` is importable on both 4.x and 5.x.
+        hf_logging = importlib.import_module("transformers.utils.logging")
 
         hf_logging.set_verbosity_error()
         # TQDM_DISABLE alone misses transformers' _tqdm_active gate
@@ -215,7 +217,7 @@ class SentenceTransformerEmbedder(Embedder):
 
     def __init__(self, model_name: str = DEFAULT_MODEL) -> None:
         try:
-            hf_logging = importlib.import_module("transformers.logging")
+            hf_logging = importlib.import_module("transformers.utils.logging")
 
             hf_logging.set_verbosity_error()
             hf_logging.disable_progress_bar()
