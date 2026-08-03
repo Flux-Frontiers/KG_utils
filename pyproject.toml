@@ -29,10 +29,18 @@ requires-python = ">=3.12,<3.14"
 dependencies = []
 
 [project.optional-dependencies]
+# The embedding stack plus the default ("auto") backend, sqlite-vec. Does NOT
+# include lancedb — vector_backend.py's own docstring scopes lancedb to
+# LanceDBBackend only, and auto_resolve_backend() picks sqlite-vec for every
+# fresh or already-migrated store, falling back to lancedb only when an
+# un-migrated LanceDB store is already on disk. No adapter in the fleet uses
+# LanceDBBackend directly (pycode_kg imports SqliteVecBackend explicitly; doc_kg
+# declares lancedb as its own direct dependency rather than getting it from
+# here), so bundling it into every `semantic` install was pure dead weight —
+# see the lancedb extra below for the un-migrated-store case.
 semantic = [
-    "lancedb>=0.19.0",
     "numpy>=1.24.0",
-    "rich>=13.0.0",
+    "rich>=13.0.0,<15.0.0",
     "sentence-transformers>=5.4.1",
     "sqlite-vec==0.1.9",
     "torch>=2.5.1",
@@ -49,6 +57,12 @@ viz = [
 # defaults to sqlite-vec.
 sqlite-vec = [
     "sqlite-vec==0.1.9",
+]
+# LanceDBBackend only. Needed to read/migrate a pre-existing, un-migrated
+# LanceDB store — auto_resolve_backend() falls back to this when one is found
+# on disk. Not part of `semantic`; opt in explicitly if you have legacy data.
+lancedb = [
+    "lancedb>=0.19.0",
 ]
 synthesis = [
     "httpx>=0.27.0",
