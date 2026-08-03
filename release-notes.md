@@ -1,59 +1,76 @@
-# Release Notes — v0.9.0
+# Release Notes — v0.10.0
 
-> Released: 2026-07-28
+> Released: 2026-08-03
 
-A security-driven release: kgmodule-utils moves to **transformers 5**. The old
-`transformers<4.57` cap pinned every install to 4.56.2, which sits below two open
-high-severity advisories — a remote-code-execution flaw (fixed in 5.3.0) and an
-arbitrary-code-execution flaw in the LightGlue model-loading path (fixed in 5.5.0). The new
-`>=5.5.0,<6` floor clears both. The move was validated to be behaviourally inert: embeddings
-are bitwise identical, a rebuilt index is byte-for-byte the same, and existing indexes query
-identically — **no re-index is required.**
+Two changes worth reading before you upgrade: **LanceDB is no longer installed by the
+`semantic` extra**, and **generated graph pages no longer contact a CDN**. The first is a
+breaking change for a narrow set of consumers; the second means any graph HTML you built
+on 0.7.0–0.9.0 is worth regenerating.
 
-## What changed
+## Breaking: `lancedb` moved to its own extra
 
-**transformers unpinned to `>=5.5.0,<6` (security).** The `<4.57` cap had no recorded
-rationale and no longer matched the fleet — doc-kg had already shipped on transformers 5.6.2.
-Before moving the floor, the upgrade was checked against transformers 5.14.1 with the rest of
-the stack unchanged: embeddings came out bitwise identical on bge-small, bge-large, and
-nomic-embed (including empty, whitespace, 3k-character, unicode, and CRLF inputs); a full
-index rebuild produced a byte-identical `vectors.sqlite`; and queries against an index built
-on 4.56.2 returned identical rankings. So the security fix costs you nothing at build or
-query time.
+`pip install 'kgmodule-utils[semantic]'` no longer pulls `lancedb`.
 
-**Progress bars stop leaking into builds and queries (bug fix).** transformers 5 removed the
-`transformers.logging` submodule alias, so the suppression code silently hit
-`ModuleNotFoundError` — swallowed by a bare `except` — and stopped muting Hugging Face's
-output, leaking a "Loading weights" bar into every build and query under transformers 5. The
-import now targets `transformers.utils.logging`, which resolves on both 4.x and 5.x, so the
-suppression works again.
+sqlite-vec has been the default backend since 0.8.0. `auto_resolve_backend()` selects it
+for every fresh or already-migrated store, and falls back to LanceDB only when it finds an
+un-migrated LanceDB store on disk. Nothing in the fleet uses `LanceDBBackend` directly —
+pycode_kg imports `SqliteVecBackend` explicitly, and doc_kg declares `lancedb` as its own
+direct dependency rather than inheriting it from here. So every `[semantic]` install was
+carrying LanceDB and its transitive tree for nothing.
 
-**Sibling KG packages no longer block dependency resolution (packaging).** The optional
-`kgdeps` Poetry group declared `doc-kg` and `pycode-kg`, which each depend on the other. Since
-Poetry locks optional groups too, relaxing the transformers pin deadlocked resolution against
-the published siblings — neither could lock until the other released. Since nothing here
-imports those packages, the dev-only group is gone (with by-hand install instructions left in
-`pyproject.toml`), permanently breaking the cycle. The lock now resolves to transformers
-5.14.1, huggingface-hub 1.25.1, and safetensors 0.8.0.
+If you have a pre-existing, un-migrated LanceDB store, opt in explicitly:
+
+```bash
+pip install 'kgmodule-utils[semantic,lancedb]'
+```
+
+Everyone else needs no change. This is why the release is 0.10.0 rather than 0.9.1 —
+removing a dependency from a published extra is breaking for whoever relied on it.
+
+## Fixed: graph pages were not self-contained
+
+`kg_utils.viz.build_graph_html` advertised "a self-contained HTML document". It wasn't.
+pyvis 0.3.2 hardcodes two Bootstrap CDN tags in its own Jinja template, and the
+`cdn_resources="in_line"` setting we already pass governs only the vis-network assets — it
+does not touch them. Every generated page fetched `bootstrap.min.css` and
+`bootstrap.bundle.min.js` from jsdelivr.
+
+Two consequences. Offline — an air-gapped machine, a plane, a reviewer who was mailed the
+file — both requests fail and the layout collapses: the network canvas stops filling its
+container and an unstyled band appears below it. And a page generated from a private
+codebase silently contacted a third-party host every time someone opened it.
+
+The output uses exactly two Bootstrap classes, so the fix strips the CDN tags and supplies
+those rules directly, copied verbatim from `bootstrap@5.0.0-beta3`, along with the two
+Reboot rules that turn out to be load-bearing for the box model. The result measures
+pixel-identical to real Bootstrap with zero external requests, and page size is essentially
+unchanged. `bootstrap.bundle.min.js` was entirely unused — no dropdowns, modals, tooltips,
+or collapses in our output — and is simply dropped.
+
+**Regenerate any graph HTML built on 0.7.0 through 0.9.0.** Those files phone home and
+break offline. No consumer code changes are needed; the fix lands once here and every
+consumer inherits it on upgrade.
+
+The bug survived because the test meant to catch it named a CDN host instead of the
+property it claimed to test — it asserted the absence of `cdnjs.cloudflare.com` while the
+page reached out to `cdn.jsdelivr.net`. It is now host-agnostic and fails on any external
+reference, including one a future pyvis release might introduce.
+
+## Also in this release
+
+- **`rich` pinned to `>=13.0.0,<15.0.0`** rather than an open upper bound.
+- **Packaging metadata modernised.** The deprecated `[project.license]` table form is now
+  the PEP 639 SPDX expression, so the wheel ships as Metadata-Version 2.4 with
+  `License-Expression: Elastic-2.0` and the LICENSE bundled.
 
 ## Upgrading
 
-**No re-index, no code change.** Rebuilding is optional — existing indexes keep working and
-return identical results.
-
-The one thing to know: **the `semantic` extra now requires transformers 5.** If your
-environment is pinned to transformers 4.x, that pin must move to `>=5.5.0,<6` (bringing
-huggingface-hub 1.x and safetensors 0.8.x with it). There is no API or embedding-output
-change on this side.
-
-If you previously relied on the `kgdeps` extra to pull the sibling KG packages, install them
-directly instead:
-
 ```bash
-pip install doc-kg pycode-kg
-pip install 'kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git'
-pip install 'agent-kg @ git+https://github.com/Flux-Frontiers/agent_kg.git'
+pip install --upgrade kgmodule-utils
 ```
+
+Add the `lancedb` extra only if you have an un-migrated LanceDB store. Regenerate any
+distributed graph HTML.
 
 ---
 
