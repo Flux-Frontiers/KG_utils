@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
@@ -61,6 +62,44 @@ _PHYSICS_OPTIONS: Final[dict[str, Any]] = {
     },
     "stabilization": {"iterations": 150},
 }
+
+#: pyvis 0.3.2 hardcodes Bootstrap CDN tags in its own template, and
+#: ``cdn_resources="in_line"`` governs only the vis-network assets -- it does not
+#: touch these.  Our output uses exactly two Bootstrap classes (``.card`` wrapping
+#: the graph and ``.card-body`` on the canvas container), so we strip the CDN tags
+#: and supply their rules directly rather than making an offline page depend on a
+#: third-party host.  ``bootstrap.bundle.min.js`` is entirely unused -- nothing we
+#: emit has a dropdown, modal, tooltip, or collapse -- so it is simply dropped.
+_BOOTSTRAP_CDN: Final[re.Pattern[str]] = re.compile(
+    r"<link\b[^>]*cdn\.jsdelivr\.net[^>]*>"
+    r"|<script\b[^>]*cdn\.jsdelivr\.net[^>]*>\s*</script>",
+    re.S,
+)
+
+#: Copied verbatim from ``bootstrap@5.0.0-beta3``: the ``.card`` / ``.card-body``
+#: rules, plus two Reboot rules that are load-bearing for the box model.  Without
+#: the ``box-sizing`` reset ``.card-body`` overflows its parent by 32px; without
+#: ``body { margin: 0 }`` the browser's default 8px margin narrows the card by
+#: 16px.  The reset is scoped to ``.card`` rather than ``*`` so it cannot leak
+#: into a host page that embeds this markup in a larger document.
+_BOOTSTRAP_SHIM: Final[str] = """<style type="text/css">
+body { margin: 0; }
+.card, .card *, .card *::before, .card *::after { box-sizing: border-box; }
+.card { position: relative; display: flex; flex-direction: column;
+        min-width: 0; word-wrap: break-word; background-color: #fff;
+        background-clip: border-box; border: 1px solid rgba(0,0,0,.125);
+        border-radius: .25rem; }
+.card-body { flex: 1 1 auto; padding: 1rem 1rem; }
+</style>"""
+
+
+def _inline_bootstrap(document: str) -> str:
+    """Replace pyvis's Bootstrap CDN tags with the rules the page actually uses.
+
+    :param document: HTML as pyvis wrote it.
+    :return: The same page with no external references.
+    """
+    return _BOOTSTRAP_CDN.sub("", document).replace("</head>", _BOOTSTRAP_SHIM + "</head>", 1)
 
 
 def _describe(scores: Any, kept: Sequence[str], suffix: str) -> str:
@@ -282,6 +321,7 @@ def build_graph_html(
     finally:
         os.unlink(tmp_path)
 
+    document = _inline_bootstrap(document)
     return document.replace("</body>", _panel_markup(panel_data) + "</body>")
 
 

@@ -38,9 +38,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`docs/viz-bootstrap-selfcontainment.md`** — documents that
-  `kg_utils.viz.build_graph_html` output fetches Bootstrap from a CDN and so is
-  not self-contained offline. Documentation only; the fix is not yet applied.
+- **`docs/viz-bootstrap-selfcontainment.md`** — the measured rationale behind the
+  Bootstrap shim, retained so the copied CSS rules are not mistaken for
+  guesswork.
+
+### Fixed
+
+- **`kg_utils.viz.build_graph_html` output is now genuinely self-contained.**
+  pyvis 0.3.2 hardcodes two Bootstrap CDN tags in its own template, and
+  `cdn_resources="in_line"` governs only the vis-network assets, so every
+  generated page fetched `bootstrap.min.css` and `bootstrap.bundle.min.js` from
+  jsdelivr — breaking offline with a collapsed layout, and silently contacting a
+  third party for a page that may be generated from a private codebase.
+  `_inline_bootstrap()` now strips both tags and supplies the two rules the page
+  actually uses (`.card`, `.card-body`), copied verbatim from
+  `bootstrap@5.0.0-beta3`, plus the `box-sizing` and `body { margin: 0 }` Reboot
+  rules that are load-bearing for the box model. Measured pixel-identical to real
+  Bootstrap with zero external requests; page size is unchanged. The
+  `bootstrap.bundle.min.js` payload was entirely unused and is dropped.
+  **Pages generated on 0.7.0–0.9.0 should be regenerated.**
+- **`test_output_is_self_contained` now tests the property it claims.** It
+  asserted the absence of one named CDN host, which stayed true while the page
+  reached out to a different one; it is now host-agnostic and fails on any
+  external reference.
 
 ## [0.9.0] - 2026-07-28
 

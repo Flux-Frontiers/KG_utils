@@ -1,8 +1,12 @@
 # `kg_utils.viz` output is not self-contained — it fetches Bootstrap from a CDN
 
-**Status:** open, fix drafted and verified below. Target: 0.7.1.
-**Affects:** `kg_utils.viz.build_graph_html` as shipped in 0.7.0, and therefore every
-consumer of it (pycode_kg today; doc_kg and gutenberg_kg once they adopt it).
+**Status:** **fixed in 0.10.0** — `_inline_bootstrap()` in `kg_utils/viz/graph_html.py`,
+covered by `tests/test_viz.py::test_output_is_self_contained` and
+`::test_bootstrap_shim_survives`. Retained as the rationale for those rules.
+**Affects:** `kg_utils.viz.build_graph_html` as shipped in 0.7.0 through 0.9.0, and
+therefore every consumer of it (pycode_kg today; doc_kg and gutenberg_kg once they
+adopt it). Anyone who generated and distributed a graph on those versions shipped a
+file that phones home and breaks offline, and will want to regenerate it.
 
 ## Symptom
 

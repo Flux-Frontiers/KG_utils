@@ -1,8 +1,13 @@
-# pyproject.toml — kgmodule-utils: shared types and snapshot infrastructure for KG modules
+# pyproject.toml — kgmodule-utils: shared SDK layer for the KGModule ecosystem
 #
-# Zero-dependency (stdlib-only) package providing:
-#   kg_utils.types    — NodeSpec, EdgeSpec, KGExtractor, KGModule, etc.
+# The core install is zero-dependency (stdlib only):
+#   kg_utils.specs     — NodeSpec, EdgeSpec, KGExtractor, etc.
 #   kg_utils.snapshots — Snapshot, SnapshotManager, SnapshotManifest, etc.
+#   kg_utils.store     — SQLite-backed GraphStore
+#   kg_utils.module    — KGModule pipeline base
+#
+# Everything heavier is behind an extra: semantic, lancedb, sqlite-vec, viz,
+# synthesis, synthesis-mflux (see [project.optional-dependencies] below).
 
 [build-system]
 requires = ["poetry-core"]
@@ -13,7 +18,8 @@ name = "kgmodule-utils"
 version = "0.10.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
-license = { text = "Elastic-2.0" }
+license = "Elastic-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "Eric G. Suchanek, PhD", email = "suchanek@flux-frontiers.com" }
 ]
@@ -87,9 +93,7 @@ packages = [{include = "kg_utils", from = "src"}]
 # forces poetry's universal resolution to reconcile the transformers pin of
 # every *published* sibling against this project's own -- a deadlock, since
 # doc-kg and pycode-kg each depend on the other. Install them by hand:
-#   pip install doc-kg pycode-kg          # both on PyPI
-#   pip install 'kg-rag @ git+https://github.com/Flux-Frontiers/KGRAG.git'
-#   pip install 'agent-kg @ git+https://github.com/Flux-Frontiers/agent_kg.git'
+#   pip install doc-kg pycode-kg   kg-rag agent-kg       # on PyPI
 
 [tool.poetry.group.dev]
 optional = true
