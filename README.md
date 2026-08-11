@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.10.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.11.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21387077.svg)](https://doi.org/10.5281/zenodo.21387077)
@@ -37,6 +37,7 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 - **`kg_utils.snapshots`** — `Snapshot`, `SnapshotManager`, `SnapshotManifest` for temporal metric tracking
 - **`kg_utils.synthesis`** — Unified text + image synthesis: oMLX, Ollama, and OpenAI text backends; mflux-local, mflux-serve, and DALL-E image backends; all env-var configurable
 - **`kg_utils.viz`** — Shared interactive-HTML graph rendering (`viz` extra): `build_graph_html()`, `select_nodes()`, `GraphTheme`, `TooltipSpec` — one renderer for code, document, and metabolic graphs, with domain differences supplied as data
+- **`kg_utils.viz3d`** — Shared 3-D graph layout (`viz3d` extra): `Layout3D`, `AlliumLayout`, `FunnelLayout`, `LayoutNode`, `LayoutEdge` — coordinates only, no renderer, so each module keeps its own viewer and shares the spatial reasoning
 - **`kg_utils.analysis`** — Read persisted centrality back out of SQLite: `load_scores()`, `available_metrics()`, `ScoreSet` (raw score, dense rank, percentile, range scaling); stdlib only
 
 ---
@@ -82,6 +83,12 @@ pip install 'kgmodule-utils[synthesis-mflux]'
 
 ```bash
 pip install 'kgmodule-utils[viz]'
+```
+
+### With 3-D graph layout (numpy)
+
+```bash
+pip install 'kgmodule-utils[viz3d]'
 ```
 
 ### In a Poetry project
@@ -243,6 +250,34 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 | `GraphTheme` | Names a domain's node kinds and edge relations (`KindStyle`, `with_alpha()`) |
 | `TooltipSpec` | Names the node fields worth showing in a tooltip (`TooltipRow`) |
 
+### `kg_utils.viz3d`
+
+> Requires the `viz3d` extra.
+
+A layout maps nodes and edges onto `{node_id: [x, y, z]}` and draws nothing, so the
+same layout feeds a PyVista desktop viewer, an off-screen light-field renderer, or a
+plain scatter plot. Which kind is a root, which relation means containment, and which
+kind sits on which Z level are all constructor arguments — one engine, every domain.
+
+| Class / function | Description |
+|---|---|
+| `Layout3D` | ABC for layout strategies: `compute(nodes, edges) -> {id: [x, y, z]}` |
+| `AlliumLayout` | Each root node becomes a Giant Allium — a stem with a Fibonacci-sphere head of its children (`root_kind`, `contains_rel`) |
+| `FunnelLayout` | Node kind picks the Z layer, golden-angle disc spiral within each layer (`zlevels`, `level_sizes`, `default_level`) |
+| `LayoutNode` / `LayoutEdge` | Domain-neutral node and edge DTOs (`from_dict()`) |
+| `fibonacci_sphere()` / `fibonacci_annulus()` / `golden_spiral_2d()` | Even point distributions for building your own layout |
+
+```python
+from kg_utils.viz3d import FunnelLayout, LayoutEdge, LayoutNode
+
+layout = FunnelLayout(
+    layer_gap=12.0,
+    zlevels={"document": 0, "section": 1, "chunk": 2},
+    level_sizes={0: 1.8, 1: 0.9, 2: 0.28},
+)
+positions = layout.compute(nodes, edges)   # {node_id: np.array([x, y, z])}
+```
+
 ### `kg_utils.analysis`
 
 | Class / function | Description |
@@ -295,6 +330,9 @@ KG_utils/
 │       │   ├── graph_html.py # Interactive HTML renderer (vis-network inlined)
 │       │   ├── theme.py      # GraphTheme, KindStyle, with_alpha
 │       │   └── tooltip.py    # TooltipSpec, TooltipRow
+│       ├── viz3d/            # Shared 3-D graph layout (viz3d extra)
+│       │   ├── __init__.py   # Layout3D, AlliumLayout, FunnelLayout, LayoutNode, LayoutEdge
+│       │   └── layout.py     # Layout engine + Fibonacci point distributions
 │       └── analysis/
 │           ├── __init__.py   # load_scores, available_metrics, ScoreSet
 │           └── scores.py     # Read persisted centrality out of SQLite
@@ -342,7 +380,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.10.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21387077
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.11.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21387077
 
 **BibTeX**
 
@@ -350,7 +388,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.10.0},
+  version   = {0.11.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},
