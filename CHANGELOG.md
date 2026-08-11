@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **pytest dev pin raised to `>=9.0.3`**, resolving GHSA-6w46-j5rx-g56g /
+  PYSEC-2026-1845. The `^8.0.0` cap deferred in the 0.10.x security pass is now
+  lifted. Dev-group only — pytest is not part of any published extra and does
+  not appear in the wheel or sdist metadata, so no released artifact changes.
+
 ### Removed
 
 ### Fixed
