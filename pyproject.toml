@@ -7,7 +7,7 @@
 #   kg_utils.module    — KGModule pipeline base
 #
 # Everything heavier is behind an extra: semantic, lancedb, sqlite-vec, viz,
-# synthesis, synthesis-mflux (see [project.optional-dependencies] below).
+# viz3d, synthesis, synthesis-mflux (see [project.optional-dependencies] below).
 
 [build-system]
 requires = ["poetry-core"]
@@ -15,7 +15,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.10.0"
+version = "0.11.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -56,6 +56,12 @@ semantic = [
 # zero-dependency install stays zero-dependency.
 viz = [
     "pyvis>=0.3.2",
+]
+# Shared 3-D layout (kg_utils.viz3d).  Pure numpy: the layouts return
+# coordinates and draw nothing, so the heavy renderer stack (pyvista, Qt) stays
+# in whichever module actually opens a window.
+viz3d = [
+    "numpy>=1.24.0",
 ]
 # Exact pin: sqlite-vec is pre-1.0, breaking minors are possible. Prebuilt
 # wheels ship for macOS (x86_64 + arm64), Linux (x86_64 + aarch64), and Windows

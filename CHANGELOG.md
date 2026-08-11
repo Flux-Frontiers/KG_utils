@@ -15,6 +15,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.11.0] - 2026-08-11
+
+### Added
+
+- **`kg_utils.viz3d` — shared 3-D graph layout**, behind a new `viz3d` extra
+  (numpy only). Moved out of `pycode_kg.layout3d`, where gutenberg_kg was
+  already importing it — paying a full `pycode-kg` dependency for five symbols
+  it shares with no other part of that package.
+  - `Layout3D` ABC, `LayoutNode` / `LayoutEdge` DTOs, `AlliumLayout`,
+    `FunnelLayout`.
+  - `fibonacci_sphere()`, `fibonacci_annulus()`, and `golden_spiral_2d()`
+    (promoted from the private `_golden_spiral_2d`) for building your own
+    layout.
+  - The layouts return coordinates and draw nothing, so pyvista and Qt stay in
+    whichever module actually opens a window.
+  - Domain coupling is now constructor arguments rather than an import:
+    `AlliumLayout(root_kind=..., contains_rel=...)` and
+    `FunnelLayout(zlevels=..., level_sizes=..., default_level=...)`. Defaults
+    preserve the previous code-graph behaviour except for `zlevels`, which now
+    defaults to a flat disc — a domain that declares no hierarchy should render
+    as having none rather than inheriting Python's.
+
+### Changed
+
+- `kg_utils/__init__.py` now lists every optional extra, not three of seven, and
+  no longer claims `[semantic]` installs `lancedb` — that stopped being true in
+  0.10.0.
+
 ## [0.10.0] - 2026-08-03
 
 ### Removed

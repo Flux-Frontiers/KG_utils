@@ -2216,7 +2216,7 @@ description = "Fundamental package for array computing in Python"
 optional = true
 python-versions = ">=3.12"
 groups = ["main"]
-markers = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "numpy-2.5.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:2c889b56fe48b1018f764b0eec8df59ab654e9148aa91faa12596043500de277"},
     {file = "numpy-2.5.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:ab451b59c5643c570974c43aef780703ef1d3b4965d2be07afd530615a9358d1"},
@@ -4442,8 +4442,9 @@ sqlite-vec = ["sqlite-vec"]
 synthesis = ["httpx", "openai", "pillow"]
 synthesis-mflux = ["httpx", "mflux", "openai", "pillow"]
 viz = ["pyvis"]
+viz3d = ["numpy"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "2c57ef8291d5d5d34e8fd64a075c9bf152c35ea6aa2c8b48895390846c67bc55"
+content-hash = "088efb8d39d1e8e459724cb0e2b85fb62d2718e5aa0ac6a0babbc58b8b6d3c87"

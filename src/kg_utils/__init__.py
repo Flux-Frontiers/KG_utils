@@ -22,12 +22,22 @@ Sub-packages / modules:
                           centrality read back for ranking and visual encoding.
     kg_utils.viz        — GraphTheme, TooltipSpec, build_graph_html, select_nodes:
                           shared interactive graph rendering (needs the 'viz' extra).
+    kg_utils.viz3d      — Layout3D, LayoutNode, LayoutEdge, AlliumLayout, FunnelLayout:
+                          shared 3-D graph layout (needs the 'viz3d' extra).
 
 Optional extras
 ---------------
-    pip install 'kgmodule-utils[semantic]'         # lancedb + sentence-transformers
+The core install is stdlib-only; everything heavier is opt-in.
+
+    pip install 'kgmodule-utils[semantic]'         # sentence-transformers + torch
+                                                   #   + sqlite-vec (the default backend)
+    pip install 'kgmodule-utils[sqlite-vec]'       # sqlite-vec alone
+    pip install 'kgmodule-utils[lancedb]'          # LanceDBBackend, for un-migrated
+                                                   #   legacy stores only
+    pip install 'kgmodule-utils[viz]'              # pyvis — interactive graph HTML
+    pip install 'kgmodule-utils[viz3d]'            # numpy — 3-D graph layout
     pip install 'kgmodule-utils[synthesis]'        # httpx + openai + pillow
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
