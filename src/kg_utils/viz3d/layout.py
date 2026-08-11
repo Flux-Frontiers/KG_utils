@@ -312,7 +312,10 @@ class AlliumLayout(Layout3D):
       at the origin.
 
     Multiple alliums are arranged in a Fibonacci annulus in the XY plane so
-    they are evenly spaced regardless of count.
+    they are evenly spaced regardless of count.  Roots take their slots in the
+    order they appear in the node list, so **callers must pass a stable order**
+    — a store whose ordering varies between rebuilds will make the whole scene
+    shuffle even when the graph has not changed.
 
     Inspired by :class:`GiantAllium` in *repo_vis/pkg_visualizer/plants3d.py*.
 

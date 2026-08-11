@@ -198,6 +198,82 @@ def test_allium_stems_sit_on_the_ground_and_heads_float():
     assert np.linalg.norm(pos["fn:a.A.run"] - pos["cls:a.A"]) < 2.0
 
 
+def test_allium_head_radius_formula_is_a_contract():
+    """Head radius is ``base_head_radius + sqrt(n_children) * 0.4``.
+
+    Downstream renderers size their node glyphs against the room this formula
+    leaves them — pycode_kg's `test_viz3d_sizing` asserts a max-centrality
+    function still fits inside the head of a four-child module. Changing the
+    coefficient silently re-tunes every consumer's occlusion budget, so it is
+    pinned here rather than left as an implementation detail.
+    """
+    n_children = 6
+    root = LayoutNode("mod:big", "module", "big")
+    kids = [LayoutNode(f"fn:{i}", "function", str(i)) for i in range(n_children)]
+    edges = [LayoutEdge("mod:big", "CONTAINS", k.id) for k in kids]
+
+    layout = AlliumLayout(stem_height=8.0, base_head_radius=2.0)
+    pos = layout.compute([root, *kids], edges)
+
+    apex = np.array([pos["mod:big"][0], pos["mod:big"][1], 8.0])
+    expected = 2.0 + np.sqrt(n_children) * 0.4
+    for k in kids:
+        assert np.linalg.norm(pos[k.id] - apex) == pytest.approx(expected)
+
+
+def test_allium_orbit_radius_formula_is_a_contract():
+    """Grandchild orbit radius is ``method_orbit_radius + sqrt(n) * 0.15``."""
+    n_grand = 9
+    root = LayoutNode("mod:m", "module", "m")
+    parent = LayoutNode("cls:C", "class", "C")
+    grand = [LayoutNode(f"m:{i}", "method", str(i)) for i in range(n_grand)]
+    edges = [
+        LayoutEdge("mod:m", "CONTAINS", "cls:C"),
+        *[LayoutEdge("cls:C", "CONTAINS", g.id) for g in grand],
+    ]
+
+    layout = AlliumLayout(method_orbit_radius=0.8)
+    pos = layout.compute([root, parent, *grand], edges)
+
+    expected = 0.8 + np.sqrt(n_grand) * 0.15
+    for g in grand:
+        assert np.linalg.norm(pos[g.id] - pos["cls:C"]) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("layout_factory", [AlliumLayout, FunnelLayout])
+def test_layouts_are_deterministic(layout_factory):
+    """Identical input must give identical positions.
+
+    A viewer recomputes the layout on every filter change and re-render; a
+    layout that drifted would make nodes jump for no user-visible reason.
+    """
+    first = layout_factory().compute(CODE_NODES, CODE_EDGES)
+    second = layout_factory().compute(CODE_NODES, CODE_EDGES)
+    assert set(first) == set(second)
+    for nid in first:
+        assert np.allclose(first[nid], second[nid])
+
+
+def test_allium_slot_assignment_follows_node_order():
+    """Roots take annulus slots in list order — so callers must pass a stable one.
+
+    This is a documented constraint, not an accident: reordering the node list
+    moves every root to a different slot. Callers feed the layout whatever order
+    their store returned, so a store whose ordering is not stable across
+    rebuilds will make the whole scene shuffle between renders even though
+    nothing in the graph changed.
+
+    Sorting internally would make this moot but would also relocate every node
+    in every existing scene, so the constraint is pinned here instead.
+    """
+    forward = AlliumLayout().compute(CODE_NODES, CODE_EDGES)
+    reverse = AlliumLayout().compute(list(reversed(CODE_NODES)), CODE_EDGES)
+
+    # Same node set, same slots occupied — but not the same node in each slot.
+    assert set(forward) == set(reverse)
+    assert not np.allclose(forward["mod:a.py"], reverse["mod:a.py"])
+
+
 def test_allium_root_kind_and_contains_rel_are_domain_supplied():
     """A document corpus gets the same treatment by naming its own vocabulary."""
     layout = AlliumLayout(root_kind="document", contains_rel="HAS_SECTION")
