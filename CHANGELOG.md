@@ -46,10 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PyVista is a real runtime dependency of three shipped functions, and it
   belonged to no extra at all: every caller hand-declared it and CI installed it
   by hand so `ty` could resolve the import. It could not simply be added to
-  `viz3d`, because `pycode_kg` takes `kgmodule-utils[semantic,viz3d]` in its
-  *main* dependencies for the layouts alone, and `pycode-kg` is itself a
-  dependency of nine repos — VTK would have reached all of them. Depend on
-  `viz3d-render` to build geometry, `viz3d` for coordinates only.
+  `viz3d`, because `pycode_kg` has already drawn this line inside its own
+  package: it takes `kgmodule-utils[semantic,viz3d]` in its *main* dependencies
+  for the layouts, and puts `pyvista` and `pyvistaqt` in its own `viz3d` extra
+  so that rendering stays opt-in. Adding PyVista to the shared `viz3d` extra
+  would quietly undo that, handing VTK to everyone who installs `pycode-kg`
+  whether they render or not. Depend on `viz3d-render` to build geometry,
+  `viz3d` for coordinates only.
 
 ### Changed
 
