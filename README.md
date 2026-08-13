@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.11.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.12.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21284866.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -37,7 +37,7 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 - **`kg_utils.snapshots`** — `Snapshot`, `SnapshotManager`, `SnapshotManifest` for temporal metric tracking
 - **`kg_utils.synthesis`** — Unified text + image synthesis: oMLX, Ollama, and OpenAI text backends; mflux-local, mflux-serve, and DALL-E image backends; all env-var configurable
 - **`kg_utils.viz`** — Shared interactive-HTML graph rendering (`viz` extra): `build_graph_html()`, `select_nodes()`, `GraphTheme`, `TooltipSpec` — one renderer for code, document, and metabolic graphs, with domain differences supplied as data
-- **`kg_utils.viz3d`** — Shared 3-D graph layout (`viz3d` extra): `Layout3D`, `AlliumLayout`, `FunnelLayout`, `LayoutNode`, `LayoutEdge` — coordinates only, no renderer, so each module keeps its own viewer and shares the spatial reasoning
+- **`kg_utils.viz3d`** — Shared 3-D graph layout (`viz3d` extra): `Layout3D`, `AlliumLayout`, `FunnelLayout`, `LayoutNode`, `LayoutEdge` — coordinates only, no renderer, so each module keeps its own viewer and shares the spatial reasoning. `kg_utils.viz3d.organic` adds space-colonization tree skeletons (`grow_tree`, `tree_mesh`) for corpora that should read as wood rather than as a scatter plot
 - **`kg_utils.analysis`** — Read persisted centrality back out of SQLite: `load_scores()`, `available_metrics()`, `ScoreSet` (raw score, dense rank, percentile, range scaling); stdlib only
 
 ---
@@ -267,6 +267,39 @@ kind sits on which Z level are all constructor arguments — one engine, every d
 | `LayoutNode` / `LayoutEdge` | Domain-neutral node and edge DTOs (`from_dict()`) |
 | `fibonacci_sphere()` / `fibonacci_annulus()` / `golden_spiral_2d()` | Even point distributions for building your own layout |
 
+#### Organic trees — `kg_utils.viz3d.organic`
+
+Lattice layouts place nodes; this half *grows* a skeleton toward them, so a
+corpus reads as wood rather than as a scatter plot. Leaf-level positions become
+attraction points and the branching comes from space colonization, so every limb
+is a real structural path and the canopy's shape is the graph's shape.
+
+The engine takes crown attractors and a root — **the hierarchy is yours to
+choose**. A document corpus grows document → section → chunk; a diary grows
+trunk → one limb per year → entry cluster → leaves. Because the pipe model sizes
+a limb by what it carries, a prolific year grows visibly heavier wood.
+
+| Function | Description |
+|---|---|
+| `grow_tree(attractors, root, key=...)` | One-call entry point: `colonize` then `pipe_radii`, seeded reproducibly from `key` |
+| `colonize()` | Space colonization (Runions, Lane & Prusinkiewicz 2007) → `Skeleton` |
+| `pipe_radii()` | Per-node branch radius by da Vinci's rule (`PIPE_EXPONENT`) |
+| `root_to_tip_paths()` / `smooth_paths()` | Skeleton paths, and their Catmull-Rom smoothing |
+| `tree_mesh()` / `leaf_glyphs()` | Swept-tube wood and foliage as `PolyData` |
+| `crown_spacing()` / `seed_from_key()` | Natural length scale of a cloud; stable seed from any string |
+
+```python
+from kg_utils.viz3d import grow_tree, tree_mesh
+
+skeleton = grow_tree(chunk_positions, root=[0, 0, 0], key="pepys")
+wood = tree_mesh(skeleton)          # needs pyvista; see below
+```
+
+> **The `viz3d` extra installs NumPy only.** The geometry above is pure NumPy;
+> only `smooth_paths`, `tree_mesh` and `leaf_glyphs` need PyVista, which they
+> import lazily. Install `pyvista` alongside if you want meshes — everything
+> else works without it.
+
 ```python
 from kg_utils.viz3d import FunnelLayout, LayoutEdge, LayoutNode
 
@@ -380,7 +413,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.11.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.12.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -388,7 +421,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.11.0},
+  version   = {0.12.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

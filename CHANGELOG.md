@@ -11,6 +11,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Removed
+
+### Fixed
+
+## [0.12.0] - 2026-08-13
+
+### Added
+
+- **`kg_utils.viz3d.organic` — botanically credible tree skeletons**, promoted
+  verbatim from `gutenberg_kg.layout_organic`. Finishes what 0.11.0 started: the
+  layouts moved out of `pycode_kg` so drawing a graph no longer required a
+  Python source-code analyser, and the tree engine was still trapped in a book
+  corpus for the same reason.
+  - Space colonization (`colonize`, Runions/Lane/Prusinkiewicz 2007), the
+    pipe model (`pipe_radii`, da Vinci's rule), `root_to_tip_paths`,
+    `smooth_paths`, `tree_mesh`, `leaf_glyphs`, `crown_spacing`, and
+    `grow_tree` as the one-call entry point.
+  - The engine takes crown attractors and a root; **the hierarchy is the
+    caller's business**. A corpus grows document → section → chunk, a diary
+    grows trunk → period limb → entry cluster → leaves. Nothing here knows
+    which.
+  - `seed_from_slug` → **`seed_from_key`**, and `grow_tree(slug=...)` →
+    `grow_tree(key=...)`. The concept was never book-specific; only the name
+    was. Renamed on promotion rather than carrying a book noun into a shared
+    package.
+  - **The `viz3d` extra stays NumPy-only.** Only `smooth_paths`, `tree_mesh`
+    and `leaf_glyphs` need PyVista and they import it lazily, so the 13 repos
+    that depend on `kgmodule-utils` do not acquire VTK for a layout import.
+    Calling one without PyVista raises a `ModuleNotFoundError` naming the
+    install command rather than an `AttributeError` on a missing module.
+
+### Changed
+
 - **pytest dev pin raised to `>=9.0.3`**, resolving GHSA-6w46-j5rx-g56g /
   PYSEC-2026-1845. The `^8.0.0` cap deferred in the 0.10.x security pass is now
   lifted. Dev-group only — pytest is not part of any published extra and does
