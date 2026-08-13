@@ -227,3 +227,132 @@ class TestPyVistaIsOptional:
         assert len(smooth_paths(sk)) == len(sk.tips)
         assert tree_mesh(sk).n_points > 0
         assert leaf_glyphs(_document_cloud(), sk).n_points > 0
+
+
+# ---------------------------------------------------------------------------
+# Ported from gutenberg_kg's tests/test_layout_organic.py, which covered this
+# engine while it lived there.  Kept verbatim in substance so the promotion
+# loses no coverage; only the slug -> key rename and the import path changed.
+# ---------------------------------------------------------------------------
+
+
+def _ellipsoid_crown(n: int, seed: int = 1) -> np.ndarray:
+    """A filled ellipsoidal crown of *n* points, centred above the origin."""
+    rng = np.random.default_rng(seed)
+    return rng.normal(0, 1, (n, 3)) * np.array([4.0, 4.0, 5.0]) + np.array([0.0, 0.0, 30.0])
+
+
+def _hollow_crown(n: int, seed: int = 2) -> np.ndarray:
+    """An annular crown with an empty core — the shape a diary's entries make."""
+    rng = np.random.default_rng(seed)
+    theta = rng.uniform(0, 2 * np.pi, n)
+    radius = rng.uniform(30.0, 45.0, n)
+    z = rng.uniform(13.0, 44.0, n)
+    return np.column_stack([radius * np.cos(theta), radius * np.sin(theta), z])
+
+
+class TestColonizeEdges:
+    """Boundary and control-parameter behaviour of the growth loop."""
+
+    def test_empty_attractors_yield_bare_root(self) -> None:
+        sk = colonize(np.empty((0, 3)), np.zeros(3))
+        assert sk.n_nodes == 1
+        assert sk.parents[0] == -1
+
+    def test_growth_branches_rather_than_chaining(self) -> None:
+        sk = colonize(_ellipsoid_crown(400), np.zeros(3), seed=3)
+        assert sk.n_nodes > 100
+        # A chain has exactly one tip; a tree has many.
+        assert len(sk.tips) > 10
+
+    def test_large_hollow_crown_still_branches(self) -> None:
+        # Regression: a step derived from inter-chunk spacing is far too fine to
+        # span an empty core, so the leader marched up the hole as one chain.
+        sk = colonize(_hollow_crown(3000), np.zeros(3), seed=4)
+        assert len(sk.tips) > 5
+
+    def test_parents_always_precede_their_children(self) -> None:
+        sk = colonize(_ellipsoid_crown(200), np.zeros(3), seed=5)
+        assert sk.parents[0] == -1
+        assert (sk.parents[1:] >= 0).all()
+        # colonize only ever appends children, which pipe_radii relies on.
+        assert (sk.parents[1:] < np.arange(1, sk.n_nodes)).all()
+
+    def test_growth_is_deterministic_for_a_seed(self) -> None:
+        crown = _ellipsoid_crown(300)
+        a = colonize(crown, np.zeros(3), seed=7)
+        b = colonize(crown, np.zeros(3), seed=7)
+        assert np.array_equal(a.points, b.points)
+
+    def test_uncapped_growth_uses_every_attractor(self) -> None:
+        sk = colonize(_ellipsoid_crown(200), np.zeros(3), max_attractors=None, seed=9)
+        assert sk.attractors_used == sk.attractors_total == 200
+
+    def test_cap_reports_both_counts(self) -> None:
+        sk = colonize(_ellipsoid_crown(5000), np.zeros(3), max_attractors=1000, seed=8)
+        assert sk.attractors_used == 1000
+        assert sk.attractors_total == 5000
+
+    def test_upward_tropism_lifts_the_crown(self) -> None:
+        crown = _ellipsoid_crown(300)
+        up = colonize(crown, np.zeros(3), tropism=(0, 0, 0.6), seed=11)
+        down = colonize(crown, np.zeros(3), tropism=(0, 0, -0.3), seed=11)
+        assert up.points[:, 2].max() > down.points[:, 2].max()
+
+
+class TestPipeRadiiDetail:
+    """The pipe model in detail — monotonicity, tips, and scale."""
+
+    def test_tips_get_the_tip_radius(self) -> None:
+        sk = colonize(_ellipsoid_crown(300), np.zeros(3), seed=12)
+        radii = pipe_radii(sk, tip_radius=0.05)
+        assert np.allclose(radii[sk.tips], 0.05)
+
+    def test_trunk_is_the_thickest_limb(self) -> None:
+        sk = colonize(_ellipsoid_crown(300), np.zeros(3), seed=13)
+        radii = pipe_radii(sk)
+        assert radii[0] == pytest.approx(radii.max())
+
+    def test_a_parent_is_never_thinner_than_its_child(self) -> None:
+        sk = colonize(_ellipsoid_crown(400), np.zeros(3), seed=14)
+        radii = pipe_radii(sk)
+        for child, parent in enumerate(sk.parents):
+            if parent >= 0:
+                assert radii[parent] >= radii[child] - 1e-9
+
+    def test_a_bigger_corpus_grows_a_thicker_trunk(self) -> None:
+        """This is what makes a prolific year read as heavier wood."""
+        small = pipe_radii(colonize(_ellipsoid_crown(120), np.zeros(3), seed=15))
+        large = pipe_radii(colonize(_ellipsoid_crown(2000), np.zeros(3), seed=15))
+        assert large[0] > small[0]
+
+    def test_radii_start_unset_and_are_stored(self) -> None:
+        sk = colonize(_ellipsoid_crown(100), np.zeros(3), seed=16)
+        assert sk.radii is None
+        pipe_radii(sk)
+        assert sk.radii is not None
+
+
+class TestSmoothing:
+    """Spline sweeps — the only geometry step that needs PyVista."""
+
+    def test_smoothing_adds_points_and_keeps_radii_aligned(self) -> None:
+        pytest.importorskip("pyvista")
+        from kg_utils.viz3d import smooth_paths
+
+        sk = grow_tree(_ellipsoid_crown(300), np.zeros(3), key="book")
+        raw = root_to_tip_paths(sk)
+        for (points, radii), path in zip(
+            smooth_paths(sk), (p for p in raw if len(p) >= 2), strict=False
+        ):
+            assert points.shape[0] >= len(path)
+            assert points.shape[0] == radii.shape[0]
+
+    def test_smoothing_fills_radii_when_missing(self) -> None:
+        pytest.importorskip("pyvista")
+        from kg_utils.viz3d import smooth_paths
+
+        sk = colonize(_ellipsoid_crown(200), np.zeros(3), seed=18)
+        assert sk.radii is None
+        assert smooth_paths(sk)
+        assert sk.radii is not None
