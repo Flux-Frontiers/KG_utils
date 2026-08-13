@@ -25,7 +25,6 @@ import importlib
 import pkgutil
 import shutil
 import subprocess
-import sys
 import zipfile
 from pathlib import Path
 
@@ -144,6 +143,6 @@ def test_every_source_module_is_packaged(tmp_path: Path) -> None:
         if "__pycache__" not in p.parts
     }
 
-    assert not (expected - packaged), (
-        "source modules absent from the built wheel: " + ", ".join(sorted(expected - packaged))
+    assert not (expected - packaged), "source modules absent from the built wheel: " + ", ".join(
+        sorted(expected - packaged)
     )

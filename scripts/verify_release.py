@@ -195,7 +195,7 @@ def main() -> None:
     print(f"ok    wheel is {wheel.name}")
 
     verify_wheel(wheel)
-    print(f"ok    installed wheel exports the full public API")
+    print("ok    installed wheel exports the full public API")
     print(f"\n{version} is publishable.")
 
 
