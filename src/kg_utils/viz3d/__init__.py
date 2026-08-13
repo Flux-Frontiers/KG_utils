@@ -12,6 +12,12 @@ renderer and shares the spatial reasoning.
 Domain differences are supplied as constructor arguments — which kind is a root,
 which relation means containment, which kind sits on which Z level — so a code
 graph, a document corpus, and a metabolic network share one implementation.
+
+:mod:`~kg_utils.viz3d.organic` is the other half: instead of placing nodes on a
+lattice it *grows* a tree skeleton toward them by space colonization, so a
+corpus reads as wood rather than as a scatter plot.  Its geometry is NumPy-only
+like the layouts; only its three mesh builders need PyVista, which they import
+lazily, so this extra stays light for callers that just want positions.
 """
 
 from kg_utils.viz3d.layout import (
@@ -25,15 +31,41 @@ from kg_utils.viz3d.layout import (
     fibonacci_sphere,
     golden_spiral_2d,
 )
+from kg_utils.viz3d.organic import (
+    MAX_ATTRACTORS,
+    PIPE_EXPONENT,
+    Skeleton,
+    colonize,
+    crown_spacing,
+    grow_tree,
+    leaf_glyphs,
+    pipe_radii,
+    root_to_tip_paths,
+    seed_from_key,
+    smooth_paths,
+    tree_mesh,
+)
 
 __all__ = [
     "DEFAULT_LEVEL_SIZE",
+    "MAX_ATTRACTORS",
+    "PIPE_EXPONENT",
     "AlliumLayout",
     "FunnelLayout",
     "Layout3D",
     "LayoutEdge",
     "LayoutNode",
+    "Skeleton",
+    "colonize",
+    "crown_spacing",
     "fibonacci_annulus",
     "fibonacci_sphere",
     "golden_spiral_2d",
+    "grow_tree",
+    "leaf_glyphs",
+    "pipe_radii",
+    "root_to_tip_paths",
+    "seed_from_key",
+    "smooth_paths",
+    "tree_mesh",
 ]

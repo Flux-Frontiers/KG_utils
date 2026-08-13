@@ -37,7 +37,7 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 - **`kg_utils.snapshots`** — `Snapshot`, `SnapshotManager`, `SnapshotManifest` for temporal metric tracking
 - **`kg_utils.synthesis`** — Unified text + image synthesis: oMLX, Ollama, and OpenAI text backends; mflux-local, mflux-serve, and DALL-E image backends; all env-var configurable
 - **`kg_utils.viz`** — Shared interactive-HTML graph rendering (`viz` extra): `build_graph_html()`, `select_nodes()`, `GraphTheme`, `TooltipSpec` — one renderer for code, document, and metabolic graphs, with domain differences supplied as data
-- **`kg_utils.viz3d`** — Shared 3-D graph layout (`viz3d` extra): `Layout3D`, `AlliumLayout`, `FunnelLayout`, `LayoutNode`, `LayoutEdge` — coordinates only, no renderer, so each module keeps its own viewer and shares the spatial reasoning
+- **`kg_utils.viz3d`** — Shared 3-D graph layout (`viz3d` extra): `Layout3D`, `AlliumLayout`, `FunnelLayout`, `LayoutNode`, `LayoutEdge` — coordinates only, no renderer, so each module keeps its own viewer and shares the spatial reasoning. `kg_utils.viz3d.organic` adds space-colonization tree skeletons (`grow_tree`, `tree_mesh`) for corpora that should read as wood rather than as a scatter plot
 - **`kg_utils.analysis`** — Read persisted centrality back out of SQLite: `load_scores()`, `available_metrics()`, `ScoreSet` (raw score, dense rank, percentile, range scaling); stdlib only
 
 ---
@@ -266,6 +266,39 @@ kind sits on which Z level are all constructor arguments — one engine, every d
 | `FunnelLayout` | Node kind picks the Z layer, golden-angle disc spiral within each layer (`zlevels`, `level_sizes`, `default_level`) |
 | `LayoutNode` / `LayoutEdge` | Domain-neutral node and edge DTOs (`from_dict()`) |
 | `fibonacci_sphere()` / `fibonacci_annulus()` / `golden_spiral_2d()` | Even point distributions for building your own layout |
+
+#### Organic trees — `kg_utils.viz3d.organic`
+
+Lattice layouts place nodes; this half *grows* a skeleton toward them, so a
+corpus reads as wood rather than as a scatter plot. Leaf-level positions become
+attraction points and the branching comes from space colonization, so every limb
+is a real structural path and the canopy's shape is the graph's shape.
+
+The engine takes crown attractors and a root — **the hierarchy is yours to
+choose**. A document corpus grows document → section → chunk; a diary grows
+trunk → one limb per year → entry cluster → leaves. Because the pipe model sizes
+a limb by what it carries, a prolific year grows visibly heavier wood.
+
+| Function | Description |
+|---|---|
+| `grow_tree(attractors, root, key=...)` | One-call entry point: `colonize` then `pipe_radii`, seeded reproducibly from `key` |
+| `colonize()` | Space colonization (Runions, Lane & Prusinkiewicz 2007) → `Skeleton` |
+| `pipe_radii()` | Per-node branch radius by da Vinci's rule (`PIPE_EXPONENT`) |
+| `root_to_tip_paths()` / `smooth_paths()` | Skeleton paths, and their Catmull-Rom smoothing |
+| `tree_mesh()` / `leaf_glyphs()` | Swept-tube wood and foliage as `PolyData` |
+| `crown_spacing()` / `seed_from_key()` | Natural length scale of a cloud; stable seed from any string |
+
+```python
+from kg_utils.viz3d import grow_tree, tree_mesh
+
+skeleton = grow_tree(chunk_positions, root=[0, 0, 0], key="pepys")
+wood = tree_mesh(skeleton)          # needs pyvista; see below
+```
+
+> **The `viz3d` extra installs NumPy only.** The geometry above is pure NumPy;
+> only `smooth_paths`, `tree_mesh` and `leaf_glyphs` need PyVista, which they
+> import lazily. Install `pyvista` alongside if you want meshes — everything
+> else works without it.
 
 ```python
 from kg_utils.viz3d import FunnelLayout, LayoutEdge, LayoutNode

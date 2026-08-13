@@ -15,6 +15,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.12.1] - 2026-08-13
+
+### Added
+
+- **`kg_utils.viz3d.organic` — botanically credible tree skeletons**, promoted
+  verbatim from `gutenberg_kg.layout_organic`. Finishes what 0.11.0 started: the
+  layouts moved out of `pycode_kg` so drawing a graph no longer required a
+  Python source-code analyser, and the tree engine was still trapped in a book
+  corpus for the same reason.
+  - Space colonization (`colonize`, Runions/Lane/Prusinkiewicz 2007), the
+    pipe model (`pipe_radii`, da Vinci's rule), `root_to_tip_paths`,
+    `smooth_paths`, `tree_mesh`, `leaf_glyphs`, `crown_spacing`, and
+    `grow_tree` as the one-call entry point.
+  - The engine takes crown attractors and a root; **the hierarchy is the
+    caller's business**. A corpus grows document → section → chunk, a diary
+    grows trunk → period limb → entry cluster → leaves. Nothing here knows
+    which.
+  - `seed_from_slug` → **`seed_from_key`**, and `grow_tree(slug=...)` →
+    `grow_tree(key=...)`. The concept was never book-specific; only the name
+    was. Renamed on promotion rather than carrying a book noun into a shared
+    package.
+  - **The `viz3d` extra stays NumPy-only.** Only `smooth_paths`, `tree_mesh`
+    and `leaf_glyphs` need PyVista and they import it lazily, so the 13 repos
+    that depend on `kgmodule-utils` do not acquire VTK for a layout import.
+    Calling one without PyVista raises a `ModuleNotFoundError` naming the
+    install command rather than an `AttributeError` on a missing module.
+
+### Changed
+
+### Removed
+
+### Fixed
+
+- **0.12.0 was published without the `viz3d` engine described above.** The
+  promotion landed on a branch that the `v0.12.0` tag does not contain, so the
+  tag's tree carries only `viz3d/__init__.py` and `viz3d/layout.py` and the
+  published wheel has no `kg_utils.viz3d.organic` at all. Importing
+  `grow_tree`, `colonize`, `crown_spacing`, `seed_from_key`, `Skeleton`,
+  `pipe_radii`, `tree_mesh` or `leaf_glyphs` from 0.12.0 raises `ImportError`.
+  This release ships what 0.12.0 was supposed to. 0.12.0 cannot be corrected in
+  place — PyPI permanently reserves an uploaded filename, so a fixed 0.12.0
+  could not be re-uploaded even after deleting the original.
+
 ## [0.12.0] - 2026-08-13
 
 ### Added
