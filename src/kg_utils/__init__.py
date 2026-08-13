@@ -24,6 +24,10 @@ Sub-packages / modules:
                           shared interactive graph rendering (needs the 'viz' extra).
     kg_utils.viz3d      — Layout3D, LayoutNode, LayoutEdge, AlliumLayout, FunnelLayout:
                           shared 3-D graph layout (needs the 'viz3d' extra).
+    kg_utils.viz3d.organic — colonize, pipe_radii, grow_tree, Skeleton: organic tree
+                          skeletons from crown attractors. Layout maths needs only
+                          'viz3d'; smooth_paths, tree_mesh and leaf_glyphs build
+                          PyVista meshes and need 'viz3d-render'.
 
 Optional extras
 ---------------
@@ -36,6 +40,8 @@ The core install is stdlib-only; everything heavier is opt-in.
                                                    #   legacy stores only
     pip install 'kgmodule-utils[viz]'              # pyvis — interactive graph HTML
     pip install 'kgmodule-utils[viz3d]'            # numpy — 3-D graph layout
+    pip install 'kgmodule-utils[viz3d-render]'     # + pyvista — build the meshes,
+                                                   #   not just the coordinates
     pip install 'kgmodule-utils[synthesis]'        # httpx + openai + pillow
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """

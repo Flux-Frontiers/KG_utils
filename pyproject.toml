@@ -7,7 +7,8 @@
 #   kg_utils.module    — KGModule pipeline base
 #
 # Everything heavier is behind an extra: semantic, lancedb, sqlite-vec, viz,
-# viz3d, synthesis, synthesis-mflux (see [project.optional-dependencies] below).
+# viz3d, viz3d-render, synthesis, synthesis-mflux (see
+# [project.optional-dependencies] below).
 
 [build-system]
 requires = ["poetry-core"]
@@ -60,8 +61,9 @@ viz = [
 # Shared 3-D layout (kg_utils.viz3d).  Pure numpy: the layouts return
 # coordinates and draw nothing, so the heavy renderer stack (pyvista, Qt) stays
 # in whichever module actually opens a window.  pycode_kg takes this in its main
-# dependencies purely for the layouts, and pycode-kg is itself a dependency of
-# nine repos, so anything added here reaches all of them — see viz3d-render.
+# dependencies purely for the layouts and keeps pyvista in its own viz3d extra, so
+# adding a renderer here would undo that split for every pycode-kg install — see
+# viz3d-render.
 viz3d = [
     "numpy>=1.24.0",
 ]

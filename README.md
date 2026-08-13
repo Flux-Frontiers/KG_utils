@@ -91,6 +91,15 @@ pip install 'kgmodule-utils[viz]'
 pip install 'kgmodule-utils[viz3d]'
 ```
 
+### With 3-D rendering (numpy + pyvista)
+
+The layouts above return coordinates and draw nothing. To build meshes from them
+— `smooth_paths`, `tree_mesh`, `leaf_glyphs` — you need a renderer too:
+
+```bash
+pip install 'kgmodule-utils[viz3d-render]'
+```
+
 ### In a Poetry project
 
 ```toml
@@ -252,7 +261,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 ### `kg_utils.viz3d`
 
-> Requires the `viz3d` extra.
+> Requires the `viz3d` extra for layouts, or `viz3d-render` to build meshes.
 
 A layout maps nodes and edges onto `{node_id: [x, y, z]}` and draws nothing, so the
 same layout feeds a PyVista desktop viewer, an off-screen light-field renderer, or a
@@ -287,6 +296,11 @@ a limb by what it carries, a prolific year grows visibly heavier wood.
 | `root_to_tip_paths()` / `smooth_paths()` | Skeleton paths, and their Catmull-Rom smoothing |
 | `tree_mesh()` / `leaf_glyphs()` | Swept-tube wood and foliage as `PolyData` |
 | `crown_spacing()` / `seed_from_key()` | Natural length scale of a cloud; stable seed from any string |
+
+The geometry above is NumPy-only and needs just `viz3d`. The three that return
+PyVista objects — `smooth_paths`, `tree_mesh`, `leaf_glyphs` — import it lazily
+and raise a `ModuleNotFoundError` naming the install if it is absent, so reach
+for `viz3d-render` when you intend to build meshes.
 
 ```python
 from kg_utils.viz3d import grow_tree, tree_mesh
