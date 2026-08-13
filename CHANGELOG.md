@@ -11,14 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Removed
+
+### Fixed
+
+## [0.12.0] - 2026-08-13
+
+### Added
+
+- **`tests/test_viz3d_layout.py` pins the `AlliumLayout` sizing contracts**
+  downstream renderers depend on. pycode_kg's `test_viz3d_sizing` restates the
+  head-radius formula as a literal to assert a max-centrality function still
+  fits inside a four-child head; since that formula moved here in 0.11.0,
+  changing its coefficient would have silently re-tuned every consumer's
+  occlusion budget with nothing to catch it. The head and orbit radius formulas
+  and layout determinism are now covered here.
+
+### Changed
+
 - **pytest dev pin raised to `>=9.0.3`**, resolving GHSA-6w46-j5rx-g56g /
   PYSEC-2026-1845. The `^8.0.0` cap deferred in the 0.10.x security pass is now
   lifted. Dev-group only — pytest is not part of any published extra and does
   not appear in the wheel or sdist metadata, so no released artifact changes.
-
-### Removed
-
-### Fixed
+- **`AlliumLayout` documents its node-ordering requirement.** Roots take their
+  annulus slots in the order they appear in the node list, so callers must pass
+  a stable order or the scene shuffles between renders even when the graph is
+  unchanged. Sorting internally would make this moot but would relocate every
+  node in every existing scene, so the behaviour is pinned and documented
+  rather than changed.
 
 ## [0.11.0] - 2026-08-11
 

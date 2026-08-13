@@ -1,76 +1,42 @@
-# Release Notes — v0.11.0
+# Release Notes — v0.12.0
 
-> Released: 2026-08-11
+> Released: 2026-08-13
 
-One new sub-package: **`kg_utils.viz3d`**, the shared 3-D graph layout engine. Nothing
-breaks — this is additive, behind a new `viz3d` extra.
+A consolidation release. No API changes and no new symbols: this one hardens the
+`viz3d` layout engine that landed in 0.11.0 with the tests its downstream consumers were
+implicitly relying on, documents a contract the move surfaced, and clears a security
+advisory in the dev toolchain. Upgrading is a no-op.
 
-## `kg_utils.viz3d` — 3-D layout, shared
+## What changed
 
-The layout engine has lived in `pycode_kg.layout3d` since PyCodeKG grew a 3-D viewer.
-GutenbergKG has been importing it from there — `Layout3D`, `LayoutNode`, `LayoutEdge`,
-`fibonacci_sphere`, `fibonacci_annulus` — and paying a full `pycode-kg` dependency in its
-`viz3d` extra for five symbols that have nothing to do with parsing Python. It now lives
-here, where every KG module can reach it on equal terms.
+**The allium sizing formulas are pinned where they now live.** When `Layout3D` and friends
+moved out of `pycode_kg.layout3d` in 0.11.0, the head-radius formula came with them — but
+PyCodeKG's `test_viz3d_sizing` still asserts, against a hand-restated copy of that formula,
+that a maximum-centrality function fits inside a four-child allium head. The formula was
+here and the only test of it was over there. Changing a coefficient would have quietly
+re-tuned every consumer's occlusion budget with nothing in this repo to catch it. The head
+radius, orbit radius, and layout determinism are now covered by tests that live alongside
+the code they constrain.
 
-```bash
-pip install 'kgmodule-utils[viz3d]'
-```
+**`AlliumLayout` documents that it trusts your node ordering.** Roots take their annulus
+slots in the order they appear in the node list, which means a store whose iteration order
+varies between rebuilds will shuffle the entire scene even when the graph has not changed.
+Sorting internally would make the problem disappear, but it would also relocate every node
+in every scene anyone has already rendered. The behaviour is therefore pinned and
+documented rather than changed: pass a stable order.
 
-The extra is numpy and nothing else. A layout maps nodes and edges onto
-`{node_id: [x, y, z]}` and draws nothing, so pyvista, Qt, and the rest of the renderer
-stack stay in whichever module actually opens a window.
-
-```python
-from kg_utils.viz3d import AlliumLayout, FunnelLayout, LayoutEdge, LayoutNode
-
-layout = FunnelLayout(
-    layer_gap=12.0,
-    zlevels={"document": 0, "section": 1, "chunk": 2},
-    level_sizes={0: 1.8, 1: 0.9, 2: 0.28},
-)
-positions = layout.compute(nodes, edges)
-```
-
-What ships:
-
-| | |
-|---|---|
-| `Layout3D` | ABC — implement `compute(nodes, edges)` and you have a layout |
-| `AlliumLayout` | Each root node becomes a Giant Allium: a stem with a Fibonacci-sphere head of its children |
-| `FunnelLayout` | Node kind picks the Z layer; golden-angle disc spiral within each layer |
-| `LayoutNode` / `LayoutEdge` | Domain-neutral DTOs with `from_dict()` |
-| `fibonacci_sphere()` / `fibonacci_annulus()` / `golden_spiral_2d()` | Even point distributions, for rolling your own |
-
-`golden_spiral_2d()` is newly public — it was `_golden_spiral_2d`, private for no better
-reason than that only one layout happened to use it.
-
-### Domain coupling became arguments
-
-The old `FunnelLayout` imported `pycode_kg.theme` to learn that modules sit at Z level 0
-and classes at Z level 1. That is a fact about Python code, not about knowledge graphs, so
-it is now supplied by the caller:
-
-```python
-AlliumLayout(root_kind="document", contains_rel="HAS_SECTION")
-FunnelLayout(zlevels=..., level_sizes=..., default_level=...)
-```
-
-Defaults preserve the previous behaviour, with one deliberate exception: `zlevels`
-defaults to `None`, which lays every node out on a single flat disc. A domain that has
-declared no hierarchy should render as having none, rather than silently inheriting
-Python's.
-
-## Also
-
-`kg_utils/__init__.py` listed three of seven optional extras and still described
-`[semantic]` as installing `lancedb`, which stopped being true in 0.10.0. It now lists
-them all, correctly.
+**pytest's dev pin moved to `>=9.0.3`,** resolving GHSA-6w46-j5rx-g56g / PYSEC-2026-1845
+and lifting the `^8.0.0` cap deferred during the 0.10.x security pass. This is the dev
+group only — pytest appears in no published extra and in neither the wheel nor the sdist
+metadata, so nothing about the released artifact changes.
 
 ## Upgrading
 
-Nothing to do. If you want the layouts, add the extra:
+Nothing to do. No public API moved, no extra changed its contents, and no rebuild is
+required. If you render 3-D scenes with `AlliumLayout` and have noticed them reshuffling
+between otherwise identical runs, the newly documented ordering requirement is the reason —
+sort your node list before handing it over.
 
-```bash
-pip install 'kgmodule-utils[viz3d]'
-```
+---
+
+_Full changelog: [CHANGELOG.md](CHANGELOG.md)_
