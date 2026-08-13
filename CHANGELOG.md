@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [0.12.0] - 2026-08-13
+## [0.12.1] - 2026-08-13
 
 ### Added
 
@@ -44,14 +44,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **pytest dev pin raised to `>=9.0.3`**, resolving GHSA-6w46-j5rx-g56g /
-  PYSEC-2026-1845. The `^8.0.0` cap deferred in the 0.10.x security pass is now
-  lifted. Dev-group only — pytest is not part of any published extra and does
-  not appear in the wheel or sdist metadata, so no released artifact changes.
-
 ### Removed
 
 ### Fixed
+
+- **0.12.0 was published without the `viz3d` engine described above.** The
+  promotion landed on a branch that the `v0.12.0` tag does not contain, so the
+  tag's tree carries only `viz3d/__init__.py` and `viz3d/layout.py` and the
+  published wheel has no `kg_utils.viz3d.organic` at all. Importing
+  `grow_tree`, `colonize`, `crown_spacing`, `seed_from_key`, `Skeleton`,
+  `pipe_radii`, `tree_mesh` or `leaf_glyphs` from 0.12.0 raises `ImportError`.
+  This release ships what 0.12.0 was supposed to. 0.12.0 cannot be corrected in
+  place — PyPI permanently reserves an uploaded filename, so a fixed 0.12.0
+  could not be re-uploaded even after deleting the original.
+
+## [0.12.0] - 2026-08-13
+
+Published from a tree without the `viz3d` organic engine; see the Fixed note
+under 0.12.1. What it did carry:
+
+### Changed
+
+- **pytest dev pin raised to `>=9.0.3`**, resolving GHSA-6w46-j5rx-g56g /
+  PYSEC-2026-1845. Dev-group only, so no released artifact changes.
 
 ## [0.11.0] - 2026-08-11
 
