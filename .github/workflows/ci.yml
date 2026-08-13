@@ -67,18 +67,13 @@ jobs:
         # lancedb only: vector_backend.py's LanceDBBackend still imports it
         # lazily, so ty needs it physically installed to resolve the import,
         # even though it's no longer part of the semantic extra (see pyproject).
-        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --extras "lancedb" --no-interaction
-
-      # Same reasoning as lancedb above, but pyvista cannot be an --extras: the
-      # viz3d extra is deliberately NumPy-only so the repos depending on this SDK
-      # do not acquire VTK to import a layout, which means pyvista belongs to no
-      # extra at all. viz3d/organic.py still imports it twice — once under
-      # TYPE_CHECKING for the mesh-builder annotations, once inside _pyvista()
-      # behind a try/except — so without it installed ty cannot resolve either,
-      # and the mesh builders go unchecked. Installed here only; published
-      # metadata is untouched and consumers still get a NumPy-only viz3d.
-      - name: Install pyvista for type resolution
-        run: poetry run pip install pyvista
+        # viz3d-render for the same reason as lancedb: viz3d/organic.py imports
+        # pyvista twice — under TYPE_CHECKING for the mesh-builder annotations,
+        # and inside _pyvista() behind a try/except — so ty needs it installed to
+        # resolve either, and without it tree_mesh, leaf_glyphs and smooth_paths
+        # go unchecked. The plain viz3d extra stays NumPy-only, so layout-only
+        # consumers are unaffected.
+        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --extras "lancedb" --extras "viz3d-render" --no-interaction
 
       - name: Run ty
         run: poetry run ty check src/

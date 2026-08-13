@@ -41,6 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     that depend on `kgmodule-utils` do not acquire VTK for a layout import.
     Calling one without PyVista raises a `ModuleNotFoundError` naming the
     install command rather than an `AttributeError` on a missing module.
+- **New `viz3d-render` extra** — the layouts plus the renderer they need.
+  `smooth_paths`, `tree_mesh` and `leaf_glyphs` import PyVista lazily, so
+  PyVista is a real runtime dependency of three shipped functions, and it
+  belonged to no extra at all: every caller hand-declared it and CI installed it
+  by hand so `ty` could resolve the import. It could not simply be added to
+  `viz3d`, because `pycode_kg` takes `kgmodule-utils[semantic,viz3d]` in its
+  *main* dependencies for the layouts alone, and `pycode-kg` is itself a
+  dependency of nine repos — VTK would have reached all of them. Depend on
+  `viz3d-render` to build geometry, `viz3d` for coordinates only.
 
 ### Changed
 

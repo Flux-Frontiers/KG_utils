@@ -59,9 +59,23 @@ viz = [
 ]
 # Shared 3-D layout (kg_utils.viz3d).  Pure numpy: the layouts return
 # coordinates and draw nothing, so the heavy renderer stack (pyvista, Qt) stays
-# in whichever module actually opens a window.
+# in whichever module actually opens a window.  pycode_kg takes this in its main
+# dependencies purely for the layouts, and pycode-kg is itself a dependency of
+# nine repos, so anything added here reaches all of them — see viz3d-render.
 viz3d = [
     "numpy>=1.24.0",
+]
+# The same layouts plus the renderer they need to produce geometry.
+# `viz3d` deliberately cannot build a mesh: smooth_paths(), tree_mesh() and
+# leaf_glyphs() import pyvista lazily and raise a ModuleNotFoundError naming the
+# install when it is absent.  That keeps VTK out of the layout-only consumers,
+# but it left pyvista — a genuine runtime dependency of three shipped functions
+# — declared in no extra at all, so every caller hand-assembled it and CI had to
+# install it by hand for `ty` to resolve the import.  Depend on this extra when
+# you intend to render; depend on `viz3d` when you only want coordinates.
+viz3d-render = [
+    "numpy>=1.24.0",
+    "pyvista>=0.44.0",
 ]
 # Exact pin: sqlite-vec is pre-1.0, breaking minors are possible. Prebuilt
 # wheels ship for macOS (x86_64 + arm64), Linux (x86_64 + aarch64), and Windows
