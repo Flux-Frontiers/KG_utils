@@ -60,6 +60,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The README's documented test install could not run the test suite.**
+  `Development` said `poetry install --with dev`, then pointed at
+  `pytest -m "not integration"`. Because the core install is deliberately
+  zero-dependency (`dependencies = []`), that command installs no runtime
+  packages at all, and pytest aborts during *collection* on missing `numpy`
+  and `httpx` — running zero tests rather than degrading to a partial run.
+  Reproduced in a clean Python 3.12 venv. The section now documents what CI
+  actually installs (`--extras "semantic" --extras "synthesis" --extras "viz"`
+  → 520 passed, 5 skipped), the two further extras that also cover the LanceDB
+  backend and the PyVista renderers (`lancedb`, `viz3d-render` → 554 passed,
+  2 skipped), the Python 3.12/3.13 requirement, and how to point the new
+  `TEIEmbedder` live tests at a running server.
+
 ## [0.12.1] - 2026-08-13
 
 ### Added
