@@ -10,7 +10,6 @@ import pytest
 from kg_utils.extractor import KGExtractor
 from kg_utils.specs import EdgeSpec, NodeSpec, QueryResult, SnippetPack
 
-
 # -- Spec dataclasses --------------------------------------------------------
 
 

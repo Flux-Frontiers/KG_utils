@@ -40,7 +40,6 @@ import os
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-
 # ---------------------------------------------------------------------------
 # Shared protocol
 # ---------------------------------------------------------------------------

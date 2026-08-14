@@ -150,6 +150,36 @@ target-version = ["py312", "py313"]
 line-length    = 100
 target-version = "py312"
 
+# Pinned explicitly, matching KGRAG. Without a `select` this project inherited
+# ruff's *default* rule set, so the enforced rules changed whenever ruff did —
+# which is exactly how 0.16 arrived carrying 38 new findings. With the set named
+# here, a version bump can change how existing rules behave but can no longer
+# silently add new ones.
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "BLE", "PLC"]
+ignore = [
+  "E501",      # line length is the formatter's business, not the linter's
+  # Lazy imports are this package's architecture, not an oversight: the core
+  # install is deliberately zero-dependency, so numpy, torch, sentence-
+  # transformers and sqlite_vec are imported inside the functions that need
+  # them. Hoisting them to module scope would break that guarantee outright.
+  "PLC0415",   # import-outside-top-level (34 sites)
+  "BLE001",    # blind-except — intentional at optional-dependency boundaries
+  # The three below are real findings, deliberately deferred rather than
+  # silently accepted. Each needs its own change, because each is a behaviour
+  # question rather than a formatting one:
+  #   B905  — 12 `zip()` calls with no `strict=`. `strict=True` would raise on
+  #           ragged input where today it truncates; that needs per-call review.
+  #   UP042 — `str, Enum` -> `StrEnum` changes what `str(member)` returns
+  #           ("TextBackend.OMLX" becomes "omlx"), which callers may depend on.
+  #   B027  — `KGModule._post_build_hook` is an intentional optional no-op;
+  #           marking it @abstractmethod would break every subclass that does
+  #           not override it.
+  "B905",
+  "UP042",
+  "B027",
+]
+
 [tool.pylint.main]
 source-roots = ["src"]
 init-hook = "import sys; sys.path.insert(0, 'src')"

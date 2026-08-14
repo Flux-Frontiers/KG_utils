@@ -5,8 +5,8 @@ comparing temporal metric snapshots. Individual KG backends (pycode_kg, doc_kg,
 ftree_kg, etc.) import from here instead of maintaining their own copies.
 """
 
-from kg_utils.snapshots.models import PruneResult, Snapshot, SnapshotManifest
 from kg_utils.snapshots.manager import SnapshotManager
+from kg_utils.snapshots.models import PruneResult, Snapshot, SnapshotManifest
 
 __all__ = [
     "PruneResult",

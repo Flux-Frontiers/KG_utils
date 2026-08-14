@@ -12,10 +12,10 @@ embedder (no model download).
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
-
-from unittest.mock import MagicMock
 
 from kg_utils.semantic import SeedHit, SemanticIndex
 from kg_utils.vector_backend import (

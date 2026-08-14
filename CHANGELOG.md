@@ -80,6 +80,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   all twelve hooks, `ty` and `pytest` included, and `ruff format --check .`,
   `ruff check .` and the 554-test suite are unchanged.
 
+### Changed
+
+- **The ruff rule set is now pinned rather than inherited** (`pyproject.toml`).
+  There was no `[tool.ruff.lint]` section, so this project took ruff's
+  *defaults* — meaning the rules actually enforced changed whenever ruff did.
+  That is not hypothetical: it is precisely how 0.16 arrived carrying 38 new
+  findings, and why the dev floor is capped below it. Naming the set closes
+  that: a version bump can still change how an existing rule behaves, but it
+  can no longer add rules behind your back.
+
+  `select` matches KGRAG's — `E`, `F`, `W`, `I`, `UP`, `B`, `BLE`, `PLC` — so
+  the two repos now share one lint contract. Adopting it surfaced 71 findings,
+  handled honestly rather than blanket-suppressed:
+
+  - **18 fixed mechanically** — 17 `I001` (unsorted imports) and one
+    `PLC0207`. Confined to import ordering and blank lines; the only source
+    changes are three files whose imports are now alphabetised.
+  - **38 ignored as intentional patterns**, matching KGRAG's own ignores.
+    `PLC0415` (34) is this package's architecture, not an oversight — the core
+    install is zero-dependency, so numpy, torch and sqlite_vec are imported
+    inside the functions that need them, and hoisting them would break that
+    guarantee. `BLE001` (4) is deliberate at optional-dependency boundaries.
+  - **15 deferred with their reasons recorded in the config**, because each is
+    a behaviour question rather than a formatting one: `B905` (12 `zip()` calls
+    with no `strict=`, where `strict=True` would raise on ragged input that
+    today truncates), `UP042` (2 — `str, Enum` → `StrEnum` changes what
+    `str(member)` returns), and `B027` (1 — `KGModule._post_build_hook` is an
+    intentional optional no-op that `@abstractmethod` would make mandatory for
+    every subclass).
+
 - **The README's documented test install could not run the test suite.**
   `Development` said `poetry install --with dev`, then pointed at
   `pytest -m "not integration"`. Because the core install is deliberately

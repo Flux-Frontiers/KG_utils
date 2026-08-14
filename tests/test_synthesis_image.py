@@ -22,11 +22,10 @@ from PIL import Image as PILImage
 
 from kg_utils.synthesis._config import ImageBackend, ImageConfig
 from kg_utils.synthesis._image import (
-    ImageSynthesizer,
     _DALLE3_SIZES,
     _MFLUX_SIZES,
+    ImageSynthesizer,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
