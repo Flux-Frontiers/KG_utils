@@ -126,8 +126,8 @@ def test_endpoint_normalisation(given: str, expected: str) -> None:
 
 
 def test_api_key_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("KG_EMBED_API_KEY", "sekrit")
-    assert TEIEmbedder(dim=1).api_key == "sekrit"
+    monkeypatch.setenv("KG_EMBED_API_KEY", "dummy-token")  # pragma: allowlist secret
+    assert TEIEmbedder(dim=1).api_key == "dummy-token"  # pragma: allowlist secret
 
 
 def test_repr_mentions_endpoint_and_dim(embedder: TEIEmbedder) -> None:
@@ -263,11 +263,15 @@ def test_no_auth_header_without_key(embedder: TEIEmbedder) -> None:
 
 
 def test_bearer_header_when_key_set() -> None:
-    emb = TEIEmbedder("http://tei.local:8080", dim=384, api_key="sekrit")
+    emb = TEIEmbedder(
+        "http://tei.local:8080",
+        dim=384,
+        api_key="dummy-token",  # pragma: allowlist secret
+    )
     rec = _Recorder(_vecs(1))
     with patch("kg_utils.embedder.urlopen", rec):
         emb.embed_texts(["x"])
-    assert rec.calls[0]["headers"]["authorization"] == "Bearer sekrit"
+    assert rec.calls[0]["headers"]["authorization"] == "Bearer dummy-token"
 
 
 def test_embed_query_delegates(embedder: TEIEmbedder) -> None:
