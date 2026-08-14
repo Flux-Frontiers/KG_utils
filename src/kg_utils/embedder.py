@@ -15,6 +15,11 @@ SentenceTransformerEmbedder
     model is cached locally — prevents HuggingFace HEAD requests that leave
     stale thread/network state and cause SIGBUS on MPS.
 
+TEIEmbedder
+    Concrete implementation backed by a remote HuggingFace Text Embeddings
+    Inference server.  Stdlib HTTP only — no torch, no numpy — so it is the
+    one embedder usable from a core (zero-dependency) install.
+
 resolve_device(device)
     Resolve the embedding device: explicit arg > ``KG_EMBED_DEVICE`` env >
     auto-detect. Public so callers can gate parallelism decisions (e.g.
@@ -41,8 +46,12 @@ License: Elastic 2.0
 from __future__ import annotations
 
 import importlib
+import json
 import os
+import time
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from kg_utils.embed import DEFAULT_MODEL, KNOWN_MODELS, resolve_model_path
 
@@ -270,6 +279,248 @@ class SentenceTransformerEmbedder(Embedder):
 
     def __repr__(self) -> str:
         return f"SentenceTransformerEmbedder(model={self.model_name!r}, dim={self.dim})"
+
+
+# ---------------------------------------------------------------------------
+# Remote embedder — HuggingFace Text Embeddings Inference (TEI)
+# ---------------------------------------------------------------------------
+
+#: Default TEI base URL.  TEI listens on port 80 inside its container; the
+#: fleet convention is to publish that on 8080.
+DEFAULT_TEI_ENDPOINT: str = "http://localhost:8080"
+
+#: TEI's own default ``--max-client-batch-size``.  Used as the assumed server
+#: limit when :class:`TEIEmbedder` is constructed without probing: a request
+#: carrying more items than the server allows is rejected outright with HTTP
+#: 422, so the safe assumption is TEI's conservative default rather than the
+#: fleet's :data:`DEFAULT_ENCODE_BATCH` of 128.
+TEI_DEFAULT_CLIENT_BATCH: int = 32
+
+#: Statuses worth retrying.  429 is not hypothetical: TEI sheds load with it
+#: (rather than queueing) as soon as in-flight requests exceed its capacity,
+#: so any client fanning out concurrent batches will meet it.
+_TEI_RETRY_STATUS: frozenset[int] = frozenset({429, 502, 503, 504})
+
+
+class TEIEmbedder(Embedder):
+    """Embedder backed by a remote HuggingFace Text Embeddings Inference server.
+
+    Speaks TEI's native ``POST /embed`` API over stdlib HTTP.  Nothing here
+    imports torch, sentence-transformers or numpy, so this is the only embedder
+    in the package that works from a **core (zero-dependency) install** — the
+    model runs in the server process, not this one.
+
+    Vectors are requested with ``normalize=True`` to match the fleet contract
+    (:class:`SentenceTransformerEmbedder` always passes
+    ``normalize_embeddings=True``), and with ``truncate=True`` so
+    over-long inputs are clipped at the model's max sequence length the way
+    sentence-transformers does silently — without it TEI rejects the whole
+    batch.
+
+    Two failure modes are handled explicitly because both were observed while
+    benchmarking this backend:
+
+    * **Server batch ceiling.**  TEI refuses a request carrying more than
+      ``max_client_batch_size`` items (HTTP 422), whose default is 32 — well
+      below the fleet's 128-item convention.  The limit is read from ``/info``
+      when probing and every call is re-chunked to respect it, so a caller
+      passing ``encode_batch_size=128`` is split transparently rather than
+      failing.
+    * **Load shedding.**  A saturated TEI returns 429 instead of queueing.
+      Those, plus 502/503/504 and transport errors, are retried with bounded
+      exponential backoff; everything else fails loudly.
+
+    Nothing is silently substituted on failure.  A wrong-dimension or
+    partially-written result would corrupt a vector store far more expensively
+    than an exception, so both are raised.
+
+    :param endpoint: TEI base URL.  Falls back to ``KG_EMBED_ENDPOINT`` then
+        :data:`DEFAULT_TEI_ENDPOINT`.  A trailing ``/`` is trimmed, as is a
+        trailing ``/v1`` (TEI's native routes live at the root; ``/v1`` is its
+        OpenAI-compatible alias).
+    :param dim: Embedding dimension.  When given, construction performs **no
+        network I/O at all** — useful for offline construction and for tests.
+        When ``None`` the server is probed once (see :meth:`probe`).
+    :param api_key: Bearer token.  Falls back to ``KG_EMBED_API_KEY``.  Not
+        required by a stock TEI, which is unauthenticated.
+    :param model_name: Informational label for :attr:`model_name` / ``repr``.
+        The served model is whatever the server was started with; this cannot
+        change it.
+    :param timeout: Per-request timeout in seconds.
+    :param max_retries: Retry attempts for retryable statuses and transport
+        errors.  ``0`` disables retrying.
+    :param max_batch: Override the server's reported ``max_client_batch_size``.
+        Defaults to the probed value, or :data:`TEI_DEFAULT_CLIENT_BATCH` when
+        not probing.
+    :raises RuntimeError: If probing is required and the server is unreachable
+        or answers unusably.
+    """
+
+    def __init__(
+        self,
+        endpoint: str | None = None,
+        *,
+        dim: int | None = None,
+        api_key: str | None = None,
+        model_name: str = "",
+        timeout: float = 120.0,
+        max_retries: int = 3,
+        max_batch: int | None = None,
+    ) -> None:
+        raw = (endpoint or os.environ.get("KG_EMBED_ENDPOINT") or DEFAULT_TEI_ENDPOINT).strip()
+        self.endpoint: str = raw.rstrip("/").removesuffix("/v1")
+
+        env_key = os.environ.get("KG_EMBED_API_KEY")
+        self.api_key: str = (api_key if api_key is not None else env_key) or ""
+        self.model_name: str = model_name
+        self.timeout: float = timeout
+        self.max_retries: int = max_retries
+        self.max_batch: int = max_batch or TEI_DEFAULT_CLIENT_BATCH
+
+        if dim is None:
+            info = self.probe()
+            if max_batch is None:
+                self.max_batch = int(info.get("max_client_batch_size") or TEI_DEFAULT_CLIENT_BATCH)
+            if not self.model_name:
+                self.model_name = str(info.get("model_id") or "")
+            self.dim = int(info["dim"])
+        else:
+            self.dim = int(dim)
+
+    # -- HTTP -------------------------------------------------------------
+
+    def _post(self, path: str, payload: dict[str, Any]) -> Any:
+        """POST *payload* as JSON to *path* and return the decoded response.
+
+        Retries :data:`_TEI_RETRY_STATUS` and transport errors with exponential
+        backoff; any other error is raised immediately.
+
+        :param path: Route below the base URL, e.g. ``"/embed"``.
+        :param payload: JSON-serialisable request body.
+        :return: Decoded JSON response.
+        :raises RuntimeError: On a non-retryable error, or once retries are
+            exhausted.
+        """
+        body = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        last = ""
+        for attempt in range(self.max_retries + 1):
+            try:
+                req = Request(self.endpoint + path, data=body, headers=headers)
+                with urlopen(req, timeout=self.timeout) as resp:  # nosec B310 - fixed http(s) base
+                    return json.loads(resp.read())
+            except HTTPError as exc:
+                try:
+                    detail = exc.read().decode("utf-8", "replace")[:200]
+                except (OSError, ValueError):
+                    detail = ""
+                last = f"HTTP {exc.code} from {path}: {detail or exc.reason}"
+                if exc.code not in _TEI_RETRY_STATUS:
+                    raise RuntimeError(f"TEI request failed — {last}") from exc
+            except (URLError, TimeoutError, OSError) as exc:
+                last = f"{type(exc).__name__} contacting {self.endpoint}{path}: {exc}"
+
+            if attempt < self.max_retries:
+                time.sleep(2.0**attempt)
+
+        raise RuntimeError(f"TEI request failed after {self.max_retries + 1} attempts — {last}")
+
+    def probe(self) -> dict[str, Any]:
+        """Query the server for its limits and embedding dimension.
+
+        ``GET /info`` reports ``max_client_batch_size`` and ``max_input_length``
+        but **not** the embedding dimension, so the dimension is measured by
+        embedding one short string.  Both facts are cached by ``__init__``;
+        nothing on the hot path re-probes, because
+        :class:`~kg_utils.vector_backend.VectorBackend` needs ``dim`` at
+        table-creation time and must never wait on a network round trip.
+
+        :return: ``{"dim": int, "max_client_batch_size": int|None,
+            "model_id": str|None, "max_input_length": int|None}``.
+        :raises RuntimeError: If the server is unreachable or returns no vector.
+        """
+        info: dict[str, Any] = {}
+        try:
+            req = Request(self.endpoint + "/info", headers={"Accept": "application/json"})
+            with urlopen(req, timeout=self.timeout) as resp:  # nosec B310
+                info = json.loads(resp.read())
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError):
+            # /info is advisory: an older or proxied deployment may not expose
+            # it.  The dimension probe below is the part that must succeed.
+            info = {}
+
+        vecs = self._post(
+            "/embed", {"inputs": ["dimension probe"], "normalize": True, "truncate": True}
+        )
+        if not isinstance(vecs, list) or not vecs or not isinstance(vecs[0], list):
+            raise RuntimeError(
+                f"TEI at {self.endpoint} returned no usable vector when probing "
+                f"the embedding dimension; got {type(vecs).__name__}."
+            )
+        return {
+            "dim": len(vecs[0]),
+            "max_client_batch_size": info.get("max_client_batch_size"),
+            "model_id": info.get("model_id"),
+            "max_input_length": info.get("max_input_length"),
+        }
+
+    # -- Embedder contract ------------------------------------------------
+
+    def embed_texts(
+        self, texts: list[str], encode_batch_size: int = DEFAULT_ENCODE_BATCH
+    ) -> list[list[float]]:
+        """Embed a list of strings into float32 vectors.
+
+        The request batch is ``min(encode_batch_size, max_batch)`` — the server
+        enforces its own ceiling and rejects anything above it, so the caller's
+        value is treated as an upper bound rather than an instruction.  Unlike
+        the in-process embedders there is no ``batch x seq^2`` memory cliff on
+        this side of the wire; batching here is purely about request size.
+
+        :param texts: Input strings.
+        :param encode_batch_size: Requested per-request batch (default
+            :data:`DEFAULT_ENCODE_BATCH`), clamped to the server's limit.
+        :return: One float32 vector per input, in input order.
+        :raises RuntimeError: If the server errors, or returns the wrong number
+            of vectors or a vector of unexpected width.
+        """
+        if not texts:
+            return []
+
+        step = max(1, min(encode_batch_size, self.max_batch))
+        out: list[list[float]] = []
+        for start in range(0, len(texts), step):
+            chunk = texts[start : start + step]
+            vecs = self._post("/embed", {"inputs": chunk, "normalize": True, "truncate": True})
+            if not isinstance(vecs, list) or len(vecs) != len(chunk):
+                raise RuntimeError(
+                    f"TEI returned {len(vecs) if isinstance(vecs, list) else '?'} vectors "
+                    f"for {len(chunk)} inputs at offset {start}."
+                )
+            for vec in vecs:
+                if len(vec) != self.dim:
+                    raise RuntimeError(
+                        f"TEI returned a {len(vec)}-dim vector but this embedder is "
+                        f"configured for {self.dim}. Refusing to write mixed-dimension "
+                        f"vectors — check that {self.endpoint} serves the expected model."
+                    )
+                out.append([float(x) for x in vec])
+        return out
+
+    def embed_query(self, query: str) -> list[float]:
+        """Embed a single query string into a float32 vector.
+
+        :param query: Query string.
+        :return: Float32 vector.
+        """
+        return self.embed_texts([query])[0]
+
+    def __repr__(self) -> str:
+        label = f", model={self.model_name!r}" if self.model_name else ""
+        return f"TEIEmbedder(endpoint={self.endpoint!r}{label}, dim={self.dim})"
 
 
 # ---------------------------------------------------------------------------

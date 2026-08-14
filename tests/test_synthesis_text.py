@@ -15,7 +15,6 @@ pytest.importorskip("openai", reason="openai package not installed — skipping 
 from kg_utils.synthesis._config import TextBackend, TextConfig
 from kg_utils.synthesis._text import TextSynthesizer
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

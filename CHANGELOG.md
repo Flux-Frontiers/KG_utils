@@ -9,11 +9,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`kg_utils.embedder.TEIEmbedder` — embeddings from a remote HuggingFace
+  Text Embeddings Inference server.** Purely additive: no existing class,
+  signature or default changes, and nothing selects it unless a caller asks
+  for it by name.
+  - **Stdlib HTTP only** (`urllib`, `json`) — no torch, no sentence-transformers,
+    not even numpy. It is therefore the one embedder that works from a **core,
+    zero-dependency install**, because the model runs in the server process.
+    Speaks TEI's native `POST /embed`.
+  - Honours the fleet contract: `normalize=True` (matching every
+    `normalize_embeddings=True` call site) and `truncate=True`, so over-long
+    inputs are clipped the way sentence-transformers does silently rather than
+    failing the batch.
+  - **`dim` never costs a round trip on the hot path.** Pass `dim=` and
+    construction does no network I/O at all; omit it and the server is probed
+    exactly once, at construction. The probe measures the dimension by
+    embedding one string because TEI's `/info` reports `max_client_batch_size`
+    and `max_input_length` but *not* the embedding width. This matters because
+    `VectorBackend` needs `dim` at table-creation time.
+  - **Request batches are clamped to the server's ceiling.** A stock TEI
+    defaults to `max_client_batch_size=32` and rejects anything larger with
+    HTTP 422 — well below this package's 128-item `DEFAULT_ENCODE_BATCH`. The
+    limit is read from `/info` and every call re-chunked to fit, so callers
+    keep passing 128 and get transparent splitting instead of an error.
+  - **Retries are bounded and failures are loud.** 429 (TEI sheds load rather
+    than queueing), 502/503/504 and transport errors retry with exponential
+    backoff; 4xx request-shape errors raise immediately rather than burning
+    retries. A wrong-width vector or a short response raises instead of being
+    written, since either would silently corrupt a vector store — vectors
+    misaligned against nodes are far more expensive than an exception.
+  - Configured by `endpoint` / `KG_EMBED_ENDPOINT` and `api_key` /
+    `KG_EMBED_API_KEY`, following the `synthesis/_config.py` env-fallback
+    pattern. A trailing `/v1` is trimmed: TEI's native routes live at the root
+    and `/v1` is only its OpenAI-compatible alias.
+  - 35 unit tests with a stubbed HTTP layer (no server, no heavy deps) plus two
+    `integration` tests that run against a live server when `KG_EMBED_ENDPOINT`
+    is set, including a cosine-parity gate against `SentenceTransformerEmbedder`.
+
+  Verified against TEI 1.9.3 serving `BAAI/bge-small-en-v1.5`: vectors match
+  sentence-transformers to cosine ≥ 0.999997 with 99.8% top-10 retrieval
+  agreement, so the two backends can share one store. **This is not a
+  performance upgrade on CPU** — in-process torch measured roughly 2× faster
+  (41 vs 19 items/s on 4 shared cores) — its wins are memory (176 MiB vs
+  1.5 GiB RSS to serve the same model) and keeping torch out of the client.
+  Full evaluation in the kgrag repo at `docs/TEI_EVALUATION.md`.
+
 ### Changed
 
 ### Removed
 
 ### Fixed
+
+- **The pre-commit hooks were configured but not installable, and their ruff
+  had drifted six minor versions from CI's.** `.pre-commit-config.yaml` and
+  `.secrets.baseline` were both checked in, but neither `pre-commit` nor
+  `detect-secrets` appeared in the dev group — so `poetry install --with dev`
+  gave you the configuration without the tool that runs it, and the hooks only
+  ever guarded developers who had installed pre-commit by some other route. CI
+  runs no detect-secrets job either, so nothing else covered that gap. Both are
+  now dev dependencies at the same versions KGRAG uses.
+
+  Separately, the config pinned `ruff-pre-commit` at **v0.9.10** while the dev
+  group resolves **0.15.22** — two different formatters over one tree, which is
+  precisely how a hook passes locally and CI fails. Pinned to `v0.15.22` to
+  match, with the hook renamed to its current id (`ruff` → `ruff-check`), and a
+  comment tying the rev to the dev floor so they are changed together. Still
+  below 0.16, per the cap recorded beside that floor.
+
+  Verified: `pre-commit run --all-files` from this project's own venv passes
+  all twelve hooks, `ty` and `pytest` included, and `ruff format --check .`,
+  `ruff check .` and the 554-test suite are unchanged.
+
+### Changed
+
+- **The ruff rule set is now pinned rather than inherited** (`pyproject.toml`).
+  There was no `[tool.ruff.lint]` section, so this project took ruff's
+  *defaults* — meaning the rules actually enforced changed whenever ruff did.
+  That is not hypothetical: it is precisely how 0.16 arrived carrying 38 new
+  findings, and why the dev floor is capped below it. Naming the set closes
+  that: a version bump can still change how an existing rule behaves, but it
+  can no longer add rules behind your back.
+
+  `select` matches KGRAG's — `E`, `F`, `W`, `I`, `UP`, `B`, `BLE`, `PLC` — so
+  the two repos now share one lint contract. Adopting it surfaced 71 findings,
+  handled honestly rather than blanket-suppressed:
+
+  - **18 fixed mechanically** — 17 `I001` (unsorted imports) and one
+    `PLC0207`. Confined to import ordering and blank lines; the only source
+    changes are three files whose imports are now alphabetised.
+  - **38 ignored as intentional patterns**, matching KGRAG's own ignores.
+    `PLC0415` (34) is this package's architecture, not an oversight — the core
+    install is zero-dependency, so numpy, torch and sqlite_vec are imported
+    inside the functions that need them, and hoisting them would break that
+    guarantee. `BLE001` (4) is deliberate at optional-dependency boundaries.
+  - **15 deferred with their reasons recorded in the config**, because each is
+    a behaviour question rather than a formatting one: `B905` (12 `zip()` calls
+    with no `strict=`, where `strict=True` would raise on ragged input that
+    today truncates), `UP042` (2 — `str, Enum` → `StrEnum` changes what
+    `str(member)` returns), and `B027` (1 — `KGModule._post_build_hook` is an
+    intentional optional no-op that `@abstractmethod` would make mandatory for
+    every subclass).
+
+- **The README's documented test install could not run the test suite.**
+  `Development` said `poetry install --with dev`, then pointed at
+  `pytest -m "not integration"`. Because the core install is deliberately
+  zero-dependency (`dependencies = []`), that command installs no runtime
+  packages at all, and pytest aborts during *collection* on missing `numpy`
+  and `httpx` — running zero tests rather than degrading to a partial run.
+  Reproduced in a clean Python 3.12 venv. The section now documents what CI
+  actually installs (`--extras "semantic" --extras "synthesis" --extras "viz"`
+  → 520 passed, 5 skipped), the two further extras that also cover the LanceDB
+  backend and the PyVista renderers (`lancedb`, `viz3d-render` → 554 passed,
+  2 skipped), the Python 3.12/3.13 requirement, and how to point the new
+  `TEIEmbedder` live tests at a running server.
 
 ## [0.12.1] - 2026-08-13
 

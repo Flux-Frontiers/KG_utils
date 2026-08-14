@@ -40,6 +40,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, cast
 
+from kg_utils.extractor import KGExtractor
 from kg_utils.semantic import (
     DEFAULT_MODEL,
     META_COLUMNS,
@@ -48,11 +49,9 @@ from kg_utils.semantic import (
     SentenceTransformerEmbedder,
     suppress_ingestion_logging,
 )
-from kg_utils.store import DEFAULT_RELS, GraphStore
-from kg_utils.extractor import KGExtractor
 from kg_utils.specs import BuildStats, EdgeSpec, NodeSpec, QueryResult, SnippetPack
+from kg_utils.store import DEFAULT_RELS, GraphStore
 from kg_utils.vector_backend import VectorBackend, make_backend, resolve_backend_name
-
 
 # ---------------------------------------------------------------------------
 # Pure utility functions (domain-agnostic)

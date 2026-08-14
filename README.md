@@ -399,22 +399,50 @@ KG_utils/
 
 ## Development
 
+Requires Python 3.12 or 3.13 (`requires-python = ">=3.12,<3.14"`); CI builds on
+3.12.
+
 ```bash
 git clone https://github.com/Flux-Frontiers/KG_utils.git
 cd KG_utils
-poetry install --with dev
+poetry env use python3.12
+poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz"
 ```
 
-Run the fast test suite (no model downloads):
+**The extras are not optional for testing.** The core install is deliberately
+zero-dependency (`dependencies = []`), so `poetry install --with dev` on its own
+installs no runtime packages at all — pytest then aborts during *collection* on
+missing `numpy` and `httpx` and runs nothing. The three extras above are exactly
+what the CI test job installs.
+
+Run the fast test suite (no model downloads) — **520 passed, 5 skipped**:
 
 ```bash
 poetry run pytest -m "not integration"
 ```
 
-Run all tests including semantic/integration (requires `[semantic]` extra):
+The 5 skips are optional backends. Add two more extras to cover the LanceDB
+backend and the PyVista renderers as well — **554 passed, 2 skipped** (the
+remainder are the `doc_kg` sibling package, and one test that only runs when
+PyVista is *absent*):
+
+```bash
+poetry install --with dev --extras "semantic" --extras "synthesis" \
+  --extras "viz" --extras "lancedb" --extras "viz3d-render"
+```
+
+Run everything, including the `integration` marker — these download embedding
+models on first use and are excluded from CI:
 
 ```bash
 poetry run pytest
+```
+
+`TEIEmbedder`'s live tests are skipped unless a Text Embeddings Inference
+server is reachable; point them at one to include them:
+
+```bash
+KG_EMBED_ENDPOINT=http://localhost:8080 poetry run pytest -m integration
 ```
 
 ---

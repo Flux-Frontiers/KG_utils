@@ -6,8 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from kg_utils.snapshots import PruneResult, Snapshot, SnapshotManifest, SnapshotManager
-
+from kg_utils.snapshots import PruneResult, Snapshot, SnapshotManager, SnapshotManifest
 
 # -- Snapshot model ----------------------------------------------------------
 

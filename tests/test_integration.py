@@ -14,17 +14,18 @@ from typing import Any
 
 import pytest
 
-from kg_utils.embed import DEFAULT_MODEL, Embedder as EmbedderProtocol, resolve_model_path
+from kg_utils.embed import DEFAULT_MODEL, resolve_model_path
+from kg_utils.embed import Embedder as EmbedderProtocol
 from kg_utils.embedder import (
     Embedder,
     SentenceTransformerEmbedder,
     load_sentence_transformer,
     wrap_embedder,
 )
-from kg_utils.snapshots import SnapshotManager
-from kg_utils.snapshots.models import Snapshot
 from kg_utils.extractor import KGExtractor
 from kg_utils.pipeline import KGModule
+from kg_utils.snapshots import SnapshotManager
+from kg_utils.snapshots.models import Snapshot
 from kg_utils.specs import EdgeSpec, NodeSpec
 
 pytestmark = pytest.mark.integration

@@ -17,6 +17,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+
 from kg_utils.analysis.scores import (
     METRIC_TABLES,
     MetricRef,

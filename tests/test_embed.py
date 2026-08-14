@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-
 from kg_utils.embed import (
     DEFAULT_MODEL,
     KNOWN_MODELS,
@@ -14,7 +13,6 @@ from kg_utils.embed import (
     kg_model_cache_dir,
     resolve_model_path,
 )
-
 
 # ---------------------------------------------------------------------------
 # Embedder protocol (runtime_checkable)

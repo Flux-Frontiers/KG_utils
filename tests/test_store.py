@@ -10,7 +10,6 @@ import pytest
 from kg_utils.specs import EdgeSpec, NodeSpec
 from kg_utils.store import GraphStore, ProvMeta, _module_to_dotted_variants
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -20,7 +19,7 @@ def _node(nid: str, kind: str = "function", name: str | None = None, **kw) -> No
     return NodeSpec(
         node_id=nid,
         kind=kind,
-        name=name or nid.split(":")[-1],
+        name=name or nid.rsplit(":", maxsplit=1)[-1],
         qualname=kw.pop("qualname", nid),
         source_path=kw.pop("source_path", "src/mod.py"),
         **kw,

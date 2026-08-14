@@ -5,20 +5,18 @@ All tests are pure Python (stdlib only); no external packages required.
 
 from __future__ import annotations
 
-
 import pytest
 
 from kg_utils.synthesis._config import (
+    _IMAGE_DEFAULTS,
+    _TEXT_DEFAULTS,
     ImageBackend,
     ImageConfig,
     TextBackend,
     TextConfig,
-    _IMAGE_DEFAULTS,
-    _TEXT_DEFAULTS,
     image_config_from_env,
     text_config_from_env,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
