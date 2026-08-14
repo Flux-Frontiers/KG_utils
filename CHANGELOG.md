@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`kg_utils.embedder.TEIEmbedder` — embeddings from a remote HuggingFace
+  Text Embeddings Inference server.** Purely additive: no existing class,
+  signature or default changes, and nothing selects it unless a caller asks
+  for it by name.
+  - **Stdlib HTTP only** (`urllib`, `json`) — no torch, no sentence-transformers,
+    not even numpy. It is therefore the one embedder that works from a **core,
+    zero-dependency install**, because the model runs in the server process.
+    Speaks TEI's native `POST /embed`.
+  - Honours the fleet contract: `normalize=True` (matching every
+    `normalize_embeddings=True` call site) and `truncate=True`, so over-long
+    inputs are clipped the way sentence-transformers does silently rather than
+    failing the batch.
+  - **`dim` never costs a round trip on the hot path.** Pass `dim=` and
+    construction does no network I/O at all; omit it and the server is probed
+    exactly once, at construction. The probe measures the dimension by
+    embedding one string because TEI's `/info` reports `max_client_batch_size`
+    and `max_input_length` but *not* the embedding width. This matters because
+    `VectorBackend` needs `dim` at table-creation time.
+  - **Request batches are clamped to the server's ceiling.** A stock TEI
+    defaults to `max_client_batch_size=32` and rejects anything larger with
+    HTTP 422 — well below this package's 128-item `DEFAULT_ENCODE_BATCH`. The
+    limit is read from `/info` and every call re-chunked to fit, so callers
+    keep passing 128 and get transparent splitting instead of an error.
+  - **Retries are bounded and failures are loud.** 429 (TEI sheds load rather
+    than queueing), 502/503/504 and transport errors retry with exponential
+    backoff; 4xx request-shape errors raise immediately rather than burning
+    retries. A wrong-width vector or a short response raises instead of being
+    written, since either would silently corrupt a vector store — vectors
+    misaligned against nodes are far more expensive than an exception.
+  - Configured by `endpoint` / `KG_EMBED_ENDPOINT` and `api_key` /
+    `KG_EMBED_API_KEY`, following the `synthesis/_config.py` env-fallback
+    pattern. A trailing `/v1` is trimmed: TEI's native routes live at the root
+    and `/v1` is only its OpenAI-compatible alias.
+  - 35 unit tests with a stubbed HTTP layer (no server, no heavy deps) plus two
+    `integration` tests that run against a live server when `KG_EMBED_ENDPOINT`
+    is set, including a cosine-parity gate against `SentenceTransformerEmbedder`.
+
+  Verified against TEI 1.9.3 serving `BAAI/bge-small-en-v1.5`: vectors match
+  sentence-transformers to cosine ≥ 0.999997 with 99.8% top-10 retrieval
+  agreement, so the two backends can share one store. **This is not a
+  performance upgrade on CPU** — in-process torch measured roughly 2× faster
+  (41 vs 19 items/s on 4 shared cores) — its wins are memory (176 MiB vs
+  1.5 GiB RSS to serve the same model) and keeping torch out of the client.
+  Full evaluation in the kgrag repo at `docs/TEI_EVALUATION.md`.
+
 ### Changed
 
 ### Removed
