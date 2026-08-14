@@ -132,6 +132,15 @@ black      = ">=22.0"
 # change.
 ruff       = ">=0.4.0,<0.16"
 ty         = ">=0.0.41"
+# `.pre-commit-config.yaml` and `.secrets.baseline` were both already checked
+# in, but neither tool was installable from this group, so `poetry install
+# --with dev` gave you the config without the thing that runs it. CI has no
+# detect-secrets job either, so the hook only ever guarded developers who had
+# installed pre-commit by some other route. Versions match KGRAG's dev group.
+pre-commit = "^4.5.1"
+# Not needed to *run* the hook — pre-commit builds its own env for that — but
+# required to regenerate `.secrets.baseline` by hand after an audited change.
+detect-secrets = "^1.5.0"
 
 [tool.black]
 line-length    = 100

@@ -60,6 +60,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The pre-commit hooks were configured but not installable, and their ruff
+  had drifted six minor versions from CI's.** `.pre-commit-config.yaml` and
+  `.secrets.baseline` were both checked in, but neither `pre-commit` nor
+  `detect-secrets` appeared in the dev group — so `poetry install --with dev`
+  gave you the configuration without the tool that runs it, and the hooks only
+  ever guarded developers who had installed pre-commit by some other route. CI
+  runs no detect-secrets job either, so nothing else covered that gap. Both are
+  now dev dependencies at the same versions KGRAG uses.
+
+  Separately, the config pinned `ruff-pre-commit` at **v0.9.10** while the dev
+  group resolves **0.15.22** — two different formatters over one tree, which is
+  precisely how a hook passes locally and CI fails. Pinned to `v0.15.22` to
+  match, with the hook renamed to its current id (`ruff` → `ruff-check`), and a
+  comment tying the rev to the dev floor so they are changed together. Still
+  below 0.16, per the cap recorded beside that floor.
+
+  Verified: `pre-commit run --all-files` from this project's own venv passes
+  all twelve hooks, `ty` and `pytest` included, and `ruff format --check .`,
+  `ruff check .` and the 554-test suite are unchanged.
+
 - **The README's documented test install could not run the test suite.**
   `Development` said `poetry install --with dev`, then pointed at
   `pytest -m "not integration"`. Because the core install is deliberately

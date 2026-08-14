@@ -12,10 +12,14 @@ repos:
         exclude: '^\.dockg/'
       - id: debug-statements
 
+  # Keep this rev in step with the `ruff` floor in pyproject's dev group.
+  # A pre-commit rev that drifts from the version CI installs means two
+  # different formatters over one tree: the hook passes locally and CI fails.
+  # Must stay below 0.16 for the reason recorded beside that floor.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.10
+    rev: v0.15.22
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
         exclude: '^\.claude/'
         pass_filenames: false
