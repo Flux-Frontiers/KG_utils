@@ -1,63 +1,39 @@
-# Release Notes — v0.12.1
+# Release Notes — v0.13.0
 
-> Released: 2026-08-13
+> Released: 2026-08-14
 
-This release ships the `viz3d` organic tree engine that 0.12.0 described but did not
-contain. The promotion sat on a branch the `v0.12.0` tag never included, so that wheel
-carried a `viz3d` package with two modules where the changelog claimed three, and every
-symbol the notes advertised raised `ImportError` on import. 0.12.1 is the corrected
-artifact — 0.12.0 cannot be fixed in place, because PyPI reserves an uploaded filename
-permanently and will not accept a replacement even after the original is deleted.
+This release adds `TEIEmbedder`, a client for remote HuggingFace Text Embeddings
+Inference servers that runs on the standard library alone — no torch, no
+sentence-transformers, not even numpy. It is the first embedder usable from a core,
+zero-dependency install, because the model lives in the server process rather than
+the client.
 
 ## What changed
 
-**A botanically credible tree engine, no longer trapped in a book corpus.** `kg_utils.viz3d.organic`
-arrives verbatim from `gutenberg_kg.layout_organic`: space colonization after Runions,
-Lane and Prusinkiewicz, the pipe model for branch radii (da Vinci's rule), root-to-tip
-path extraction, mesh and leaf-glyph builders, crown spacing, and `grow_tree` as the
-one-call entry point. This finishes what 0.11.0 began. That release moved the layouts out
-of `pycode_kg` so that drawing a graph no longer obliged you to install a Python
-source-code analyser; the tree engine was stranded in a Gutenberg corpus for exactly the
-same reason, and is now free of it.
+**Remote embeddings without the ML stack.** `kg_utils.embedder.TEIEmbedder` speaks
+TEI's native `/embed` API over stdlib HTTP, honours the fleet contract
+(`normalize=True`, `truncate=True`), clamps request batches to the server's
+advertised ceiling, and retries transient failures with backoff while failing loudly
+on anything that could corrupt a vector store. Verified against TEI 1.9.3 serving
+`BAAI/bge-small-en-v1.5`: cosine parity ≥ 0.999997 with the in-process
+sentence-transformers backend, so the two can share one store. Its wins are memory
+(176 MiB vs 1.5 GiB RSS for the same model) and keeping torch out of the client —
+on CPU it is not a speed upgrade.
 
-The engine takes crown attractors and a root, and knows nothing about what they mean. A
-document corpus grows document → section → chunk; a diary grows trunk → period limb →
-entry cluster → leaves. The hierarchy is the caller's business. That is also why
-`seed_from_slug` became **`seed_from_key`** and `grow_tree(slug=...)` became
-`grow_tree(key=...)` on the way over — the concept was never book-specific, only the
-name was, and renaming on promotion beat carrying a book noun into a shared package.
-
-**Rendering stays opt-in, and now has an extra that says so.** The `viz3d` extra remains
-NumPy-only. Just three functions — `smooth_paths`, `tree_mesh` and `leaf_glyphs` — need
-PyVista, they import it lazily, and calling one without it raises a `ModuleNotFoundError`
-naming the install command rather than a bare `AttributeError`. That keeps VTK away from
-the thirteen repos that depend on this package for coordinates alone. But it also left
-PyVista a genuine runtime dependency belonging to no extra at all, so every caller
-hand-declared it and CI installed it by hand to let `ty` resolve the import. The new
-**`viz3d-render`** extra fixes that without collapsing the distinction: depend on it to
-build geometry, on `viz3d` when you only want coordinates. It could not simply be folded
-into `viz3d`, because `pycode_kg` draws this same line internally — it takes
-`kgmodule-utils[semantic,viz3d]` in its main dependencies and keeps PyVista in its own
-extra, and widening the shared one would have handed VTK to every `pycode-kg` install.
-
-**A release gate that checks the artifact instead of the version string.** What went wrong
-in 0.12.0 was invisible to every check a source checkout can perform: the tree was
-self-consistent, the tests passed, and the version string was correct — the tag simply
-pointed at a commit missing the feature. `scripts/verify_release.py` now builds a wheel,
-installs it into a throwaway virtualenv with no source directory on the path, and imports
-the public API from there. A release that documents a symbol it does not ship fails before
-it reaches PyPI.
+**Developer tooling actually installs now.** The checked-in pre-commit configuration
+was not installable from the dev group, and its ruff had drifted six minor versions
+from CI's — the classic recipe for hooks passing locally while CI fails. Both tools
+are now dev dependencies, the hook rev matches the dev floor, and the ruff rule set
+is pinned explicitly rather than inherited from ruff's shifting defaults. The
+README's test instructions were also fixed: the documented install could not even
+collect the suite; it now describes what CI actually installs.
 
 ## Upgrading
 
-If you are on 0.12.0 and import anything from `kg_utils.viz3d.organic`, upgrade — on
-0.12.0 those imports fail outright. Otherwise this is additive and nothing is required.
-
-Rendering callers should switch their dependency from `kgmodule-utils[viz3d]` plus a
-hand-declared `pyvista` to `kgmodule-utils[viz3d-render]`; layout-only callers change
-nothing and acquire no VTK. Anyone porting code off `gutenberg_kg.layout_organic` should
-rename `seed_from_slug` to `seed_from_key` and the `grow_tree(slug=...)` argument to
-`key=...`; the behaviour is otherwise identical.
+Nothing to do — every change is additive or tooling-side, with no API, signature, or
+default changes. To try the new embedder, point it at a running TEI server via
+`TEIEmbedder(endpoint=...)` or the `KG_EMBED_ENDPOINT` / `KG_EMBED_API_KEY`
+environment variables.
 
 ---
 

@@ -14,9 +14,9 @@ authors:
     orcid: "https://orcid.org/0009-0009-0891-1507"
     email: suchanek@flux-frontiers.com
     affiliation: "Flux-Frontiers"
-version: "0.12.1"
+version: "0.13.0"
 doi: "10.5281/zenodo.21284866"
-date-released: "2026-08-13"
+date-released: "2026-08-14"
 license-url: "https://www.elastic.co/licensing/elastic-license"
 repository-code: "https://github.com/Flux-Frontiers/KG_utils"
 url: "https://github.com/Flux-Frontiers/KG_utils"

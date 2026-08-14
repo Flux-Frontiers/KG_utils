@@ -1,14 +1,6 @@
-# pyproject.toml — kgmodule-utils: shared SDK layer for the KGModule ecosystem
-#
-# The core install is zero-dependency (stdlib only):
-#   kg_utils.specs     — NodeSpec, EdgeSpec, KGExtractor, etc.
-#   kg_utils.snapshots — Snapshot, SnapshotManager, SnapshotManifest, etc.
-#   kg_utils.store     — SQLite-backed GraphStore
-#   kg_utils.module    — KGModule pipeline base
-#
-# Everything heavier is behind an extra: semantic, lancedb, sqlite-vec, viz,
-# viz3d, viz3d-render, synthesis, synthesis-mflux (see
-# [project.optional-dependencies] below).
+# kgmodule-utils — shared SDK layer for the KGModule ecosystem.
+# The core install (specs, snapshots, store, module) is zero-dependency;
+# everything heavier lives behind an extra ([project.optional-dependencies]).
 
 [build-system]
 requires = ["poetry-core"]
@@ -16,7 +8,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.12.1"
+version = "0.13.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -36,15 +28,9 @@ requires-python = ">=3.12,<3.14"
 dependencies = []
 
 [project.optional-dependencies]
-# The embedding stack plus the default ("auto") backend, sqlite-vec. Does NOT
-# include lancedb — vector_backend.py's own docstring scopes lancedb to
-# LanceDBBackend only, and auto_resolve_backend() picks sqlite-vec for every
-# fresh or already-migrated store, falling back to lancedb only when an
-# un-migrated LanceDB store is already on disk. No adapter in the fleet uses
-# LanceDBBackend directly (pycode_kg imports SqliteVecBackend explicitly; doc_kg
-# declares lancedb as its own direct dependency rather than getting it from
-# here), so bundling it into every `semantic` install was pure dead weight —
-# see the lancedb extra below for the un-migrated-store case.
+# Embedding stack plus the default ("auto") backend, sqlite-vec. Deliberately
+# excludes lancedb: no fleet adapter uses LanceDBBackend directly, so bundling
+# it here was dead weight — see the `lancedb` extra for legacy stores.
 semantic = [
     "numpy>=1.24.0",
     "rich>=13.0.0,<15.0.0",
@@ -53,42 +39,29 @@ semantic = [
     "torch>=2.5.1",
     "transformers>=5.5.0,<6",
 ]
-# Shared graph rendering (kg_utils.viz).  Kept out of the core so the
-# zero-dependency install stays zero-dependency.
+# Shared graph rendering (kg_utils.viz); kept out of core to stay zero-dependency.
 viz = [
     "pyvis>=0.3.2",
 ]
-# Shared 3-D layout (kg_utils.viz3d).  Pure numpy: the layouts return
-# coordinates and draw nothing, so the heavy renderer stack (pyvista, Qt) stays
-# in whichever module actually opens a window.  pycode_kg takes this in its main
-# dependencies purely for the layouts and keeps pyvista in its own viz3d extra, so
-# adding a renderer here would undo that split for every pycode-kg install — see
-# viz3d-render.
+# Shared 3-D layouts (kg_utils.viz3d). Pure numpy — returns coordinates, draws
+# nothing. Adding a renderer here would force VTK on every pycode-kg install;
+# see viz3d-render.
 viz3d = [
     "numpy>=1.24.0",
 ]
-# The same layouts plus the renderer they need to produce geometry.
-# `viz3d` deliberately cannot build a mesh: smooth_paths(), tree_mesh() and
-# leaf_glyphs() import pyvista lazily and raise a ModuleNotFoundError naming the
-# install when it is absent.  That keeps VTK out of the layout-only consumers,
-# but it left pyvista — a genuine runtime dependency of three shipped functions
-# — declared in no extra at all, so every caller hand-assembled it and CI had to
-# install it by hand for `ty` to resolve the import.  Depend on this extra when
-# you intend to render; depend on `viz3d` when you only want coordinates.
+# Layouts plus the renderer: smooth_paths(), tree_mesh() and leaf_glyphs()
+# import pyvista lazily. Depend on this to render, on `viz3d` for coordinates.
 viz3d-render = [
     "numpy>=1.24.0",
     "pyvista>=0.44.0",
 ]
-# Exact pin: sqlite-vec is pre-1.0, breaking minors are possible. Prebuilt
-# wheels ship for macOS (x86_64 + arm64), Linux (x86_64 + aarch64), and Windows
-# (amd64) — no compile step. Also bundled in the `semantic` extra since "auto"
-# defaults to sqlite-vec.
+# Exact pin: pre-1.0, breaking minors possible. Prebuilt wheels everywhere;
+# also bundled in `semantic` since "auto" defaults to sqlite-vec.
 sqlite-vec = [
     "sqlite-vec==0.1.9",
 ]
-# LanceDBBackend only. Needed to read/migrate a pre-existing, un-migrated
-# LanceDB store — auto_resolve_backend() falls back to this when one is found
-# on disk. Not part of `semantic`; opt in explicitly if you have legacy data.
+# LanceDBBackend only, for reading/migrating a legacy un-migrated LanceDB
+# store. Not part of `semantic`; opt in explicitly.
 lancedb = [
     "lancedb>=0.19.0",
 ]
@@ -110,12 +83,9 @@ Repository = "https://github.com/Flux-Frontiers/kg_utils"
 [tool.poetry]
 packages = [{include = "kg_utils", from = "src"}]
 
-# Cross-KG sibling packages (doc-kg, pycode-kg, agent-kg, kg-rag) are NOT
-# declared here. They are never imported by this package, and listing them
-# forces poetry's universal resolution to reconcile the transformers pin of
-# every *published* sibling against this project's own -- a deadlock, since
-# doc-kg and pycode-kg each depend on the other. Install them by hand:
-#   pip install doc-kg pycode-kg   kg-rag agent-kg       # on PyPI
+# Cross-KG siblings (doc-kg, pycode-kg, agent-kg, kg-rag) are deliberately not
+# declared: never imported here, and listing them deadlocks poetry's resolver
+# (doc-kg and pycode-kg depend on each other). Install them by hand from PyPI.
 
 [tool.poetry.group.dev]
 optional = true
@@ -123,56 +93,31 @@ optional = true
 [tool.poetry.group.dev.dependencies]
 pytest     = ">=9.0.3"
 pytest-cov = "^5.0.0"
-# Capped below 0.16 deliberately. 0.16 expanded the default rule set (38 new
-# findings here, several needing judgement rather than autofix) and began
-# formatting Python inside Markdown code blocks, rewriting hand-aligned doc
-# examples. Both are real upgrades to adopt on purpose, not side effects a
-# lock regeneration should smuggle in mid-release. Lift the cap in its own
-# change.
+# Capped below 0.16 deliberately: 0.16 expands the default rules and reformats
+# Python in Markdown blocks. Adopt on purpose; lift the cap in its own change.
 ruff       = ">=0.4.0,<0.16"
 ty         = ">=0.0.41"
-# `.pre-commit-config.yaml` and `.secrets.baseline` were both already checked
-# in, but neither tool was installable from this group, so `poetry install
-# --with dev` gave you the config without the thing that runs it. CI has no
-# detect-secrets job either, so the hook only ever guarded developers who had
-# installed pre-commit by some other route. Versions match KGRAG's dev group.
+# Makes the checked-in hook config runnable from `poetry install --with dev`.
+# Versions match KGRAG's dev group.
 pre-commit = "^4.5.1"
-# Not needed to *run* the hook — pre-commit builds its own env for that — but
-# required to regenerate `.secrets.baseline` by hand after an audited change.
+# Only needed to regenerate `.secrets.baseline` by hand after an audited change.
 detect-secrets = "^1.5.0"
 
 [tool.ruff]
 line-length    = 100
 target-version = "py312"
 
-# Pinned explicitly, matching KGRAG. Without a `select` this project inherited
-# ruff's *default* rule set, so the enforced rules changed whenever ruff did —
-# which is exactly how 0.16 arrived carrying 38 new findings. With the set named
-# here, a version bump can change how existing rules behave but can no longer
-# silently add new ones.
+# Explicit select (matching KGRAG) so a ruff upgrade can't silently add rules.
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "BLE", "PLC"]
 ignore = [
   "E501",      # line length is the formatter's business, not the linter's
-  # Lazy imports are this package's architecture, not an oversight: the core
-  # install is deliberately zero-dependency, so numpy, torch, sentence-
-  # transformers and sqlite_vec are imported inside the functions that need
-  # them. Hoisting them to module scope would break that guarantee outright.
-  "PLC0415",   # import-outside-top-level (34 sites)
+  "PLC0415",   # lazy imports ARE the architecture: core install is zero-dependency
   "BLE001",    # blind-except — intentional at optional-dependency boundaries
-  # The three below are real findings, deliberately deferred rather than
-  # silently accepted. Each needs its own change, because each is a behaviour
-  # question rather than a formatting one:
-  #   B905  — 12 `zip()` calls with no `strict=`. `strict=True` would raise on
-  #           ragged input where today it truncates; that needs per-call review.
-  #   UP042 — `str, Enum` -> `StrEnum` changes what `str(member)` returns
-  #           ("TextBackend.OMLX" becomes "omlx"), which callers may depend on.
-  #   B027  — `KGModule._post_build_hook` is an intentional optional no-op;
-  #           marking it @abstractmethod would break every subclass that does
-  #           not override it.
-  "B905",
-  "UP042",
-  "B027",
+  # Real findings, deferred — each is a behaviour change needing its own review:
+  "B905",      # zip() strict= would raise where today it truncates
+  "UP042",     # StrEnum changes str(member) output, which callers may rely on
+  "B027",      # _post_build_hook is an intentional optional no-op
 ]
 
 [tool.pylint.main]

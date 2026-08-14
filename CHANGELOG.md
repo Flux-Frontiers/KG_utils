@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-14
+
 ### Added
 
 - **`kg_utils.embedder.TEIEmbedder` — embeddings from a remote HuggingFace
@@ -53,10 +55,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (41 vs 19 items/s on 4 shared cores) — its wins are memory (176 MiB vs
   1.5 GiB RSS to serve the same model) and keeping torch out of the client.
   Full evaluation in the kgrag repo at `docs/TEI_EVALUATION.md`.
-
-### Changed
-
-### Removed
 
 ### Fixed
 
