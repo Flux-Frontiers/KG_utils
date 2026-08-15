@@ -49,6 +49,62 @@ class SnapshotManager:
         self.package_name = package_name
         self.db_path = Path(db_path) if db_path else None
 
+    @property
+    def repo_root(self) -> Path:
+        """Repository root, inferred as the grandparent of ``snapshots_dir``.
+
+        Snapshot directories are laid out as ``<repo>/.<kind>kg/snapshots``
+        across every KG package, so two levels up is the repo.
+
+        Resolved first, because ``snapshots_dir`` is very often *relative* —
+        ``SnapshotManager(".dockg/snapshots")`` is the form every KG package's
+        own docstring demonstrates. Without resolving, the grandparent of a
+        relative path is ``.``, nothing is ever inside it, and
+        :meth:`_relativize_paths` would silently rewrite nothing.
+        """
+        return self.snapshots_dir.resolve().parent.parent
+
+    def _relativize_paths(self, metrics: dict[str, Any]) -> dict[str, Any]:
+        """Rewrite absolute paths under the repo root as repo-relative.
+
+        Snapshots are committed to git, so an absolute value like
+        ``/Users/alice/repos/foo/.dockg/graph.sqlite`` in ``db_path`` publishes
+        the author's home directory and username, and makes every snapshot
+        machine-specific — two developers rebuilding the same tree produce
+        diffs that record only where each of them keeps their checkout.
+
+        Only paths *inside* the repo are rewritten. An absolute path elsewhere
+        (a corpus on another volume, say) is left alone, because relativizing
+        it would produce a ``../..`` chain that says even more about the
+        machine than the original did.
+
+        :param metrics: Snapshot metrics, possibly containing path strings.
+        :return: The metrics with in-repo absolute paths made relative.
+        """
+        root = self.repo_root
+
+        def fix(value: Any) -> Any:
+            if isinstance(value, str) and value.startswith("/"):
+                candidate = Path(value)
+                # Try the literal path first, then its resolved form. The
+                # second attempt matters when only one side crosses a symlink
+                # — on macOS a repo under /tmp is really /private/tmp, so a
+                # recorded path and a resolved root can describe the same
+                # directory and still fail a literal comparison.
+                for probe in (candidate, candidate.resolve()):
+                    try:
+                        return probe.relative_to(root).as_posix()
+                    except ValueError:
+                        continue
+                return value
+            if isinstance(value, dict):
+                return {k: fix(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [fix(v) for v in value]
+            return value
+
+        return {k: fix(v) for k, v in metrics.items()}
+
     # ------------------------------------------------------------------
     # Package version detection
     # ------------------------------------------------------------------
@@ -98,6 +154,7 @@ class SnapshotManager:
 
         metrics: dict[str, Any] = dict(graph_stats_dict or {})
         metrics.update(extra_metrics)
+        metrics = self._relativize_paths(metrics)
 
         snapshot = Snapshot(
             branch=branch,

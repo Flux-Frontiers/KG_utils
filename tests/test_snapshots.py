@@ -71,6 +71,99 @@ def test_capture_and_save(mgr: SnapshotManager) -> None:
     assert path is not None and path.exists()
 
 
+def test_capture_relativizes_in_repo_paths(tmp_path: Path) -> None:
+    """Snapshots are committed, so absolute in-repo paths must not be stored.
+
+    An absolute ``db_path`` publishes the author's home directory and username
+    and makes the snapshot machine-specific: two developers rebuilding the same
+    tree would produce a diff recording only where each keeps their checkout.
+    """
+    repo = tmp_path / "repo"
+    mgr = SnapshotManager(repo / ".dockg" / "snapshots", package_name="test-pkg")
+    assert mgr.repo_root == repo
+
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        tree_hash="hash-rel",
+        graph_stats_dict={
+            "total_nodes": 5,
+            "total_edges": 3,
+            "db_path": str(repo / ".dockg" / "graph.sqlite"),
+        },
+        repo_root=str(repo),
+        nested={"vectors": str(repo / ".dockg" / "vectors.sqlite")},
+        outside="/Volumes/corpus/books",
+    )
+
+    assert snap.metrics["db_path"] == ".dockg/graph.sqlite"
+    assert snap.metrics["repo_root"] == "."
+    assert snap.metrics["nested"]["vectors"] == ".dockg/vectors.sqlite"
+    # Paths outside the repo are left alone — relativizing them would emit a
+    # ../.. chain that leaks more about the machine than the original.
+    assert snap.metrics["outside"] == "/Volumes/corpus/books"
+    # Non-path values are untouched.
+    assert snap.metrics["total_nodes"] == 5
+
+
+def test_capture_relativizes_under_relative_snapshots_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A relative ``snapshots_dir`` must still resolve to the repo root.
+
+    ``SnapshotManager(".dockg/snapshots")`` is the form every KG package's own
+    docstring demonstrates. Without resolving, the grandparent of a relative
+    path is ``.``, nothing is ever inside it, and the rewrite silently does
+    nothing — a leak that fails *open*.
+    """
+    repo = (tmp_path / "repo").resolve()
+    (repo / ".dockg").mkdir(parents=True)
+    monkeypatch.chdir(repo)
+
+    mgr = SnapshotManager(".dockg/snapshots", package_name="test-pkg")
+    assert mgr.repo_root == repo
+
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        tree_hash="hash-relative-dir",
+        graph_stats_dict={
+            "total_nodes": 5,
+            "db_path": str(repo / ".dockg" / "graph.sqlite"),
+        },
+    )
+
+    assert snap.metrics["db_path"] == ".dockg/graph.sqlite"
+    assert str(repo) not in snap.metrics["db_path"]
+
+
+def test_capture_relativizes_across_a_symlinked_root(tmp_path: Path) -> None:
+    """A recorded path and the root may describe one directory via a symlink.
+
+    On macOS a repo under ``/tmp`` really lives at ``/private/tmp``, so a
+    literal ``relative_to`` fails even though both name the same place.
+    """
+    real = (tmp_path / "real").resolve()
+    (real / ".dockg" / "snapshots").mkdir(parents=True)
+    link = tmp_path / "link"
+    link.symlink_to(real)
+
+    mgr = SnapshotManager(link / ".dockg" / "snapshots", package_name="test-pkg")
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        tree_hash="hash-symlink",
+        graph_stats_dict={
+            "total_nodes": 5,
+            # Recorded through the *real* path while the manager was built
+            # from the symlinked one.
+            "db_path": str(real / ".dockg" / "graph.sqlite"),
+        },
+    )
+
+    assert snap.metrics["db_path"] == ".dockg/graph.sqlite"
+
+
 def test_save_rejects_zero_nodes(mgr: SnapshotManager) -> None:
     snap = mgr.capture(
         version="0.1.0",
