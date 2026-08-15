@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-08-15
+
+### Fixed
+
+- **`SnapshotManager.repo_root` is assignable again.** 0.13.1 introduced it as
+  a read-only property, and a read-only property cannot be assigned — so any
+  subclass storing its own repository root raised
+  `AttributeError: property 'repo_root' has no setter` at construction. That is
+  the natural thing to do whenever a package's data root and its repository
+  root differ; `gutenberg_kg`'s manager does exactly that, and the regression
+  took out every `gutenkg snapshot` command in a released version.
+
+  `repo_root` returns to a plain attribute set in `__init__`, computed exactly
+  as before — the resolved grandparent of `snapshots_dir` — so the default
+  behaviour and everything 0.13.1 fixed are unchanged. A subclass may now
+  overwrite it after `super().__init__()`, and `_relativize_paths()` honours
+  the root the subclass actually means rather than the one inferred from the
+  directory layout.
+
+- **A snapshot capture no longer fails on an unusable repository root.**
+  Because subclasses may assign anything, `_relativize_paths()` passes metrics
+  through untouched when the root is `None` or empty instead of raising
+  part-way through a capture. A failed relativization should never fail the
+  capture that contains it.
+
+### Removed
+
+- The `Last Revision:` header line from `vector_backend.py`. The field
+  invalidates itself: correcting it changes the file, which moves git's
+  last-change date to today and makes the corrected header wrong again.
+  `git log -1 --format=%cd -- <file>` is exact and free. `Author:` and
+  `License:` are kept.
+
 ## [0.13.1] - 2026-08-15
 
 ### Fixed
