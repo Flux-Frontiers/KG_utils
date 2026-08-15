@@ -164,6 +164,56 @@ def test_capture_relativizes_across_a_symlinked_root(tmp_path: Path) -> None:
     assert snap.metrics["db_path"] == ".dockg/graph.sqlite"
 
 
+def test_subclass_may_reassign_repo_root(tmp_path: Path) -> None:
+    """A subclass must be able to set ``self.repo_root`` after ``super().__init__``.
+
+    Regression: 0.13.1 made ``repo_root`` a read-only property, which broke
+    every subclass that stores its own — gutenberg_kg's manager does, because
+    its corpus root and repo root differ, and construction raised
+    ``AttributeError: property 'repo_root' ... has no setter``. That took out
+    every ``gutenkg snapshot`` command in a released version.
+    """
+    repo = (tmp_path / "repo").resolve()
+    elsewhere = (tmp_path / "corpus").resolve()
+    (repo / ".gutenkg" / "snapshots").mkdir(parents=True)
+    elsewhere.mkdir()
+
+    class SubManager(SnapshotManager):
+        def __init__(self, snapshots_dir: Path, repo_root: Path) -> None:
+            super().__init__(snapshots_dir, package_name="test-pkg")
+            self.repo_root = repo_root
+
+    mgr = SubManager(repo / ".gutenkg" / "snapshots", repo_root=elsewhere)
+    assert mgr.repo_root == elsewhere
+
+    # Relativization must honour the root the subclass set, not the derived one.
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        tree_hash="hash-subclass",
+        graph_stats_dict={"total_nodes": 2, "db_path": str(elsewhere / "g.sqlite")},
+    )
+    assert snap.metrics["db_path"] == "g.sqlite"
+
+
+def test_relativize_survives_an_unusable_repo_root(tmp_path: Path) -> None:
+    """A subclass may set repo_root to None; capture must not raise."""
+
+    class NoRoot(SnapshotManager):
+        def __init__(self, snapshots_dir: Path) -> None:
+            super().__init__(snapshots_dir, package_name="test-pkg")
+            self.repo_root = None  # type: ignore[assignment]
+
+    mgr = NoRoot(tmp_path / ".kg" / "snapshots")
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        tree_hash="hash-noroot",
+        graph_stats_dict={"total_nodes": 1, "db_path": "/abs/path/g.sqlite"},
+    )
+    assert snap.metrics["db_path"] == "/abs/path/g.sqlite"
+
+
 def test_save_rejects_zero_nodes(mgr: SnapshotManager) -> None:
     snap = mgr.capture(
         version="0.1.0",

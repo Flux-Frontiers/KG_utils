@@ -48,21 +48,23 @@ class SnapshotManager:
         self.manifest_path = self.snapshots_dir / "manifest.json"
         self.package_name = package_name
         self.db_path = Path(db_path) if db_path else None
-
-    @property
-    def repo_root(self) -> Path:
-        """Repository root, inferred as the grandparent of ``snapshots_dir``.
-
-        Snapshot directories are laid out as ``<repo>/.<kind>kg/snapshots``
-        across every KG package, so two levels up is the repo.
-
-        Resolved first, because ``snapshots_dir`` is very often *relative* —
-        ``SnapshotManager(".dockg/snapshots")`` is the form every KG package's
-        own docstring demonstrates. Without resolving, the grandparent of a
-        relative path is ``.``, nothing is ever inside it, and
-        :meth:`_relativize_paths` would silently rewrite nothing.
-        """
-        return self.snapshots_dir.resolve().parent.parent
+        #: Repository root, inferred as the grandparent of ``snapshots_dir``
+        #: — snapshot directories are laid out as ``<repo>/.<kind>kg/snapshots``
+        #: across every KG package, so two levels up is the repo.
+        #:
+        #: Resolved first, because ``snapshots_dir`` is very often *relative*:
+        #: ``SnapshotManager(".dockg/snapshots")`` is the form every KG
+        #: package's own docstring demonstrates, and the grandparent of a
+        #: relative path is ``.``, inside which nothing ever lies.
+        #:
+        #: A plain attribute rather than a property **on purpose**. Subclasses
+        #: assign ``self.repo_root`` after calling ``super().__init__()`` —
+        #: gutenberg_kg does, because its corpus root and repo root differ — and
+        #: a read-only property makes that assignment raise AttributeError at
+        #: construction. Assigning here lets a subclass override it, and
+        #: :meth:`_relativize_paths` then relativizes against the root the
+        #: subclass actually means.
+        self.repo_root = self.snapshots_dir.resolve().parent.parent
 
     def _relativize_paths(self, metrics: dict[str, Any]) -> dict[str, Any]:
         """Rewrite absolute paths under the repo root as repo-relative.
@@ -81,7 +83,13 @@ class SnapshotManager:
         :param metrics: Snapshot metrics, possibly containing path strings.
         :return: The metrics with in-repo absolute paths made relative.
         """
-        root = self.repo_root
+        # Subclasses may reassign repo_root to anything — gutenberg_kg passes
+        # one in, and it can be a str or None. Without a usable root there is
+        # nothing to relativize against, so leave the metrics untouched rather
+        # than raising inside a snapshot capture.
+        if not self.repo_root:
+            return dict(metrics)
+        root = Path(self.repo_root)
 
         def fix(value: Any) -> Any:
             if isinstance(value, str) and value.startswith("/"):
