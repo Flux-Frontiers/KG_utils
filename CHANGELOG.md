@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Snapshots no longer record absolute paths.** `SnapshotManager.capture()`
+  now rewrites any metric value that is an absolute path *inside the repo* as
+  a repo-relative one, so `db_path` reads `.dockg/graph.sqlite` rather than
+  `/Users/<name>/repos/<repo>/.dockg/graph.sqlite`. Snapshots are committed to
+  git, so the absolute form published the author's home directory and username
+  and made every snapshot machine-specific — two developers rebuilding the same
+  tree produced a diff recording only where each of them kept their checkout.
+
+  Measured across the fleet before the fix: 166 committed snapshot files in 8
+  repos carried an absolute path. This is the single shared point every KG
+  package's snapshot flows through, so the fix reaches all of them, but only
+  once each picks up the release.
+
+  Paths *outside* the repo are deliberately left alone — relativizing them
+  would emit a `../..` chain that says more about the machine than the
+  original did. Adds `SnapshotManager.repo_root`, inferred as the grandparent
+  of `snapshots_dir`, which is the layout every KG package already uses.
+
 ## [0.13.0] - 2026-08-14
 
 ### Added

@@ -71,6 +71,41 @@ def test_capture_and_save(mgr: SnapshotManager) -> None:
     assert path is not None and path.exists()
 
 
+def test_capture_relativizes_in_repo_paths(tmp_path: Path) -> None:
+    """Snapshots are committed, so absolute in-repo paths must not be stored.
+
+    An absolute ``db_path`` publishes the author's home directory and username
+    and makes the snapshot machine-specific: two developers rebuilding the same
+    tree would produce a diff recording only where each keeps their checkout.
+    """
+    repo = tmp_path / "repo"
+    mgr = SnapshotManager(repo / ".dockg" / "snapshots", package_name="test-pkg")
+    assert mgr.repo_root == repo
+
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        tree_hash="hash-rel",
+        graph_stats_dict={
+            "total_nodes": 5,
+            "total_edges": 3,
+            "db_path": str(repo / ".dockg" / "graph.sqlite"),
+        },
+        repo_root=str(repo),
+        nested={"vectors": str(repo / ".dockg" / "vectors.sqlite")},
+        outside="/Volumes/corpus/books",
+    )
+
+    assert snap.metrics["db_path"] == ".dockg/graph.sqlite"
+    assert snap.metrics["repo_root"] == "."
+    assert snap.metrics["nested"]["vectors"] == ".dockg/vectors.sqlite"
+    # Paths outside the repo are left alone — relativizing them would emit a
+    # ../.. chain that leaks more about the machine than the original.
+    assert snap.metrics["outside"] == "/Volumes/corpus/books"
+    # Non-path values are untouched.
+    assert snap.metrics["total_nodes"] == 5
+
+
 def test_save_rejects_zero_nodes(mgr: SnapshotManager) -> None:
     snap = mgr.capture(
         version="0.1.0",
