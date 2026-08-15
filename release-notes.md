@@ -1,39 +1,55 @@
-# Release Notes — v0.13.0
+# Release Notes — v0.13.1
 
-> Released: 2026-08-14
+> Released: 2026-08-15
 
-This release adds `TEIEmbedder`, a client for remote HuggingFace Text Embeddings
-Inference servers that runs on the standard library alone — no torch, no
-sentence-transformers, not even numpy. It is the first embedder usable from a core,
-zero-dependency install, because the model lives in the server process rather than
-the client.
+A single fix, in the one place every KG package's snapshots pass through: snapshots
+no longer record absolute filesystem paths. Until now a captured snapshot stored
+its database location verbatim — `/Users/<name>/repos/<project>/.dockg/graph.sqlite`
+— and snapshots are committed to git. That put a home directory and a username into
+version control across the ecosystem, and made every snapshot specific to the
+machine that produced it.
 
 ## What changed
 
-**Remote embeddings without the ML stack.** `kg_utils.embedder.TEIEmbedder` speaks
-TEI's native `/embed` API over stdlib HTTP, honours the fleet contract
-(`normalize=True`, `truncate=True`), clamps request batches to the server's
-advertised ceiling, and retries transient failures with backoff while failing loudly
-on anything that could corrupt a vector store. Verified against TEI 1.9.3 serving
-`BAAI/bge-small-en-v1.5`: cosine parity ≥ 0.999997 with the in-process
-sentence-transformers backend, so the two can share one store. Its wins are memory
-(176 MiB vs 1.5 GiB RSS for the same model) and keeping torch out of the client —
-on CPU it is not a speed upgrade.
+**Paths inside the repository are now stored relative to it.** `db_path` reads
+`.dockg/graph.sqlite` instead of the full absolute path. The rewrite happens in
+`SnapshotManager.capture()`, which every KG package reaches — either by inheriting
+it or by delegating through `super().capture()` — so one change covers the family.
+It walks nested dictionaries and lists, so a path buried inside a structured metric
+is caught alongside a top-level one.
 
-**Developer tooling actually installs now.** The checked-in pre-commit configuration
-was not installable from the dev group, and its ruff had drifted six minor versions
-from CI's — the classic recipe for hooks passing locally while CI fails. Both tools
-are now dev dependencies, the hook rev matches the dev floor, and the ruff rule set
-is pinned explicitly rather than inherited from ruff's shifting defaults. The
-README's test instructions were also fixed: the documented install could not even
-collect the suite; it now describes what CI actually installs.
+**Paths outside the repository are deliberately untouched.** A corpus on another
+volume stays absolute, because rewriting it would produce a `../..` chain that
+describes the machine more thoroughly than the original string did. The rewrite
+only applies where the result is genuinely portable.
+
+**The repository root is resolved before anything is compared.** This is the part
+that makes the rest work. `SnapshotManager(".dockg/snapshots")` — the relative form
+shown in every KG package's own documentation — has `.` as its grandparent, and no
+path is ever inside `.`. Without resolving first, the rewrite would have quietly
+done nothing while appearing to succeed. Comparison also retries against the
+resolved candidate, so a repository reached through a symbolic link still matches;
+on macOS a checkout under `/tmp` actually lives at `/private/tmp`, and both
+spellings name one directory.
+
+The public surface gains one property, `SnapshotManager.repo_root`. Nothing was
+removed or renamed, and no existing signature changed.
 
 ## Upgrading
 
-Nothing to do — every change is additive or tooling-side, with no API, signature, or
-default changes. To try the new embedder, point it at a running TEI server via
-`TEIEmbedder(endpoint=...)` or the `KG_EMBED_ENDPOINT` / `KG_EMBED_API_KEY`
-environment variables.
+Upgrade and rebuild; there is nothing to migrate and no new configuration. From the
+next snapshot each project captures, its paths will be recorded relative to the
+repository.
+
+This release does not rewrite snapshots that are already committed. Those keep the
+absolute paths they were written with until each project rewrites them once — a
+mechanical edit of the `db_path` field in `.<kind>kg/snapshots/*.json` and the
+accompanying `manifest.json`. Projects that upgrade without doing that stop
+accumulating new occurrences but keep the existing ones in their history.
+
+One cosmetic consequence: because deduplication compares the metrics dictionary,
+the first capture after upgrading will see `db_path` change format and record a
+snapshot even when nothing else moved. It happens once per project.
 
 ---
 

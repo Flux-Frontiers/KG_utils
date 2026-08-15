@@ -29,7 +29,7 @@ Optional dependencies
 
 Author: Eric G. Suchanek, PhD
 License: Elastic-2.0
-Last Revision: 2026-07-15
+Last Revision: 2026-08-14
 """
 
 from __future__ import annotations

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-08-15
+
 ### Fixed
 
 - **Snapshots no longer record absolute paths.** `SnapshotManager.capture()`
@@ -20,12 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Measured across the fleet before the fix: 166 committed snapshot files in 8
   repos carried an absolute path. This is the single shared point every KG
   package's snapshot flows through, so the fix reaches all of them, but only
-  once each picks up the release.
+  once each picks up the release. It does not retroactively clean files already
+  committed — those need a one-time rewrite per repo.
 
-  Paths *outside* the repo are deliberately left alone — relativizing them
-  would emit a `../..` chain that says more about the machine than the
-  original did. Adds `SnapshotManager.repo_root`, inferred as the grandparent
-  of `snapshots_dir`, which is the layout every KG package already uses.
+  Paths *outside* the repo are deliberately left alone: relativizing them would
+  emit a `../..` chain that says more about the machine than the original did.
+
+### Added
+
+- **`SnapshotManager.repo_root`** — the repository root, taken as the
+  grandparent of a **resolved** `snapshots_dir`. Resolving matters more than it
+  looks: `SnapshotManager(".dockg/snapshots")` is the relative form every KG
+  package's own docstring demonstrates, and the grandparent of a relative path
+  is `.`, inside which nothing ever lies. Without resolving, the rewrite above
+  would silently do nothing while reporting success — the guard would fail
+  open. Path comparison also retries against the resolved candidate, so a root
+  reached through a symlink still matches; on macOS a repo under `/tmp` really
+  lives at `/private/tmp`, and the two spellings name one directory.
 
 ## [0.13.0] - 2026-08-14
 
