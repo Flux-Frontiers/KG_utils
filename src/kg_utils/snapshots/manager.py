@@ -55,8 +55,14 @@ class SnapshotManager:
 
         Snapshot directories are laid out as ``<repo>/.<kind>kg/snapshots``
         across every KG package, so two levels up is the repo.
+
+        Resolved first, because ``snapshots_dir`` is very often *relative* —
+        ``SnapshotManager(".dockg/snapshots")`` is the form every KG package's
+        own docstring demonstrates. Without resolving, the grandparent of a
+        relative path is ``.``, nothing is ever inside it, and
+        :meth:`_relativize_paths` would silently rewrite nothing.
         """
-        return self.snapshots_dir.parent.parent
+        return self.snapshots_dir.resolve().parent.parent
 
     def _relativize_paths(self, metrics: dict[str, Any]) -> dict[str, Any]:
         """Rewrite absolute paths under the repo root as repo-relative.
@@ -79,10 +85,18 @@ class SnapshotManager:
 
         def fix(value: Any) -> Any:
             if isinstance(value, str) and value.startswith("/"):
-                try:
-                    return Path(value).relative_to(root).as_posix()
-                except ValueError:
-                    return value
+                candidate = Path(value)
+                # Try the literal path first, then its resolved form. The
+                # second attempt matters when only one side crosses a symlink
+                # — on macOS a repo under /tmp is really /private/tmp, so a
+                # recorded path and a resolved root can describe the same
+                # directory and still fail a literal comparison.
+                for probe in (candidate, candidate.resolve()):
+                    try:
+                        return probe.relative_to(root).as_posix()
+                    except ValueError:
+                        continue
+                return value
             if isinstance(value, dict):
                 return {k: fix(v) for k, v in value.items()}
             if isinstance(value, list):
