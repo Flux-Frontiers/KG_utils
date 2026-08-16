@@ -1,6 +1,7 @@
 # kgmodule-utils — shared SDK layer for the KGModule ecosystem.
 # The core install (specs, snapshots, store, module) is zero-dependency;
 # everything heavier lives behind an extra ([project.optional-dependencies]).
+# poetry install --with dev --all-extras
 
 [build-system]
 requires = ["poetry-core"]
