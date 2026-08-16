@@ -28,6 +28,11 @@ Sub-packages / modules:
                           skeletons from crown attractors. Layout maths needs only
                           'viz3d'; smooth_paths, tree_mesh and leaf_glyphs build
                           PyVista meshes and need 'viz3d-render'.
+    kg_utils.viz3d.qt   — PovRenderSession, PovRenderWorker, ImagePopup,
+                          cast_scene_to_looking_glass: the Qt machinery a viewer needs
+                          to ray-trace and cast without freezing (needs 'viz3d-qt').
+                          Deliberately not re-exported from kg_utils.viz3d — importing
+                          a layout must not require PyQt.
 
 Optional extras
 ---------------
@@ -42,6 +47,8 @@ The core install is stdlib-only; everything heavier is opt-in.
     pip install 'kgmodule-utils[viz3d]'            # numpy — 3-D graph layout
     pip install 'kgmodule-utils[viz3d-render]'     # + pyvista — build the meshes,
                                                    #   not just the coordinates
+    pip install 'kgmodule-utils[viz3d-qt]'         # + PyQt5 + quiltwright — ray-trace
+                                                   #   and cast from a live viewer
     pip install 'kgmodule-utils[synthesis]'        # httpx + openai + pillow
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`kg_utils.viz3d.qt` — the Qt machinery a viewer needs to ray-trace and
+  cast, behind a new `viz3d-qt` extra.** `PovRenderWorker` keeps POV-Ray off
+  the GUI thread, `PovRenderSession` owns the whole lifecycle around it (temp
+  views directory, progress bar fed by counting files, cleanup, teardown),
+  `ImagePopup` previews the result, and `cast_scene_to_looking_glass` runs the
+  PyVista build → render → write → cast path.
+
+  This is machinery, not wiring. Which node becomes a trunk stays per-repo;
+  a thread wrapper and a progress loop carry no domain claim, and `pycode_kg`
+  and `gutenberg_kg` had already copied the cast path between them closely
+  enough that only the widget names differed (`cast_btn` vs `cast_button`).
+  `PovRenderSession` therefore takes its widgets as constructor arguments
+  rather than being a mixin that assumes one repo's attribute names.
+
+  `PovRenderSession.shutdown()` fixes a crash the copies shared: closing the
+  window during a render left a running `QThread` to be destroyed, which
+  aborts the process, and let queued signals land on deleted widgets. It
+  disconnects before waiting, and parks a worker it cannot stop in time.
+
+  **Not re-exported from `kg_utils.viz3d`** — importing a layout must not
+  require PyQt. Unlike `organic.py`, which spans `viz3d` and `viz3d-render` by
+  importing PyVista inside its functions, Qt cannot be deferred that way:
+  these classes subclass `QThread`/`QDialog`/`QObject`, so the base class must
+  exist when the class body runs. `TestExtraBoundaries` pins the boundary.
+
 ## [0.14.0] - 2026-08-16
 
 ### Changed

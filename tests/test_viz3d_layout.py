@@ -370,3 +370,40 @@ def test_funnel_disc_radius_grows_with_layer_population():
 def test_funnel_handles_an_empty_graph():
     """Zero nodes is a valid graph, not an error."""
     assert FunnelLayout().compute([], []) == {}
+
+
+class TestExtraBoundaries:
+    """The layering claim: importing a layout must not drag a renderer in.
+
+    ``kg_utils.viz3d`` is the ``viz3d`` extra — numpy only. PyVista belongs to
+    ``viz3d-render`` and PyQt to ``viz3d-qt``, and both are reached by importing
+    a *different* module. Re-exporting :mod:`kg_utils.viz3d.qt` from the package
+    ``__init__`` for convenience would silently make PyQt a hard requirement of
+    every consumer that just wants coordinates, which is exactly the mistake
+    these subprocess checks exist to catch.
+    """
+
+    @staticmethod
+    def _imports_after(statement: str) -> set[str]:
+        """:return: Third-party modules present in ``sys.modules`` after *statement*."""
+        import subprocess
+        import sys
+
+        probe = f"import sys; {statement}; print(' '.join(sorted(sys.modules)))"
+        out = subprocess.run(
+            [sys.executable, "-c", probe], capture_output=True, text=True, check=True
+        )
+        return set(out.stdout.split())
+
+    def test_importing_viz3d_does_not_import_pyqt(self):
+        assert "PyQt5" not in self._imports_after("import kg_utils.viz3d")
+
+    def test_importing_viz3d_does_not_import_pyvista(self):
+        assert "pyvista" not in self._imports_after("import kg_utils.viz3d")
+
+    def test_qt_is_not_reachable_from_the_package_namespace(self):
+        """It must be `from kg_utils.viz3d.qt import ...`, never a re-export."""
+        import kg_utils.viz3d as viz3d
+
+        assert not hasattr(viz3d, "PovRenderSession")
+        assert "PovRenderSession" not in getattr(viz3d, "__all__", [])

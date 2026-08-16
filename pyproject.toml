@@ -55,6 +55,17 @@ viz3d-render = [
     "numpy>=1.24.0",
     "pyvista>=0.44.0",
 ]
+# Qt glue for light-field renders (kg_utils.viz3d.qt): the POV-Ray worker
+# thread, its progress/cleanup lifecycle, and the cast path. Qt cannot be
+# imported lazily the way organic.py imports pyvista — these classes subclass
+# QThread/QDialog/QObject, so the base class must exist at import time. Hence
+# a separate module behind a separate extra, and no re-export from viz3d.
+viz3d-qt = [
+    "numpy>=1.24.0",
+    "pyvista>=0.44.0",
+    "PyQt5>=5.15.0",
+    "quiltwright>=0.6.0",
+]
 # Exact pin: pre-1.0, breaking minors possible. Prebuilt wheels everywhere;
 # also bundled in `semantic` since "auto" defaults to sqlite-vec.
 sqlite-vec = [
