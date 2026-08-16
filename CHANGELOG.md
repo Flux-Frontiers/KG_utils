@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`viz3d.limb_paths` and `viz3d.leaf_frames` — the NumPy halves of the two
+  mesh builders.** `smooth_paths` and `leaf_glyphs` each do two things: place
+  geometry, then hand it to PyVista. The placement is pure NumPy and the
+  PyVista part is a detail of one renderer, so a consumer that describes a
+  limb analytically — a POV-Ray `sphere_sweep`, say — had no way to reach the
+  geometry without dragging in VTK to build a tube it was going to throw away.
+
+  `leaf_frames(positions, skeleton)` returns the clung leaf positions and
+  their aim vectors; `leaf_glyphs` now calls it and glyphs the result, so
+  there is one copy of the clinging rule rather than two. `limb_paths` is the
+  PyVista-free counterpart of `smooth_paths`, splining each root-to-tip path
+  through a uniform Catmull-Rom instead of `pv.Spline`. Both stay available
+  under the NumPy-only `viz3d` extra.
+
+  `limb_paths` interpolates the same control points as `smooth_paths` but is
+  **not** bit-identical to VTK's parametric spline, and says so — when two
+  backends must agree to the pixel, call `smooth_paths` once and give both the
+  same points rather than letting each smooth its own.
+
+- **`viz3d.LEAF_ASPECT`** — the per-axis scale that flattens the leaf
+  prototype from a ball into a blade, exported so a non-PyVista renderer can
+  build the same shape from `leaf_frames` rather than re-deriving it.
+
+  Together these let `quiltwright.povgen` emit an organic tree as analytic
+  POV-Ray primitives: 839 KB of SDL for a 3000-leaf tree against roughly
+  12.5 MB for the equivalent triangle dump.
+
 ## [0.13.2] - 2026-08-15
 
 ### Fixed

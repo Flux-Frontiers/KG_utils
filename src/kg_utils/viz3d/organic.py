@@ -54,6 +54,11 @@ PIPE_EXPONENT: float = 2.2
 #: silhouette stops changing and the O(tips x attractors) inner loop dominates.
 MAX_ATTRACTORS: int = 3000
 
+#: Per-axis scale flattening the leaf prototype from a ball into a blade.
+#: Shared so a non-PyVista renderer can build the same shape from
+#: :func:`leaf_frames` rather than re-deriving it.
+LEAF_ASPECT: tuple[float, float, float] = (1.0, 0.55, 0.2)
+
 
 def _pyvista():
     """
@@ -425,6 +430,79 @@ def smooth_paths(
     return out
 
 
+def limb_paths(
+    skeleton: Skeleton,
+    *,
+    subdivisions: int = 4,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """
+    Smooth root-to-tip limb paths with per-point radii, without PyVista.
+
+    The NumPy counterpart of :func:`smooth_paths`, for renderers that describe
+    a limb analytically — a POV-Ray ``sphere_sweep``, say — and so never need
+    a tessellated tube or the VTK stack that builds one.
+
+    The smoothing is a uniform Catmull-Rom through the same control points,
+    which interpolates them exactly as ``pv.Spline`` does but is **not
+    bit-identical** to VTK's parametric spline.  When two backends must agree
+    to the pixel, run :func:`smooth_paths` once and give both the same points
+    rather than letting each smooth its own.
+
+    :param skeleton: Skeleton with radii assigned by :func:`pipe_radii`.
+    :param subdivisions: Spline samples per skeleton segment.
+    :return: ``[(points (K, 3), radii (K,)), ...]`` per path.
+    """
+    if skeleton.radii is None:
+        pipe_radii(skeleton)
+    radii = skeleton.radii
+    assert radii is not None  # set above; keeps the type checker honest
+
+    out: list[tuple[np.ndarray, np.ndarray]] = []
+    for path in root_to_tip_paths(skeleton):
+        if len(path) < 2:
+            continue
+        raw = skeleton.points[path]
+        smoothed = _catmull_rom(raw, subdivisions)
+        src_t = np.linspace(0.0, 1.0, len(path))
+        dst_t = np.linspace(0.0, 1.0, smoothed.shape[0])
+        out.append((smoothed, np.interp(dst_t, src_t, radii[path])))
+    return out
+
+
+def _catmull_rom(points: np.ndarray, samples_per_segment: int) -> np.ndarray:
+    """
+    Resample a polyline through a uniform Catmull-Rom spline.
+
+    Endpoints are duplicated so the first and last segments have the
+    neighbours the basis needs, which keeps the curve pinned to the original
+    ends rather than shrinking away from them.
+
+    :param points: ``(K, 3)`` control points.
+    :param samples_per_segment: Output samples per input segment.
+    :return: ``(K', 3)`` resampled polyline.
+    """
+    pts = np.atleast_2d(np.asarray(points, dtype=float))
+    if pts.shape[0] < 3 or samples_per_segment < 2:
+        return pts
+    padded = np.vstack([pts[0], pts, pts[-1]])
+    out = [pts[0]]
+    for i in range(pts.shape[0] - 1):
+        p0, p1, p2, p3 = padded[i], padded[i + 1], padded[i + 2], padded[i + 3]
+        for step in range(1, samples_per_segment + 1):
+            t = step / samples_per_segment
+            t2, t3 = t * t, t * t * t
+            out.append(
+                0.5
+                * (
+                    (2 * p1)
+                    + (-p0 + p2) * t
+                    + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
+                    + (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+                )
+            )
+    return np.asarray(out, dtype=float)
+
+
 def tree_mesh(
     skeleton: Skeleton,
     *,
@@ -451,6 +529,65 @@ def tree_mesh(
     if not tubes:
         return pv.PolyData()
     return tubes[0] if len(tubes) == 1 else pv.merge(tubes)
+
+
+def leaf_frames(
+    positions: np.ndarray,
+    skeleton: Skeleton,
+    *,
+    size: float = 0.35,
+    cling: float = 0.7,
+    seed: int = 0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Leaf positions and aim vectors, without building any mesh.
+
+    This is the placement half of :func:`leaf_glyphs` — the clinging that
+    pulls each leaf in to its nearest twig, and the local branch direction
+    that orients it — separated out so it can be used by renderers other than
+    PyVista.  ``leaf_glyphs`` calls it and then glyphs the result; a POV-Ray
+    emitter calls it and instances an analytic ellipsoid per leaf instead.
+
+    Pure NumPy, so it stays available under the ``viz3d`` extra alone.
+
+    :param positions: ``(M, 3)`` leaf positions (the chunk attractors).
+    :param skeleton: Grown skeleton, used for local branch direction.
+    :param size: Leaf glyph radius, which sets the clearance a clung leaf
+        keeps from the wood.
+    :param cling: How far each leaf is pulled toward its nearest skeleton
+        node, from ``0`` to ``1``.  See :func:`leaf_glyphs`.
+    :param seed: RNG seed for the roll jitter.
+    :return: ``(points (M, 3), directions (M, 3))``, directions unit-length.
+        Both are empty arrays when *positions* is empty.
+    """
+    pts = np.atleast_2d(np.asarray(positions, dtype=float))
+    if pts.size == 0:
+        return np.zeros((0, 3)), np.zeros((0, 3))
+
+    rng = np.random.default_rng(seed)
+
+    # Local branch direction: the segment ending at the nearest skeleton node.
+    dists = np.linalg.norm(pts[:, None, :] - skeleton.points[None, :, :], axis=2)
+    nearest = dists.argmin(axis=1)
+    parents = skeleton.parents[nearest]
+
+    if cling > 0.0:
+        anchor = skeleton.points[nearest]
+        offset = pts - anchor
+        distance = np.linalg.norm(offset, axis=1, keepdims=True)
+        direction = offset / np.maximum(distance, 1e-9)
+        radii = skeleton.radii if skeleton.radii is not None else pipe_radii(skeleton)
+        clearance = (radii[nearest] + size)[:, None]
+        pts = anchor + direction * np.maximum(distance * (1.0 - cling), clearance)
+
+    vecs = np.where(
+        parents[:, None] >= 0,
+        skeleton.points[nearest] - skeleton.points[np.clip(parents, 0, None)],
+        np.array([0.0, 0.0, 1.0]),
+    )
+    vecs = vecs + rng.normal(0.0, 0.3, vecs.shape)
+    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+    return pts, vecs / np.maximum(norms, 1e-9)
 
 
 def leaf_glyphs(
@@ -490,42 +627,18 @@ def leaf_glyphs(
     :return: Glyphed ``PolyData``, one actor's worth.
     """
     pv = _pyvista()
-    pts = np.atleast_2d(np.asarray(positions, dtype=float))
+    pts, vecs = leaf_frames(positions, skeleton, size=size, cling=cling, seed=seed)
     if pts.size == 0:
         return pv.PolyData()
-
-    rng = np.random.default_rng(seed)
-
-    # Local branch direction: the segment ending at the nearest skeleton node.
-    dists = np.linalg.norm(pts[:, None, :] - skeleton.points[None, :, :], axis=2)
-    nearest = dists.argmin(axis=1)
-    parents = skeleton.parents[nearest]
-
-    if cling > 0.0:
-        anchor = skeleton.points[nearest]
-        offset = pts - anchor
-        distance = np.linalg.norm(offset, axis=1, keepdims=True)
-        direction = offset / np.maximum(distance, 1e-9)
-        radii = skeleton.radii if skeleton.radii is not None else pipe_radii(skeleton)
-        clearance = (radii[nearest] + size)[:, None]
-        pts = anchor + direction * np.maximum(distance * (1.0 - cling), clearance)
 
     cloud = pv.PolyData(pts)
     if tint is not None:
         cloud["tint"] = np.asarray(tint, dtype=float)
-
-    vecs = np.where(
-        parents[:, None] >= 0,
-        skeleton.points[nearest] - skeleton.points[np.clip(parents, 0, None)],
-        np.array([0.0, 0.0, 1.0]),
-    )
-    vecs = vecs + rng.normal(0.0, 0.3, vecs.shape)
-    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
-    cloud["direction"] = vecs / np.maximum(norms, 1e-9)
+    cloud["direction"] = vecs
 
     # A flattened ellipsoid: cheap, and it silhouettes like foliage.
     proto = pv.Sphere(radius=size, theta_resolution=8, phi_resolution=6)
-    proto.scale([1.0, 0.55, 0.2], inplace=True)
+    proto.scale(LEAF_ASPECT, inplace=True)
     return cloud.glyph(geom=proto, orient="direction", scale=False)
 
 

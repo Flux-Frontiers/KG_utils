@@ -32,13 +32,16 @@ from kg_utils.viz3d.layout import (
     golden_spiral_2d,
 )
 from kg_utils.viz3d.organic import (
+    LEAF_ASPECT,
     MAX_ATTRACTORS,
     PIPE_EXPONENT,
     Skeleton,
     colonize,
     crown_spacing,
     grow_tree,
+    leaf_frames,
     leaf_glyphs,
+    limb_paths,
     pipe_radii,
     root_to_tip_paths,
     seed_from_key,
@@ -48,6 +51,7 @@ from kg_utils.viz3d.organic import (
 
 __all__ = [
     "DEFAULT_LEVEL_SIZE",
+    "LEAF_ASPECT",
     "MAX_ATTRACTORS",
     "PIPE_EXPONENT",
     "AlliumLayout",
@@ -62,7 +66,9 @@ __all__ = [
     "fibonacci_sphere",
     "golden_spiral_2d",
     "grow_tree",
+    "leaf_frames",
     "leaf_glyphs",
+    "limb_paths",
     "pipe_radii",
     "root_to_tip_paths",
     "seed_from_key",
