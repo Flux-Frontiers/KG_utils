@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the ankles; and a zero-height subject falls back to a unit depth instead of
   collapsing the standoff to nothing.
 
+  `frame_tree(..., fov=)` fits the subject's bounding sphere to a lens instead
+  of standing off a fixed multiple of its height. The standoff rule is what
+  the `cmd_quilt` copies did, and it is right *there*, because PyVista's
+  `plotter.reset_camera()` re-fits afterwards. POV-Ray has no such pass, so
+  hoisting the rule as-is silently dropped the fitting and the first real
+  render came out cropped top and bottom — while every unit test still passed,
+  because a badly-fitted frame is a structurally valid one. Omitting `fov`
+  keeps the standoff rule, so PyVista callers are unaffected.
+
   Groundwork for `kgrag_priv/docs/POVRAY_QUILT_ROLLOUT_PLAN.md` — every KG
   module renderable as a quilt through both of quiltwright's backends.
 

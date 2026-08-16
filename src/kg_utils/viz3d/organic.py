@@ -772,6 +772,7 @@ class CameraFrame:
 def frame_tree(
     points: np.ndarray,
     *,
+    fov: float | None = None,
     standoff: float = 1.5,
     include_root: bool = True,
 ) -> CameraFrame:
@@ -791,9 +792,16 @@ def frame_tree(
     small and high in the tile.
 
     :param points: ``(N, 3)`` subject points, typically the crown attractors.
+    :param fov: Vertical field of view in degrees.  Given one, the camera is
+        placed at the distance that fits the subject's bounding sphere in it —
+        the answer ``plotter.reset_camera()`` computes, which a renderer
+        without one has to compute for itself.  ``None`` falls back to
+        *standoff*, which is what a PyVista caller wants: it sets a direction
+        and lets ``reset_camera()`` do the fitting.
     :param standoff: Camera distance as a multiple of the subject's ``z``
-        extent.  The default matches the framing ``gutenkg quilt`` and
-        ``pycodekg quilt` have used since they were written.
+        extent, used only when *fov* is ``None``.  The default matches the
+        framing ``gutenkg quilt`` and ``pycodekg quilt`` have used since they
+        were written.
     :param include_root: Extend the bounds to the origin, where a grown
         skeleton's root node sits.  The trunk carries no attractors, so without
         this the frame covers the canopy and cuts the tree off at the ankles.
@@ -810,8 +818,19 @@ def frame_tree(
     centre = (lo + hi) / 2.0
     depth = float(hi[2] - lo[2]) or 1.0
 
+    if fov is None:
+        # Historical rule: stand off from the near face, so the subject
+        # straddles the focal plane.  reset_camera() fixes up the distance.
+        eye_y = lo[1] - depth * standoff
+    else:
+        # A fit is a camera-to-centre distance, so it is measured from the
+        # focal point — measuring it from the near face would stand the
+        # camera a half-depth too far back and undersize the subject.
+        radius = float(np.linalg.norm(hi - lo)) / 2.0 or 1.0
+        eye_y = centre[1] - radius / max(np.tan(np.radians(float(fov) / 2.0)), 1e-6)
+
     return CameraFrame(
-        position=(float(centre[0]), float(lo[1] - depth * standoff), float(centre[2])),
+        position=(float(centre[0]), float(eye_y), float(centre[2])),
         focal_point=(float(centre[0]), float(centre[1]), float(centre[2])),
         up=(0.0, 0.0, 1.0),
     )

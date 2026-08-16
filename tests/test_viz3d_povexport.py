@@ -456,3 +456,40 @@ def test_frame_tree_survives_a_flat_subject(crown):
 def test_frame_tree_rejects_an_empty_subject():
     with pytest.raises(ValueError, match="empty"):
         frame_tree(np.zeros((0, 3)))
+
+
+def test_frame_tree_fits_the_subject_to_a_given_fov():
+    """
+    A renderer with no ``reset_camera()`` has to compute the fit itself. Without
+    this the camera stands at a fixed multiple of the subject's height, which
+    overflows a narrow lens and wastes a wide one — a regression only a render
+    shows, since the frame is still structurally valid.
+    """
+    rng = np.random.default_rng(3)
+    canopy = rng.normal(0.0, 1.5, (120, 3)) + np.array([0.0, 0.0, 30.0])
+    lo = np.minimum(canopy.min(axis=0), 0.0)
+    hi = np.maximum(canopy.max(axis=0), 0.0)
+    radius = float(np.linalg.norm(hi - lo)) / 2.0
+
+    for fov in (14.0, 26.0, 60.0):
+        frame = frame_tree(canopy, fov=fov)
+        distance = abs(frame.position[1] - frame.focal_point[1])
+        assert distance == pytest.approx(radius / np.tan(np.radians(fov / 2.0)))
+
+
+def test_frame_tree_without_a_fov_keeps_the_standoff_rule():
+    """PyVista callers set a direction and let reset_camera() fit."""
+    rng = np.random.default_rng(3)
+    canopy = rng.normal(0.0, 1.5, (120, 3)) + np.array([0.0, 0.0, 30.0])
+    lo = np.minimum(canopy.min(axis=0), 0.0)
+    hi = np.maximum(canopy.max(axis=0), 0.0)
+    frame = frame_tree(canopy)
+    assert frame.position[1] == pytest.approx(lo[1] - (hi[2] - lo[2]) * 1.5)
+
+
+def test_a_narrower_lens_stands_further_back():
+    rng = np.random.default_rng(3)
+    canopy = rng.normal(0.0, 1.5, (120, 3)) + np.array([0.0, 0.0, 30.0])
+    narrow = frame_tree(canopy, fov=14.0).position[1]
+    wide = frame_tree(canopy, fov=60.0).position[1]
+    assert narrow < wide
