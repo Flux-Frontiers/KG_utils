@@ -4,7 +4,22 @@
 the same geometry ``leaf_glyphs`` and ``tree_mesh`` build.  These tests pin
 the two properties that matter for that: they run without PyVista installed,
 and they agree with the PyVista path they were factored out of.
+
+Only the three comparison tests need PyVista, and they carry
+``@requires_pyvista`` individually.  This file used to gate the whole module
+on it, which had two costs: the twenty-seven pure-NumPy tests — the ones
+covering the very accessors that exist *not* to need PyVista — were skipped on
+any machine without the render extra, and the "runs without PyVista" claim in
+the paragraph above was only ever checked where it could not fail.  A
+module-scope ``importorskip`` aborts collection for the whole file, so no test
+placed after it can cover that case either;
+:func:`test_the_accessors_run_with_no_pyvista_installed` uses a subprocess
+with the import blocked instead.
 """
+
+import importlib.util
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -23,7 +38,70 @@ from kg_utils.viz3d.organic import (
     seed_from_key,
 )
 
-pv = pytest.importorskip("pyvista", reason="PyVista comparisons need the render extra")
+
+def test_the_accessors_run_with_no_pyvista_installed():
+    """
+    The property this module exists to protect, checked in the environment it
+    is a claim about.  Runs before the module-scope gate below, so it survives
+    a machine with no render extra — which is the only machine where it could
+    ever fail.
+    """
+    probe = """
+import sys
+
+class _Block:
+    def find_spec(self, name, path=None, target=None):
+        if name.split(".")[0] in ("pyvista", "vtk", "vtkmodules"):
+            raise ModuleNotFoundError(f"No module named {name!r}", name=name)
+        return None
+
+sys.meta_path.insert(0, _Block())
+
+import numpy as np
+from kg_utils.viz3d.organic import LEAF_ASPECT, grow_tree, leaf_frames, limb_paths
+
+rng = np.random.default_rng(0)
+crown = rng.normal(0, 1, (60, 3)) * np.array([3.0, 3.0, 6.0]) + np.array([0, 0, 20.0])
+skeleton = grow_tree(crown, np.zeros(3), key="nopv")
+
+points, directions = leaf_frames(crown, skeleton)
+assert points.shape == directions.shape == (60, 3)
+paths = limb_paths(skeleton)
+assert paths and all(p.ndim == 2 for p, _ in paths)
+assert len(LEAF_ASPECT) == 3
+assert "pyvista" not in sys.modules and "vtkmodules" not in sys.modules
+print("OK")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "OK" in result.stdout
+
+
+#: The three tests below compare against the PyVista path and so need it
+#: installed.  Everything else here is NumPy-only by design and must keep
+#: running without it — that is the property the module exists to protect.
+def _has_pyvista() -> bool:
+    """Whether PyVista can be located, without importing it.
+
+    ``find_spec`` is wrapped because it *raises* rather than returning ``None``
+    when a finder rejects the name — a partially removed install, or a test
+    harness blocking the import to simulate one.  Either way the answer we
+    want is "no".
+
+    :return: True if PyVista appears importable.
+    """
+    try:
+        return importlib.util.find_spec("pyvista") is not None
+    except (ImportError, ValueError):
+        return False
+
+
+requires_pyvista = pytest.mark.skipif(
+    not _has_pyvista(),
+    reason="PyVista comparisons need the viz3d-render extra",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +213,7 @@ def test_leaf_frames_handles_an_empty_crown(skeleton):
     assert directions.shape == (0, 3)
 
 
+@requires_pyvista
 def test_leaf_glyphs_places_glyphs_at_leaf_frame_points(crown, skeleton):
     """The refactor must not have moved the foliage."""
     from kg_utils.viz3d.organic import leaf_glyphs
@@ -196,6 +275,7 @@ def test_limb_paths_assigns_radii_when_missing(crown):
     assert bare.radii is not None
 
 
+@requires_pyvista
 def test_limb_paths_tracks_smooth_paths_closely(skeleton):
     """The NumPy spline is not VTK's, but it must not wander off the limb."""
     from kg_utils.viz3d.organic import smooth_paths
@@ -207,6 +287,7 @@ def test_limb_paths_tracks_smooth_paths_closely(skeleton):
         assert deviation < 0.02 * scale
 
 
+@requires_pyvista
 def test_a_two_node_path_is_the_one_place_the_sample_counts_differ():
     """
     Catmull-Rom needs three control points to curve, so a two-node path comes

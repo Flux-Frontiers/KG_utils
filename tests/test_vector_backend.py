@@ -1,11 +1,25 @@
-"""Tests for kg_utils.vector_backend — LanceDBBackend and SqliteVecBackend.
+"""Tests for kg_utils.vector_backend — SqliteVecBackend, and LanceDB's ANN gate.
 
-Both backends are exercised through the same VectorBackend protocol against
-real LanceDB and real sqlite-vec (no mocks), plus a parity test asserting they
-return identical top-k ids on the same tiny corpus, an int8 round-trip
-(sqlite-vec gotcha: raw blobs must be wrapped with vec_int8), and a
-SemanticIndex integration test over each backend with a deterministic fake
+SqliteVecBackend is the default backend and is exercised through the
+VectorBackend protocol against real sqlite-vec (no mocks): protocol
+conformance, an int8 round-trip (sqlite-vec gotcha: raw blobs must be wrapped
+with vec_int8), and a SemanticIndex integration test with a deterministic fake
 embedder (no model download).
+
+**LanceDB is no longer exercised against a real store.** It is legacy — the
+default moved to sqlite-vec, and nothing in the fleet builds a LanceDB index
+any more — so requiring the `lancedb` extra to run this file cost more than it
+bought. It cost a great deal, in fact: the import gate was at module scope, so
+a CI job without `lancedb` skipped the *sqlite-vec* tests too, and
+`vector_backend.py` sat at 45% coverage with the default backend untested.
+
+What survives is `TestAnnGate` and the `_pq_subvectors` tests, which drive
+`maybe_create_ann_index` through a mock table and never call `open()` — so
+they need no `lancedb` install. `doc_kg` still imports `LanceDBBackend` and
+`_pq_subvectors` for un-migrated stores, and this is what keeps that path from
+being wholly untested. The parts only reachable through a real LanceDB
+connection (`open`, `upsert`, `search`, `delete_ids`) are now uncovered by
+design; see the note in the module docstring of `kg_utils.vector_backend`.
 """
 
 # pylint: disable=redefined-outer-name,missing-function-docstring
@@ -26,7 +40,6 @@ from kg_utils.vector_backend import (
 )
 
 sqlite_vec = pytest.importorskip("sqlite_vec")
-_ = pytest.importorskip("lancedb")
 
 DIM = 16
 META = ("kind", "name", "qualname", "module_path")
@@ -51,17 +64,13 @@ def _corpus(n: int = 8) -> tuple[list[dict], np.ndarray]:
     return rows, v
 
 
-def _make_lance(tmp_path, **kw) -> LanceDBBackend:
-    return LanceDBBackend(tmp_path / "lancedb", table="t", dim=DIM, meta_columns=META, **kw)
-
-
 def _make_sqlite(tmp_path, **kw) -> SqliteVecBackend:
     return SqliteVecBackend(tmp_path / "vectors.sqlite", dim=DIM, meta_columns=META, **kw)
 
 
-@pytest.fixture(params=["lancedb", "sqlite"])
-def backend(request, tmp_path) -> VectorBackend:
-    b = _make_lance(tmp_path) if request.param == "lancedb" else _make_sqlite(tmp_path)
+@pytest.fixture
+def backend(tmp_path) -> VectorBackend:
+    b = _make_sqlite(tmp_path)
     b.open(wipe=True)
     return b
 
@@ -124,24 +133,6 @@ def test_upsert_replaces_existing_id_incremental(backend):
     assert backend.count() == 8
     ids = [h["id"] for h in backend.search(v[5].tolist(), 8)]
     assert ids.count("n2") == 1
-
-
-# ---------------------------------------------------------------------------
-# Cross-backend parity — the Phase 1 verify gate
-# ---------------------------------------------------------------------------
-
-
-def test_backends_agree_on_topk(tmp_path):
-    rows, v = _corpus(12)
-    lb = _make_lance(tmp_path)
-    sb = _make_sqlite(tmp_path)
-    for b in (lb, sb):
-        b.open(wipe=True)
-        b.upsert(rows)
-    for qi in (0, 5, 9):  # 3 sample queries
-        lb_ids = [h["id"] for h in lb.search(v[qi].tolist(), 5)]
-        sb_ids = [h["id"] for h in sb.search(v[qi].tolist(), 5)]
-        assert lb_ids == sb_ids, f"query {qi}: {lb_ids} != {sb_ids}"
 
 
 # ---------------------------------------------------------------------------
@@ -318,12 +309,8 @@ class TestAnnGate:
         assert tbl.create_index.call_count == 2
 
 
-@pytest.mark.parametrize("which", ["lancedb", "sqlite"])
-def test_semantic_index_over_backend(tmp_path, which):
-    if which == "lancedb":
-        be = LanceDBBackend(tmp_path / "ld", table="t", dim=_FakeEmbedder.dim, meta_columns=META)
-    else:
-        be = SqliteVecBackend(tmp_path / "v.sqlite", dim=_FakeEmbedder.dim, meta_columns=META)
+def test_semantic_index_over_backend(tmp_path):
+    be = SqliteVecBackend(tmp_path / "v.sqlite", dim=_FakeEmbedder.dim, meta_columns=META)
 
     idx = SemanticIndex(tmp_path / "ld", embedder=_FakeEmbedder(), backend=be)
     stats = idx.build(_FakeStore(), wipe=True, batch_size=2)

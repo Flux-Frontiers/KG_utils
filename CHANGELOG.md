@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The vector-backend tests no longer require LanceDB, and CI now installs
+  `viz3d-render`.** Two module-scope import gates were quietly costing most of
+  this package's test coverage.
+
+  `tests/test_vector_backend.py` opened with `importorskip("lancedb")`. CI's
+  test job installs `semantic`, `synthesis` and `viz` — `semantic` bundles
+  sqlite-vec, but nothing installs lancedb — so the whole file skipped and
+  `vector_backend.py`, the storage seam under every consumer, ran at **45%**
+  with the *default* sqlite-vec backend untested. LanceDB is legacy: the
+  default moved to sqlite-vec and nothing in the fleet builds a LanceDB index
+  any more, so the real-LanceDB tests are gone rather than the dependency
+  being added back. `TestAnnGate` and the `_pq_subvectors` tests stay — they
+  drive the ANN gate through a mock table and never call `open()`, so they
+  need no install — which matters because `doc_kg` still imports
+  `LanceDBBackend` and `_pq_subvectors` for un-migrated stores. Coverage of
+  that module is now **63%**, and the docstring names the methods that are
+  deliberately unexercised.
+
+  `tests/test_viz3d_povexport.py` had the same shape and a sharper irony: a
+  module-scope `importorskip("pyvista")` guarding a file whose stated purpose
+  is pinning that `limb_paths`, `leaf_frames` and `LEAF_ASPECT` work *without*
+  PyVista. Only three of its thirty tests compare against the PyVista path;
+  those now carry `@requires_pyvista` individually and the other twenty-seven
+  run everywhere. The "runs without PyVista" claim could never have been
+  tested from inside that file — a module-scope skip aborts collection for
+  everything after it — so it is now checked in a subprocess with the import
+  blocked. CI also installs `viz3d-render`, taking `viz3d/organic.py` from
+  **58%** to **94%**.
+
+  Suite total: **81% → 85%**, with 56 tests that previously never ran in CI.
+
 ### Added
 
 - **`viz3d.limb_paths` and `viz3d.leaf_frames` — the NumPy halves of the two
