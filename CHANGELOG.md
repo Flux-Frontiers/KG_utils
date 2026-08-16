@@ -7,54 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **`viz3d.frame_tree` and `viz3d.CameraFrame` — one camera rule for a grown
-  tree.** The rule (level view along `-y`, `+z` up, focal point at the bounds
-  centre, standing off by 1.5x the vertical extent) existed three times across
-  the fleet: `gutenberg_kg/cli/cmd_quilt.py` and `pycode_kg/cli/cmd_quilt.py`
-  line for line, plus a NumPy re-derivation in `gutenberg_kg.povscene` written
-  because the POV-Ray path has no plotter whose bounds it could read. A fourth
-  copy was about to appear the moment `pycode_kg` grew POV-Ray output.
-
-  `CameraFrame` is renderer-independent: a PyVista caller assigns its three
-  fields onto `plotter.camera`, a POV-Ray caller converts them. A test asserts
-  the returned frame matches the arithmetic those `cmd_quilt` copies perform,
-  so this is a consolidation rather than a third behaviour.
-
-  Two details the copies got differently and that are now decided once:
-  `include_root` extends the bounds to the origin, because a grown skeleton's
-  trunk carries no attractors and framing the crown alone cuts the tree off at
-  the ankles; and a zero-height subject falls back to a unit depth instead of
-  collapsing the standoff to nothing.
-
-  `frame_tree(..., fov=)` fits the subject's bounding sphere to a lens instead
-  of standing off a fixed multiple of its height. The standoff rule is what
-  the `cmd_quilt` copies did, and it is right *there*, because PyVista's
-  `plotter.reset_camera()` re-fits afterwards. POV-Ray has no such pass, so
-  hoisting the rule as-is silently dropped the fitting and the first real
-  render came out cropped top and bottom — while every unit test still passed,
-  because a badly-fitted frame is a structurally valid one. Omitting `fov`
-  keeps the standoff rule, so PyVista callers are unaffected.
-
-  `margin=` then leaves headroom beyond the exact fit, nonzero by default. An
-  exact fit puts the silhouette against the frame edge, which reads as cropped
-  on a flat render — and on a light-field panel it *is* cropped, because the
-  outermost views shear the subject sideways out of a frame with no room to
-  give.
-
-  Groundwork for `kgrag_priv/docs/POVRAY_QUILT_ROLLOUT_PLAN.md` — every KG
-  module renderable as a quilt through both of quiltwright's backends.
-
-### Fixed
-
-- **The PyVista-absence test now runs.** `test_mesh_builders_explain_themselves_when_pyvista_is_absent`
-  skipped whenever PyVista *was* installed — which is every machine that can run
-  the rest of the suite, and CI too once the `viz3d-render` extra was added. So
-  the message a caller without the render extra actually sees had no coverage
-  anywhere. A test of an absence path cannot be gated on that absence; it has
-  to manufacture it, which it now does in a subprocess with the import blocked.
-  Confirmed by mutation: changing the install hint fails it.
+## [0.14.0] - 2026-08-16
 
 ### Changed
 
@@ -128,6 +81,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`viz3d.frame_tree` and `viz3d.CameraFrame` — one camera rule for a grown
+  tree.** The rule (level view along `-y`, `+z` up, focal point at the bounds
+  centre, standing off by 1.5x the vertical extent) existed three times across
+  the fleet: `gutenberg_kg/cli/cmd_quilt.py` and `pycode_kg/cli/cmd_quilt.py`
+  line for line, plus a NumPy re-derivation in `gutenberg_kg.povscene` written
+  because the POV-Ray path has no plotter whose bounds it could read. A fourth
+  copy was about to appear the moment `pycode_kg` grew POV-Ray output.
+
+  `CameraFrame` is renderer-independent: a PyVista caller assigns its three
+  fields onto `plotter.camera`, a POV-Ray caller converts them. A test asserts
+  the returned frame matches the arithmetic those `cmd_quilt` copies perform,
+  so this is a consolidation rather than a third behaviour.
+
+  Two details the copies got differently and that are now decided once:
+  `include_root` extends the bounds to the origin, because a grown skeleton's
+  trunk carries no attractors and framing the crown alone cuts the tree off at
+  the ankles; and a zero-height subject falls back to a unit depth instead of
+  collapsing the standoff to nothing.
+
+  `frame_tree(..., fov=)` fits the subject's bounding sphere to a lens instead
+  of standing off a fixed multiple of its height. The standoff rule is what
+  the `cmd_quilt` copies did, and it is right *there*, because PyVista's
+  `plotter.reset_camera()` re-fits afterwards. POV-Ray has no such pass, so
+  hoisting the rule as-is silently dropped the fitting and the first real
+  render came out cropped top and bottom — while every unit test still passed,
+  because a badly-fitted frame is a structurally valid one. Omitting `fov`
+  keeps the standoff rule, so PyVista callers are unaffected.
+
+  `margin=` then leaves headroom beyond the exact fit, nonzero by default. An
+  exact fit puts the silhouette against the frame edge, which reads as cropped
+  on a flat render — and on a light-field panel it *is* cropped, because the
+  outermost views shear the subject sideways out of a frame with no room to
+  give.
+
+  Groundwork for `kgrag_priv/docs/POVRAY_QUILT_ROLLOUT_PLAN.md` — every KG
+  module renderable as a quilt through both of quiltwright's backends.
+
+
 - **`viz3d.limb_paths` and `viz3d.leaf_frames` — the NumPy halves of the two
   mesh builders.** `smooth_paths` and `leaf_glyphs` each do two things: place
   geometry, then hand it to PyVista. The placement is pure NumPy and the
@@ -196,6 +187,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Both assume a `+z`-up world, as the rest of the module does; the docstrings
   now say so.
+
+### Fixed
+
+- **The PyVista-absence test now runs.** `test_mesh_builders_explain_themselves_when_pyvista_is_absent`
+  skipped whenever PyVista *was* installed — which is every machine that can run
+  the rest of the suite, and CI too once the `viz3d-render` extra was added. So
+  the message a caller without the render extra actually sees had no coverage
+  anywhere. A test of an absence path cannot be gated on that absence; it has
+  to manufacture it, which it now does in a subprocess with the import blocked.
+  Confirmed by mutation: changing the install hint fails it.
 
 ## [0.13.2] - 2026-08-15
 
