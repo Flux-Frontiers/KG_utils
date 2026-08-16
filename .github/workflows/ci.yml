@@ -113,8 +113,12 @@ jobs:
         run: >-
           poetry install --with dev
           --extras "semantic" --extras "synthesis" --extras "viz"
-          --extras "viz3d-render"
+          --extras "viz3d-render" --extras "viz3d-qt"
           --no-interaction
 
       - name: Run tests
+        # offscreen lets the viz3d-qt suite construct QApplication/QWidgets
+        # on a runner with no display; without it those tests abort Qt.
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: poetry run pytest -m "not integration"
