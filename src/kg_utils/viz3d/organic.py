@@ -748,3 +748,70 @@ def grow_tree(
     )
     pipe_radii(skeleton, tip_radius=tip_radius)
     return skeleton
+
+
+@dataclass(frozen=True)
+class CameraFrame:
+    """Where to stand to photograph a tree, in world coordinates.
+
+    Renderer-independent on purpose.  A PyVista caller assigns the three fields
+    onto ``plotter.camera``; a POV-Ray caller converts them into a
+    ``PovCamera``.  Neither rule is written twice.
+
+    :param position: Eye position.
+    :param focal_point: Point looked at, which a light-field renderer also
+        takes as the focal plane — the depth that lands on the glass.
+    :param up: Up vector.  ``+z``, as everything in this module assumes.
+    """
+
+    position: tuple[float, float, float]
+    focal_point: tuple[float, float, float]
+    up: tuple[float, float, float] = (0.0, 0.0, 1.0)
+
+
+def frame_tree(
+    points: np.ndarray,
+    *,
+    standoff: float = 1.5,
+    include_root: bool = True,
+) -> CameraFrame:
+    """
+    Frame a grown tree for a hero shot: level view, ``+z`` up, looking along ``+y``.
+
+    The camera stands off along ``-y`` by *standoff* times the subject's
+    vertical extent and looks at the centre of it, so the crown straddles the
+    focal plane rather than sitting entirely behind it.  On a light-field panel
+    that placement is what decides which half of the tree floats out of the
+    glass and which half recedes, so it is worth having exactly once.
+
+    **Frame the subject, not the scene.**  Pass the crown — the points the
+    skeleton grew toward.  Framing from a renderer's own bounds instead means
+    framing whatever happens to be in it: a ground plane three crown-widths
+    across drags the centre down and the camera back, and the tree ends up
+    small and high in the tile.
+
+    :param points: ``(N, 3)`` subject points, typically the crown attractors.
+    :param standoff: Camera distance as a multiple of the subject's ``z``
+        extent.  The default matches the framing ``gutenkg quilt`` and
+        ``pycodekg quilt` have used since they were written.
+    :param include_root: Extend the bounds to the origin, where a grown
+        skeleton's root node sits.  The trunk carries no attractors, so without
+        this the frame covers the canopy and cuts the tree off at the ankles.
+    :return: The :class:`CameraFrame`.
+    :raises ValueError: If *points* is empty.
+    """
+    pts = np.atleast_2d(np.asarray(points, dtype=float))
+    if pts.size == 0:
+        raise ValueError("cannot frame an empty point set")
+
+    lo, hi = pts.min(axis=0), pts.max(axis=0)
+    if include_root:
+        lo, hi = np.minimum(lo, 0.0), np.maximum(hi, 0.0)
+    centre = (lo + hi) / 2.0
+    depth = float(hi[2] - lo[2]) or 1.0
+
+    return CameraFrame(
+        position=(float(centre[0]), float(lo[1] - depth * standoff), float(centre[2])),
+        focal_point=(float(centre[0]), float(centre[1]), float(centre[2])),
+        up=(0.0, 0.0, 1.0),
+    )

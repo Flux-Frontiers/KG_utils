@@ -28,6 +28,7 @@ from kg_utils.viz3d.organic import (
     LEAF_ASPECT,
     Skeleton,
     colonize,
+    frame_tree,
     grow_tree,
     leaf_facing,
     leaf_frames,
@@ -384,3 +385,74 @@ def test_oriented_cluster_follows_facing():
     side = np.asarray(oriented_cluster(30, np.zeros(3), np.array([1.0, 0.0, 0.0]), 1.0))
     assert up[:, 2].mean() > 0.3
     assert side[:, 0].mean() > 0.3
+
+
+# ---------------------------------------------------------------------------
+# frame_tree — the one camera rule, replacing three copies
+# ---------------------------------------------------------------------------
+
+
+def test_frame_tree_looks_along_plus_y_from_a_standoff(crown):
+    frame = frame_tree(crown)
+    assert frame.up == (0.0, 0.0, 1.0)
+    assert frame.position[1] < crown[:, 1].min()  # stands off along -y
+    assert frame.position[0] == pytest.approx(frame.focal_point[0])
+    assert frame.position[2] == pytest.approx(frame.focal_point[2])  # level view
+
+
+def test_frame_tree_reproduces_the_rule_cmd_quilt_implements(crown):
+    """
+    The rule this replaces, verbatim from gutenberg_kg/cli/cmd_quilt.py and
+    pycode_kg/cli/cmd_quilt.py (identical in both):
+
+        centre   = midpoint of the bounds
+        up       = (0, 0, 1)
+        focal    = centre
+        position = (centre.x, ymin - (zmax - zmin) * 1.5, centre.z)
+
+    Given the same bounds, this must agree — otherwise it is not a
+    consolidation, it is a third behaviour.
+    """
+    lo = np.minimum(crown.min(axis=0), 0.0)
+    hi = np.maximum(crown.max(axis=0), 0.0)
+    centre = (lo + hi) / 2.0
+    expected_position = (centre[0], lo[1] - (hi[2] - lo[2]) * 1.5, centre[2])
+
+    frame = frame_tree(crown)
+    assert frame.focal_point == pytest.approx(tuple(centre))
+    assert frame.position == pytest.approx(expected_position)
+
+
+def test_frame_tree_includes_the_root_so_the_trunk_is_in_shot():
+    """The trunk carries no attractors; framing the crown alone cuts it off.
+
+    Uses a crown lifted well clear of the origin, the way a grown tree's is —
+    the module fixture is offset in ``y`` for the leaf tests and straddles
+    ``z = 0``, where the root adds nothing and this says nothing.
+    """
+    rng = np.random.default_rng(11)
+    canopy = rng.normal(0.0, 1.5, (120, 3)) + np.array([0.0, 0.0, 30.0])
+
+    with_root = frame_tree(canopy)
+    canopy_only = frame_tree(canopy, include_root=False)
+    assert with_root.focal_point[2] < canopy_only.focal_point[2]
+    # Halfway between the root and the treetop, not halfway up the canopy.
+    assert with_root.focal_point[2] == pytest.approx(canopy[:, 2].max() / 2.0, rel=0.05)
+
+
+def test_frame_tree_standoff_scales_the_distance(crown):
+    near = frame_tree(crown, standoff=1.0)
+    far = frame_tree(crown, standoff=3.0)
+    assert far.position[1] < near.position[1]
+
+
+def test_frame_tree_survives_a_flat_subject(crown):
+    """A single-level crown has zero z extent; the standoff must not collapse."""
+    flat = np.column_stack([crown[:, 0], crown[:, 1], np.zeros(len(crown))])
+    frame = frame_tree(flat, include_root=False)
+    assert frame.position[1] < flat[:, 1].min()
+
+
+def test_frame_tree_rejects_an_empty_subject():
+    with pytest.raises(ValueError, match="empty"):
+        frame_tree(np.zeros((0, 3)))

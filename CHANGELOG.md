@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`viz3d.frame_tree` and `viz3d.CameraFrame` — one camera rule for a grown
+  tree.** The rule (level view along `-y`, `+z` up, focal point at the bounds
+  centre, standing off by 1.5x the vertical extent) existed three times across
+  the fleet: `gutenberg_kg/cli/cmd_quilt.py` and `pycode_kg/cli/cmd_quilt.py`
+  line for line, plus a NumPy re-derivation in `gutenberg_kg.povscene` written
+  because the POV-Ray path has no plotter whose bounds it could read. A fourth
+  copy was about to appear the moment `pycode_kg` grew POV-Ray output.
+
+  `CameraFrame` is renderer-independent: a PyVista caller assigns its three
+  fields onto `plotter.camera`, a POV-Ray caller converts them. A test asserts
+  the returned frame matches the arithmetic those `cmd_quilt` copies perform,
+  so this is a consolidation rather than a third behaviour.
+
+  Two details the copies got differently and that are now decided once:
+  `include_root` extends the bounds to the origin, because a grown skeleton's
+  trunk carries no attractors and framing the crown alone cuts the tree off at
+  the ankles; and a zero-height subject falls back to a unit depth instead of
+  collapsing the standoff to nothing.
+
+  Groundwork for `kgrag_priv/docs/POVRAY_QUILT_ROLLOUT_PLAN.md` — every KG
+  module renderable as a quilt through both of quiltwright's backends.
+
 ### Changed
 
 - **The vector-backend tests no longer require LanceDB, and CI now installs
