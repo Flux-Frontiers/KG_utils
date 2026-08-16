@@ -207,6 +207,33 @@ def test_limb_paths_tracks_smooth_paths_closely(skeleton):
         assert deviation < 0.02 * scale
 
 
+def test_a_two_node_path_is_the_one_place_the_sample_counts_differ():
+    """
+    Catmull-Rom needs three control points to curve, so a two-node path comes
+    back unchanged where ``smooth_paths`` resamples it along the same straight
+    line.  Both describe that line and share both endpoints, so nothing renders
+    differently — but the test above zips the two outputs, and a caller doing
+    the same on a skeleton with a two-node limb would be surprised.  Pinned so
+    the asymmetry is a documented property rather than a discovery.
+    """
+    from kg_utils.viz3d.organic import smooth_paths
+
+    straight = Skeleton(
+        points=np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 5.0]]),
+        parents=np.array([-1, 0]),
+    )
+    (mine, _), (theirs, _) = limb_paths(straight)[0], smooth_paths(straight)[0]
+
+    assert mine.shape[0] == 2
+    assert theirs.shape[0] == 5  # subdivisions + 1
+    assert np.allclose(mine[[0, -1]], theirs[[0, -1]])
+    # Same segment: every one of the resampled points lies on it.
+    direction = mine[-1] - mine[0]
+    offsets = theirs - mine[0]
+    cross = np.cross(np.broadcast_to(direction, offsets.shape), offsets)
+    assert np.allclose(cross, 0.0)
+
+
 # ---------------------------------------------------------------------------
 # leaf_facing / oriented_cluster — promoted from gutenberg_kg and pycode_kg
 # ---------------------------------------------------------------------------

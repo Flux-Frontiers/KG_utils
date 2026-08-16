@@ -450,7 +450,17 @@ def limb_paths(
     to the pixel, run :func:`smooth_paths` once and give both the same points
     rather than letting each smooth its own.
 
-    :param skeleton: Skeleton with radii assigned by :func:`pipe_radii`.
+    The sample *count* matches :func:`smooth_paths` for every path of three or
+    more nodes.  It does not for a two-node path: Catmull-Rom needs three
+    control points to curve, so this returns the two points unchanged where
+    ``smooth_paths`` returns ``subdivisions + 1`` of them along the same
+    straight segment.  Both describe the same line and share both endpoints,
+    so nothing renders differently — but do not zip the two functions' outputs
+    together, or assert that they agree in length, without allowing for it.
+
+    :param skeleton: Skeleton with radii assigned by :func:`pipe_radii`;
+        :func:`pipe_radii` is called on it here if they are missing, which
+        sets ``skeleton.radii`` as a side effect.
     :param subdivisions: Spline samples per skeleton segment.
     :return: ``[(points (K, 3), radii (K,)), ...]`` per path.
     """

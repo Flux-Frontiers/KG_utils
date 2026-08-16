@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backends must agree to the pixel, call `smooth_paths` once and give both the
   same points rather than letting each smooth its own.
 
+  The two agree in sample *count* for every path of three or more nodes, and
+  not for a two-node one: Catmull-Rom needs three control points to curve, so
+  `limb_paths` returns those two points unchanged where `smooth_paths` returns
+  `subdivisions + 1` along the same straight segment. Both describe that line
+  and share both endpoints, so nothing renders differently — but the parity
+  test zips the two outputs, and so will callers. Now documented on
+  `limb_paths` and pinned by
+  `test_a_two_node_path_is_the_one_place_the_sample_counts_differ`, found
+  while building the first downstream consumer.
+
+  `limb_paths` also calls `pipe_radii` on a skeleton that has none, which sets
+  `skeleton.radii` as a side effect. That matches `smooth_paths`, and the
+  docstring now says so rather than leaving it to be discovered.
+
 - **`viz3d.LEAF_ASPECT`** — the per-axis scale that flattens the leaf
   prototype from a ball into a blade, exported so a non-PyVista renderer can
   build the same shape from `leaf_frames` rather than re-deriving it.
