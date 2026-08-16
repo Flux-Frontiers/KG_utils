@@ -73,7 +73,7 @@ jobs:
         # resolve either, and without it tree_mesh, leaf_glyphs and smooth_paths
         # go unchecked. The plain viz3d extra stays NumPy-only, so layout-only
         # consumers are unaffected.
-        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --extras "lancedb" --extras "viz3d-render" --no-interaction
+        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --extras "lancedb" --extras "viz3d-render" --extras "viz3d-qt" --no-interaction
 
       - name: Run ty
         run: poetry run ty check src/
