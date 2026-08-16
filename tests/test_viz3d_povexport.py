@@ -472,9 +472,39 @@ def test_frame_tree_fits_the_subject_to_a_given_fov():
     radius = float(np.linalg.norm(hi - lo)) / 2.0
 
     for fov in (14.0, 26.0, 60.0):
-        frame = frame_tree(canopy, fov=fov)
+        frame = frame_tree(canopy, fov=fov, margin=0.0)
         distance = abs(frame.position[1] - frame.focal_point[1])
         assert distance == pytest.approx(radius / np.tan(np.radians(fov / 2.0)))
+
+
+def test_frame_tree_leaves_headroom_by_default():
+    """
+    An exact fit puts the silhouette against the frame edge. That reads as
+    cropped on a flat render, and on a light-field panel it *is* cropped: the
+    outermost views shear the subject sideways out of a frame with no room.
+    """
+    rng = np.random.default_rng(3)
+    canopy = rng.normal(0.0, 1.5, (120, 3)) + np.array([0.0, 0.0, 30.0])
+    exact = frame_tree(canopy, fov=26.0, margin=0.0)
+    roomy = frame_tree(canopy, fov=26.0)
+    assert roomy.position[1] < exact.position[1]
+    assert roomy.focal_point == exact.focal_point
+
+
+def test_frame_tree_headroom_scales_the_fit():
+    rng = np.random.default_rng(3)
+    canopy = rng.normal(0.0, 1.5, (120, 3)) + np.array([0.0, 0.0, 30.0])
+    exact = frame_tree(canopy, fov=26.0, margin=0.0)
+    roomy = frame_tree(canopy, fov=26.0, margin=0.25)
+    reach = exact.focal_point[1] - exact.position[1]
+    assert roomy.focal_point[1] - roomy.position[1] == pytest.approx(reach * 1.25)
+
+
+def test_frame_tree_headroom_does_not_touch_the_standoff_rule():
+    # margin scales a fit; without a fov there is nothing to leave room in.
+    rng = np.random.default_rng(3)
+    canopy = rng.normal(0.0, 1.5, (120, 3)) + np.array([0.0, 0.0, 30.0])
+    assert frame_tree(canopy, margin=0.5).position == frame_tree(canopy).position
 
 
 def test_frame_tree_without_a_fov_keeps_the_standoff_rule():

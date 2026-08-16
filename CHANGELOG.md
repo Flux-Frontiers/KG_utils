@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   because a badly-fitted frame is a structurally valid one. Omitting `fov`
   keeps the standoff rule, so PyVista callers are unaffected.
 
+  `margin=` then leaves headroom beyond the exact fit, nonzero by default. An
+  exact fit puts the silhouette against the frame edge, which reads as cropped
+  on a flat render — and on a light-field panel it *is* cropped, because the
+  outermost views shear the subject sideways out of a frame with no room to
+  give.
+
   Groundwork for `kgrag_priv/docs/POVRAY_QUILT_ROLLOUT_PLAN.md` — every KG
   module renderable as a quilt through both of quiltwright's backends.
 

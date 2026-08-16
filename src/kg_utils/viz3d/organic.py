@@ -773,6 +773,7 @@ def frame_tree(
     points: np.ndarray,
     *,
     fov: float | None = None,
+    margin: float = 0.12,
     standoff: float = 1.5,
     include_root: bool = True,
 ) -> CameraFrame:
@@ -798,6 +799,12 @@ def frame_tree(
         without one has to compute for itself.  ``None`` falls back to
         *standoff*, which is what a PyVista caller wants: it sets a direction
         and lets ``reset_camera()`` do the fitting.
+    :param margin: Headroom beyond the exact fit, as a fraction of the fitted
+        distance.  Used only when *fov* is given.  An exact fit puts the
+        subject's silhouette against the frame edge, which reads as cropped
+        even when it is not — and on a light-field panel it *is* cropped,
+        because the outermost views shear the subject sideways out of a frame
+        that had no room to give.  Nonzero by default for that reason.
     :param standoff: Camera distance as a multiple of the subject's ``z``
         extent, used only when *fov* is ``None``.  The default matches the
         framing ``gutenkg quilt`` and ``pycodekg quilt`` have used since they
@@ -827,7 +834,8 @@ def frame_tree(
         # focal point — measuring it from the near face would stand the
         # camera a half-depth too far back and undersize the subject.
         radius = float(np.linalg.norm(hi - lo)) / 2.0 or 1.0
-        eye_y = centre[1] - radius / max(np.tan(np.radians(float(fov) / 2.0)), 1e-6)
+        fitted = radius / max(np.tan(np.radians(float(fov) / 2.0)), 1e-6)
+        eye_y = centre[1] - fitted * (1.0 + max(float(margin), 0.0))
 
     return CameraFrame(
         position=(float(centre[0]), float(eye_y), float(centre[2])),
