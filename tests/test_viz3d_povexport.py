@@ -14,8 +14,10 @@ from kg_utils.viz3d.organic import (
     Skeleton,
     colonize,
     grow_tree,
+    leaf_facing,
     leaf_frames,
     limb_paths,
+    oriented_cluster,
     pipe_radii,
     root_to_tip_paths,
     seed_from_key,
@@ -203,3 +205,74 @@ def test_limb_paths_tracks_smooth_paths_closely(skeleton):
         assert mine.shape == theirs.shape
         deviation = np.linalg.norm(mine - theirs, axis=1).max()
         assert deviation < 0.02 * scale
+
+
+# ---------------------------------------------------------------------------
+# leaf_facing / oriented_cluster — promoted from gutenberg_kg and pycode_kg
+# ---------------------------------------------------------------------------
+
+
+def test_leaf_facing_is_unit_length():
+    for outward in ([1.0, 0.0, 0.0], [0.3, -0.9, 0.2], [-2.0, 5.0, -1.0]):
+        assert np.linalg.norm(leaf_facing(np.array(outward))) == pytest.approx(1.0)
+
+
+def test_leaf_facing_tilts_upward_but_keeps_the_limb_direction():
+    """Foliage runs out along the branch, then reaches for light."""
+    facing = leaf_facing(np.array([1.0, 0.0, 0.0]))
+    assert facing[0] > 0.0, "must keep running outward"
+    assert facing[2] > 0.0, "must reach upward"
+
+
+def test_leaf_facing_up_bias_controls_the_reach():
+    flat = leaf_facing(np.array([1.0, 0.0, 0.0]), up_bias=0.0)
+    steep = leaf_facing(np.array([1.0, 0.0, 0.0]), up_bias=4.0)
+    assert flat[2] == pytest.approx(0.0)
+    assert steep[2] > flat[2]
+
+
+def test_leaf_facing_ignores_the_vertical_component_of_outward():
+    """Only the horizontal run matters; the upward part comes from up_bias."""
+    a = leaf_facing(np.array([1.0, 0.0, 0.0]))
+    b = leaf_facing(np.array([1.0, 0.0, 9.0]))
+    assert a == pytest.approx(b)
+
+
+def test_leaf_facing_falls_back_to_up_for_a_vertical_limb():
+    assert leaf_facing(np.array([0.0, 0.0, 5.0])) == pytest.approx([0.0, 0.0, 1.0])
+
+
+def test_oriented_cluster_places_every_point_on_the_facing_side():
+    """Far-side points are reflected, not discarded, so none end up behind."""
+    centre = np.array([1.0, 2.0, 3.0])
+    facing = np.array([0.0, 0.0, 1.0])
+    points = np.asarray(oriented_cluster(40, centre, facing, 2.0))
+    assert points.shape == (40, 3)
+    assert np.all((points - centre) @ facing >= -1e-9)
+
+
+def test_oriented_cluster_keeps_every_point_on_the_sphere():
+    centre = np.array([0.0, 0.0, 0.0])
+    facing = np.array([0.0, 1.0, 0.0])
+    points = np.asarray(oriented_cluster(30, centre, facing, 1.5))
+    assert np.linalg.norm(points - centre, axis=1) == pytest.approx(np.full(30, 1.5))
+
+
+def test_oriented_cluster_returns_the_requested_count():
+    """Reflection rather than rejection is why the count is exact."""
+    for n in (1, 2, 7, 50):
+        assert len(oriented_cluster(n, np.zeros(3), np.array([0.0, 0.0, 1.0]), 1.0)) == n
+
+
+def test_oriented_cluster_handles_an_empty_cluster():
+    """The guard gutenberg_kg's copy lacked: it raised a broadcast ValueError."""
+    assert oriented_cluster(0, np.zeros(3), np.array([0.0, 0.0, 1.0]), 1.0) == []
+    assert oriented_cluster(-3, np.zeros(3), np.array([0.0, 0.0, 1.0]), 1.0) == []
+
+
+def test_oriented_cluster_follows_facing():
+    """Rotating the facing vector carries the whole cluster with it."""
+    up = np.asarray(oriented_cluster(30, np.zeros(3), np.array([0.0, 0.0, 1.0]), 1.0))
+    side = np.asarray(oriented_cluster(30, np.zeros(3), np.array([1.0, 0.0, 0.0]), 1.0))
+    assert up[:, 2].mean() > 0.3
+    assert side[:, 0].mean() > 0.3

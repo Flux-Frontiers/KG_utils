@@ -41,6 +41,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from kg_utils.viz3d.layout import fibonacci_sphere
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import pyvista as pv
 
@@ -529,6 +531,70 @@ def tree_mesh(
     if not tubes:
         return pv.PolyData()
     return tubes[0] if len(tubes) == 1 else pv.merge(tubes)
+
+
+def _unit(vector: np.ndarray) -> np.ndarray:
+    """
+    Unit vector, falling back to ``+z`` for a degenerate input.
+
+    :param vector: Any 3-vector.
+    :return: Unit-length vector, or ``+z`` if the input is near zero.
+    """
+    norm = float(np.linalg.norm(vector))
+    return np.asarray(vector, dtype=float) / norm if norm > 1e-9 else np.array([0.0, 0.0, 1.0])
+
+
+def leaf_facing(outward: np.ndarray, up_bias: float = 0.6) -> np.ndarray:
+    """
+    Direction a limb's foliage cluster should face.
+
+    Foliage runs out along the branch and then reaches for light, so the
+    cluster axis is the limb's outward direction tilted upward — not world
+    ``+z``.  A cluster that always points straight up is the single clearest
+    tell that a tree was assembled rather than grown, and it is far more
+    obvious in parallax on a light-field panel than in a flat projection.
+
+    Assumes a ``+z``-up world, as the rest of this module does.
+
+    :param outward: Vector from the trunk axis to the branch tip.
+    :param up_bias: How strongly foliage reaches upward relative to running
+        outward; ``0`` follows the limb exactly, large values return to
+        vertical.
+    :return: Unit facing vector.
+    """
+    horizontal = np.asarray(outward, dtype=float).copy()
+    horizontal[2] = 0.0
+    if float(np.linalg.norm(horizontal)) < 1e-9:
+        return np.array([0.0, 0.0, 1.0])
+    return _unit(_unit(horizontal) + np.array([0.0, 0.0, up_bias]))
+
+
+def oriented_cluster(
+    n_points: int,
+    center: np.ndarray,
+    facing: np.ndarray,
+    radius: float,
+) -> list[np.ndarray]:
+    """
+    A hemispherical cluster of *n_points* around *center*, opening along *facing*.
+
+    Points on the far side are **reflected** across the facing plane rather
+    than discarded, so a cluster of any size fills its hemisphere evenly
+    instead of thinning out as half the samples are thrown away.
+
+    :param n_points: Number of positions to return.
+    :param center: Cluster centre, typically a branch tip.
+    :param facing: Unit direction the hemisphere opens toward, from
+        :func:`leaf_facing`.
+    :param radius: Cluster radius in scene units.
+    :return: List of ``(3,)`` positions; empty when *n_points* is not positive.
+    """
+    if n_points <= 0:
+        return []
+    sphere = np.asarray(fibonacci_sphere(n_points, radius=radius), dtype=float)
+    centre = np.asarray(center, dtype=float)
+    behind = np.minimum(sphere @ np.asarray(facing, dtype=float), 0.0)
+    return list(centre + sphere - 2.0 * behind[:, None] * np.asarray(facing, dtype=float))
 
 
 def leaf_frames(

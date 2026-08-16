@@ -36,6 +36,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   POV-Ray primitives: 839 KB of SDL for a 3000-leaf tree against roughly
   12.5 MB for the equivalent triangle dump.
 
+- **`viz3d.leaf_facing` and `viz3d.oriented_cluster` — promoted from the two
+  consumers.** Both existed as private copies in `gutenberg_kg/scene.py` and
+  `pycode_kg/scene3d.py`: pure geometry with no domain knowledge, carried as
+  an open item in `VISUALIZATION_STACK.md` and the 2026-08-14 journal since
+  `_depth_report` went up into `quiltwright` 0.4.0. Their only dependency,
+  `fibonacci_sphere`, was already here.
+
+  `leaf_facing(outward, up_bias=0.6)` gives the direction a limb's foliage
+  cluster should face — the limb's own outward run tilted upward, rather than
+  world `+z`. A cluster that always points straight up is the clearest tell
+  that a tree was assembled rather than grown, and parallax on a light-field
+  panel makes that far more obvious than a flat projection does.
+  `oriented_cluster(n, centre, facing, radius)` scatters a hemisphere opening
+  along that facing, *reflecting* far-side points across the facing plane
+  rather than discarding them, so a cluster of any size fills its hemisphere
+  evenly and returns exactly the count asked for.
+
+  The two copies were verified equivalent before merging — 500 randomized
+  cases matching both originals exactly — with one real divergence:
+  **`gutenberg_kg`'s `oriented_cluster` raised `ValueError` on an empty
+  cluster** (`fibonacci_sphere` returns `[]`, and subtracting a `(3,)` centre
+  from a `(0,)` array fails to broadcast), where `pycode_kg`'s guarded and
+  returned `[]`. The promoted version takes the guard, so the latent crash
+  does not survive the merge.
+
+  Both assume a `+z`-up world, as the rest of the module does; the docstrings
+  now say so.
+
 ## [0.13.2] - 2026-08-15
 
 ### Fixed
