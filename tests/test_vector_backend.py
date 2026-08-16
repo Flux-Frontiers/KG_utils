@@ -312,7 +312,9 @@ class TestAnnGate:
 def test_semantic_index_over_backend(tmp_path):
     be = SqliteVecBackend(tmp_path / "v.sqlite", dim=_FakeEmbedder.dim, meta_columns=META)
 
-    idx = SemanticIndex(tmp_path / "ld", embedder=_FakeEmbedder(), backend=be)
+    # The path is inert here — an explicit backend is passed, so it is only
+    # what the default backend *would* have used.
+    idx = SemanticIndex(tmp_path / "v.sqlite", embedder=_FakeEmbedder(), backend=be)
     stats = idx.build(_FakeStore(), wipe=True, batch_size=2)
     assert stats["indexed_rows"] == 4
     assert stats["dim"] == 4

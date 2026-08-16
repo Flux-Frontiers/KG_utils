@@ -6,9 +6,13 @@ and :meth:`KGModule.analyze`.
 
 Optional dependencies
 ---------------------
-  lancedb, numpy, sentence-transformers
+  numpy, sentence-transformers, sqlite-vec
 
 Install with: pip install 'kgmodule-utils[semantic]'
+
+``lancedb`` is *not* in that extra. It is reachable only via
+``vector_backend="lancedb"`` against a pre-migration store, which additionally
+needs ``pip install 'kgmodule-utils[lancedb]'``.
 
 Typical domain usage::
 
@@ -301,17 +305,19 @@ class KGModule(ABC):
     :param repo_root: Repository root directory.
     :param db_path: SQLite database path (defaults to ``.<kind>kg/graph.sqlite``
                     under ``repo_root``; set ``_default_dir`` in subclass to override).
-    :param lancedb_dir: LanceDB directory (defaults to ``.<kind>kg/lancedb``).
+    :param vectors_path: sqlite-vec store path (defaults to
+        ``.<kind>kg/vectors.sqlite``). Replaced ``lancedb_dir`` in 0.14.0 — see
+        :attr:`_legacy_store_dir` for the compatibility note.
     :param model: Sentence-transformer model name for embedding.
-    :param table: LanceDB table name.
+    :param table: Vector table name.
     :param vector_backend: ``"auto"`` (default), ``"sqlite-vec"``, or ``"lancedb"``.
         ``"auto"`` picks ``sqlite-vec`` for a fresh or already-migrated KG and
-        ``lancedb`` only when an un-migrated LanceDB store already exists on disk,
-        so existing corpora keep working untouched. ``"sqlite-vec"`` forces the
-        exact (recall 1.0) sqlite-vec store, kept in a ``vectors.sqlite`` sidecar
-        next to ``lancedb_dir``. Both require the ``sqlite-vec`` optional
-        dependency, bundled in the ``semantic`` extra. ``"lancedb"`` forces the
-        legacy LanceDB store.
+        ``lancedb`` only when an un-migrated LanceDB store already exists beside
+        :paramref:`vectors_path`, so existing corpora keep working untouched.
+        ``"sqlite-vec"`` forces the exact (recall 1.0) sqlite-vec store and
+        requires the ``sqlite-vec`` optional dependency, bundled in the
+        ``semantic`` extra. ``"lancedb"`` forces the legacy LanceDB store and
+        additionally requires the ``lancedb`` extra.
     """
 
     #: Override in subclass to change the default artefact directory name.
@@ -321,7 +327,7 @@ class KGModule(ABC):
         self,
         repo_root: str | Path,
         db_path: str | Path | None = None,
-        lancedb_dir: str | Path | None = None,
+        vectors_path: str | Path | None = None,
         *,
         model: str = DEFAULT_MODEL,
         table: str = "kg_nodes",
@@ -330,10 +336,12 @@ class KGModule(ABC):
         self.repo_root = Path(repo_root).resolve()
         _dir = self.repo_root / self._default_dir
         self.db_path = Path(db_path) if db_path is not None else _dir / "graph.sqlite"
-        self.lancedb_dir = Path(lancedb_dir) if lancedb_dir is not None else _dir / "lancedb"
-        # Sidecar sits next to the lancedb dir (fleet convention: <kg-dir>/vectors.sqlite),
-        # so an explicit lancedb_dir relocates the sqlite-vec store with it.
-        self.vectors_path = self.lancedb_dir.parent / "vectors.sqlite"
+        # Fleet convention: <kg-dir>/vectors.sqlite. Passing this explicitly
+        # relocates the store, which is what CLI callers with a placeholder
+        # repo_root rely on.
+        self.vectors_path = (
+            Path(vectors_path) if vectors_path is not None else _dir / "vectors.sqlite"
+        )
         self.model_name = model
         self.table_name = table
         self.vector_backend = vector_backend
@@ -341,6 +349,20 @@ class KGModule(ABC):
         self._store: GraphStore | None = None
         self._index: SemanticIndex | None = None
         self._embedder: Embedder | None = None
+
+    @property
+    def _legacy_store_dir(self) -> Path:
+        """Where a pre-migration LanceDB store would sit for this KG.
+
+        Deliberately private and derived rather than a constructor argument.
+        ``vector_backend="auto"`` has to know where to *look* for an
+        un-migrated store to keep old corpora working, but that lookup path is
+        not part of the module's API — exposing it as ``lancedb_dir`` was what
+        kept the retired backend's name in every downstream signature.
+
+        :return: The sibling ``lancedb`` directory beside :attr:`vectors_path`.
+        """
+        return self.vectors_path.parent / "lancedb"
 
     # ------------------------------------------------------------------
     # Abstract interface — domain authors implement these
@@ -395,7 +417,7 @@ class KGModule(ABC):
             extractor = self.make_extractor()
             backend = self._make_vector_backend()
             self._index = SemanticIndex(
-                self.lancedb_dir,
+                self.vectors_path,
                 embedder=self.embedder,
                 table=self.table_name,
                 index_kinds=extractor.meaningful_node_kinds(),
@@ -411,12 +433,12 @@ class KGModule(ABC):
         """
         resolved = resolve_backend_name(
             self.vector_backend,
-            lancedb_dir=self.lancedb_dir,
+            lancedb_dir=self._legacy_store_dir,
             sqlite_path=self.vectors_path,
         )
         return make_backend(
             resolved,
-            lancedb_dir=self.lancedb_dir,
+            lancedb_dir=self._legacy_store_dir,
             sqlite_path=self.vectors_path,
             table=self.table_name,
             dim=self.embedder.dim,
@@ -866,7 +888,7 @@ class KGModule(ABC):
         s = self.store.stats()
         s["vector_backend"] = resolve_backend_name(
             self.vector_backend,
-            lancedb_dir=self.lancedb_dir,
+            lancedb_dir=self._legacy_store_dir,
             sqlite_path=self.vectors_path,
         )
         return s

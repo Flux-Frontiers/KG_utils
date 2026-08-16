@@ -1,4 +1,4 @@
-"""kg_utils/semantic.py — LanceDB vector index for knowledge graph modules.
+"""kg_utils/semantic.py — sqlite-vec vector index for knowledge graph modules.
 
 SemanticIndex is a derived, disposable layer built from GraphStore nodes.
 SQLite (GraphStore) remains the authoritative source of truth.
@@ -14,11 +14,15 @@ unconditionally) for free.
 
 Optional dependencies
 ---------------------
-  lancedb            — vector store backend
+  sqlite-vec         — vector store backend (the default)
   numpy              — array operations
   sentence-transformers — local embedding model
 
 Install with: pip install 'kgmodule-utils[semantic]'
+
+:class:`LanceDBBackend` is re-exported here for the one caller that still reads
+a pre-migration store (``dockg convert-index``), but nothing in this module
+constructs it any more — see :meth:`SemanticIndex._get_backend`.
 """
 
 from __future__ import annotations
@@ -128,32 +132,38 @@ _DEFAULT_KINDS = ("module", "class", "function", "method")
 
 
 class SemanticIndex:
-    """LanceDB-backed semantic vector index for a knowledge graph.
+    """sqlite-vec-backed semantic vector index for a knowledge graph.
 
     Reads nodes from a :class:`~kg_utils.store.GraphStore`, embeds them, and
-    stores the vectors in LanceDB.  The index is derived and disposable — it
-    can be rebuilt from SQLite at any time without data loss.
+    stores the vectors in a ``vectors.sqlite`` store.  The index is derived and
+    disposable — it can be rebuilt from SQLite at any time without data loss.
 
-    :param lancedb_dir: Directory for the LanceDB database (used only when the
-        default LanceDB backend is constructed; ignored if *backend* is given).
+    Changed in 0.14.0: the first parameter was ``lancedb_dir``, a *directory*.
+    It is now ``vectors_path``, a *file*, and the default backend is
+    :class:`SqliteVecBackend` rather than :class:`LanceDBBackend`.  Passing
+    ``lancedb_dir=`` raises :exc:`TypeError`, matching how memory-kg 0.7.0,
+    Metabo_kg 0.10.0 and diary-kg 0.95.0 each dropped the same parameter.
+
+    :param vectors_path: Path to the ``vectors.sqlite`` store (used only when
+        the default backend is constructed; ignored if *backend* is given).
     :param embedder: Embedding backend. Defaults to :class:`SentenceTransformerEmbedder`.
-    :param table: LanceDB table name.
+    :param table: Vector table name.
     :param index_kinds: Node kinds to embed.
-    :param backend: Vector store backend. Defaults to a :class:`LanceDBBackend`
-        over *lancedb_dir* — pass a :class:`SqliteVecBackend` to store vectors in
-        ``sqlite-vec`` instead.
+    :param backend: Vector store backend. Defaults to a :class:`SqliteVecBackend`
+        over *vectors_path*.  To read a pre-migration LanceDB store, construct a
+        :class:`LanceDBBackend` explicitly and pass it here.
     """
 
     def __init__(
         self,
-        lancedb_dir: str | Path,
+        vectors_path: str | Path,
         *,
         embedder: Embedder | None = None,
         table: str = _DEFAULT_TABLE,
         index_kinds: Sequence[str] = _DEFAULT_KINDS,
         backend: VectorBackend | None = None,
     ) -> None:
-        self.lancedb_dir = Path(lancedb_dir)
+        self.vectors_path = Path(vectors_path)
         self.embedder: Embedder = embedder or SentenceTransformerEmbedder()
         self.table_name = table
         self.index_kinds = tuple(index_kinds)
@@ -177,7 +187,7 @@ class SemanticIndex:
         :param wipe: If ``True``, delete all existing vectors first.
         :param batch_size: Number of nodes to embed per batch.
         :param quiet: Suppress progress output during ingestion.
-        :return: Stats dict with ``indexed_rows``, ``dim``, ``table``, ``lancedb_dir``, ``kinds``.
+        :return: Stats dict with ``indexed_rows``, ``dim``, ``table``, ``vectors_path``, ``kinds``.
         """
         if quiet:
             suppress_ingestion_logging()
@@ -214,7 +224,7 @@ class SemanticIndex:
             "indexed_rows": indexed,
             "dim": self.embedder.dim,
             "table": self.table_name,
-            "lancedb_dir": str(self.lancedb_dir),
+            "vectors_path": str(self.vectors_path),
             "kinds": list(self.index_kinds),
         }
 
@@ -260,15 +270,19 @@ class SemanticIndex:
         return store.query_nodes(kinds=list(self.index_kinds))
 
     def _get_backend(self) -> VectorBackend:
-        """Return the vector backend, constructing the default LanceDB one lazily.
+        """Return the vector backend, constructing the default sqlite-vec one lazily.
 
         Deferred so the embedder's ``dim`` (which may load the model) is only
         touched when the index is actually built or searched.
+
+        Changed in 0.14.0: this used to default to :class:`LanceDBBackend`.
+        ``KGModule`` always passes an explicit backend, so the fleet never hit
+        that default — but bare use of this class silently created a LanceDB
+        store long after the fleet had migrated off it.
         """
         if self._backend is None:
-            self._backend = LanceDBBackend(
-                self.lancedb_dir,
-                table=self.table_name,
+            self._backend = SqliteVecBackend(
+                self.vectors_path,
                 dim=self.embedder.dim,
                 meta_columns=_META_COLUMNS,
             )
@@ -276,7 +290,7 @@ class SemanticIndex:
 
     def __repr__(self) -> str:
         return (
-            f"SemanticIndex(lancedb_dir={self.lancedb_dir!r}, "
+            f"SemanticIndex(vectors_path={self.vectors_path!r}, "
             f"table={self.table_name!r}, embedder={self.embedder!r})"
         )
 
