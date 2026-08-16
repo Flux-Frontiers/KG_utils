@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Groundwork for `kgrag_priv/docs/POVRAY_QUILT_ROLLOUT_PLAN.md` — every KG
   module renderable as a quilt through both of quiltwright's backends.
 
+### Fixed
+
+- **The PyVista-absence test now runs.** `test_mesh_builders_explain_themselves_when_pyvista_is_absent`
+  skipped whenever PyVista *was* installed — which is every machine that can run
+  the rest of the suite, and CI too once the `viz3d-render` extra was added. So
+  the message a caller without the render extra actually sees had no coverage
+  anywhere. A test of an absence path cannot be gated on that absence; it has
+  to manufacture it, which it now does in a subprocess with the import blocked.
+  Confirmed by mutation: changing the install hint fails it.
+
 ### Changed
 
 - **The vector-backend tests no longer require LanceDB, and CI now installs

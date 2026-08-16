@@ -23,6 +23,9 @@ import pytest
 
 pytest.importorskip("numpy")
 
+import subprocess
+import sys
+
 import numpy as np
 
 from kg_utils.viz3d import (
@@ -204,19 +207,47 @@ class TestPyVistaIsOptional:
         assert grow_tree is not None and seed_from_key is not None
 
     def test_mesh_builders_explain_themselves_when_pyvista_is_absent(self) -> None:
-        try:
-            import pyvista  # noqa: F401
-        except ModuleNotFoundError:
-            pass
-        else:
-            pytest.skip("pyvista installed; absence path not exercisable here")
+        """
+        The message a caller without the render extra actually sees.
 
-        from kg_utils.viz3d import leaf_glyphs, tree_mesh
+        This used to skip whenever pyvista *was* installed — which is to say it
+        skipped on every machine that could run the rest of the suite, and on
+        CI once the ``viz3d-render`` extra was added. A test of the absence
+        path cannot be gated on absence; it has to manufacture it. A subprocess
+        with the import blocked does that, and runs everywhere.
+        """
+        probe = """
+import sys
 
-        sk = grow_tree(_document_cloud(), np.zeros(3), key="book")
-        for call in (lambda: tree_mesh(sk), lambda: leaf_glyphs(_document_cloud(), sk)):
-            with pytest.raises(ModuleNotFoundError, match="pip install pyvista"):
-                call()
+class _Block:
+    def find_spec(self, name, path=None, target=None):
+        if name.split(".")[0] in ("pyvista", "vtk", "vtkmodules"):
+            raise ModuleNotFoundError(f"No module named {name!r}", name=name)
+        return None
+
+sys.meta_path.insert(0, _Block())
+
+import numpy as np
+from kg_utils.viz3d import grow_tree, leaf_glyphs, tree_mesh
+
+rng = np.random.default_rng(0)
+cloud = rng.normal(0, 1, (80, 3)) * np.array([3.0, 3.0, 6.0]) + np.array([0, 0, 20.0])
+sk = grow_tree(cloud, np.zeros(3), key="book")
+
+for call in (lambda: tree_mesh(sk), lambda: leaf_glyphs(cloud, sk)):
+    try:
+        call()
+    except ModuleNotFoundError as exc:
+        assert "pip install pyvista" in str(exc), str(exc)
+    else:
+        raise AssertionError("mesh builder did not raise without pyvista")
+print("OK")
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", probe], capture_output=True, text=True, check=False
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
 
     def test_mesh_builders_work_when_pyvista_is_present(self) -> None:
         pytest.importorskip("pyvista")
