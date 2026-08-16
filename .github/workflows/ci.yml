@@ -103,7 +103,18 @@ jobs:
           key: test-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --no-interaction
+        # viz3d-render carries pyvista, which tests/test_viz3d_povexport.py
+        # gates on at module scope. Without it that whole file skipped, so
+        # limb_paths, leaf_frames and LEAF_ASPECT — the PyVista-free accessors
+        # the POV-Ray consumers are built on — had no CI coverage at all and
+        # viz3d/organic.py sat at 58%. `lancedb` is deliberately absent: the
+        # vector-backend tests no longer require it (see that file's docstring),
+        # and adding it back would only re-cover the legacy LanceDB store.
+        run: >-
+          poetry install --with dev
+          --extras "semantic" --extras "synthesis" --extras "viz"
+          --extras "viz3d-render"
+          --no-interaction
 
       - name: Run tests
         run: poetry run pytest -m "not integration"

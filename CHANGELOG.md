@@ -7,6 +7,159 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`viz3d.frame_tree` and `viz3d.CameraFrame` — one camera rule for a grown
+  tree.** The rule (level view along `-y`, `+z` up, focal point at the bounds
+  centre, standing off by 1.5x the vertical extent) existed three times across
+  the fleet: `gutenberg_kg/cli/cmd_quilt.py` and `pycode_kg/cli/cmd_quilt.py`
+  line for line, plus a NumPy re-derivation in `gutenberg_kg.povscene` written
+  because the POV-Ray path has no plotter whose bounds it could read. A fourth
+  copy was about to appear the moment `pycode_kg` grew POV-Ray output.
+
+  `CameraFrame` is renderer-independent: a PyVista caller assigns its three
+  fields onto `plotter.camera`, a POV-Ray caller converts them. A test asserts
+  the returned frame matches the arithmetic those `cmd_quilt` copies perform,
+  so this is a consolidation rather than a third behaviour.
+
+  Two details the copies got differently and that are now decided once:
+  `include_root` extends the bounds to the origin, because a grown skeleton's
+  trunk carries no attractors and framing the crown alone cuts the tree off at
+  the ankles; and a zero-height subject falls back to a unit depth instead of
+  collapsing the standoff to nothing.
+
+  `frame_tree(..., fov=)` fits the subject's bounding sphere to a lens instead
+  of standing off a fixed multiple of its height. The standoff rule is what
+  the `cmd_quilt` copies did, and it is right *there*, because PyVista's
+  `plotter.reset_camera()` re-fits afterwards. POV-Ray has no such pass, so
+  hoisting the rule as-is silently dropped the fitting and the first real
+  render came out cropped top and bottom — while every unit test still passed,
+  because a badly-fitted frame is a structurally valid one. Omitting `fov`
+  keeps the standoff rule, so PyVista callers are unaffected.
+
+  `margin=` then leaves headroom beyond the exact fit, nonzero by default. An
+  exact fit puts the silhouette against the frame edge, which reads as cropped
+  on a flat render — and on a light-field panel it *is* cropped, because the
+  outermost views shear the subject sideways out of a frame with no room to
+  give.
+
+  Groundwork for `kgrag_priv/docs/POVRAY_QUILT_ROLLOUT_PLAN.md` — every KG
+  module renderable as a quilt through both of quiltwright's backends.
+
+### Fixed
+
+- **The PyVista-absence test now runs.** `test_mesh_builders_explain_themselves_when_pyvista_is_absent`
+  skipped whenever PyVista *was* installed — which is every machine that can run
+  the rest of the suite, and CI too once the `viz3d-render` extra was added. So
+  the message a caller without the render extra actually sees had no coverage
+  anywhere. A test of an absence path cannot be gated on that absence; it has
+  to manufacture it, which it now does in a subprocess with the import blocked.
+  Confirmed by mutation: changing the install hint fails it.
+
+### Changed
+
+- **The vector-backend tests no longer require LanceDB, and CI now installs
+  `viz3d-render`.** Two module-scope import gates were quietly costing most of
+  this package's test coverage.
+
+  `tests/test_vector_backend.py` opened with `importorskip("lancedb")`. CI's
+  test job installs `semantic`, `synthesis` and `viz` — `semantic` bundles
+  sqlite-vec, but nothing installs lancedb — so the whole file skipped and
+  `vector_backend.py`, the storage seam under every consumer, ran at **45%**
+  with the *default* sqlite-vec backend untested. LanceDB is legacy: the
+  default moved to sqlite-vec and nothing in the fleet builds a LanceDB index
+  any more, so the real-LanceDB tests are gone rather than the dependency
+  being added back. `TestAnnGate` and the `_pq_subvectors` tests stay — they
+  drive the ANN gate through a mock table and never call `open()`, so they
+  need no install — which matters because `doc_kg` still imports
+  `LanceDBBackend` and `_pq_subvectors` for un-migrated stores. Coverage of
+  that module is now **63%**, and the docstring names the methods that are
+  deliberately unexercised.
+
+  `tests/test_viz3d_povexport.py` had the same shape and a sharper irony: a
+  module-scope `importorskip("pyvista")` guarding a file whose stated purpose
+  is pinning that `limb_paths`, `leaf_frames` and `LEAF_ASPECT` work *without*
+  PyVista. Only three of its thirty tests compare against the PyVista path;
+  those now carry `@requires_pyvista` individually and the other twenty-seven
+  run everywhere. The "runs without PyVista" claim could never have been
+  tested from inside that file — a module-scope skip aborts collection for
+  everything after it — so it is now checked in a subprocess with the import
+  blocked. CI also installs `viz3d-render`, taking `viz3d/organic.py` from
+  **58%** to **94%**.
+
+  Suite total: **81% → 85%**, with 56 tests that previously never ran in CI.
+
+### Added
+
+- **`viz3d.limb_paths` and `viz3d.leaf_frames` — the NumPy halves of the two
+  mesh builders.** `smooth_paths` and `leaf_glyphs` each do two things: place
+  geometry, then hand it to PyVista. The placement is pure NumPy and the
+  PyVista part is a detail of one renderer, so a consumer that describes a
+  limb analytically — a POV-Ray `sphere_sweep`, say — had no way to reach the
+  geometry without dragging in VTK to build a tube it was going to throw away.
+
+  `leaf_frames(positions, skeleton)` returns the clung leaf positions and
+  their aim vectors; `leaf_glyphs` now calls it and glyphs the result, so
+  there is one copy of the clinging rule rather than two. `limb_paths` is the
+  PyVista-free counterpart of `smooth_paths`, splining each root-to-tip path
+  through a uniform Catmull-Rom instead of `pv.Spline`. Both stay available
+  under the NumPy-only `viz3d` extra.
+
+  `limb_paths` interpolates the same control points as `smooth_paths` but is
+  **not** bit-identical to VTK's parametric spline, and says so — when two
+  backends must agree to the pixel, call `smooth_paths` once and give both the
+  same points rather than letting each smooth its own.
+
+  The two agree in sample *count* for every path of three or more nodes, and
+  not for a two-node one: Catmull-Rom needs three control points to curve, so
+  `limb_paths` returns those two points unchanged where `smooth_paths` returns
+  `subdivisions + 1` along the same straight segment. Both describe that line
+  and share both endpoints, so nothing renders differently — but the parity
+  test zips the two outputs, and so will callers. Now documented on
+  `limb_paths` and pinned by
+  `test_a_two_node_path_is_the_one_place_the_sample_counts_differ`, found
+  while building the first downstream consumer.
+
+  `limb_paths` also calls `pipe_radii` on a skeleton that has none, which sets
+  `skeleton.radii` as a side effect. That matches `smooth_paths`, and the
+  docstring now says so rather than leaving it to be discovered.
+
+- **`viz3d.LEAF_ASPECT`** — the per-axis scale that flattens the leaf
+  prototype from a ball into a blade, exported so a non-PyVista renderer can
+  build the same shape from `leaf_frames` rather than re-deriving it.
+
+  Together these let `quiltwright.povgen` emit an organic tree as analytic
+  POV-Ray primitives: 839 KB of SDL for a 3000-leaf tree against roughly
+  12.5 MB for the equivalent triangle dump.
+
+- **`viz3d.leaf_facing` and `viz3d.oriented_cluster` — promoted from the two
+  consumers.** Both existed as private copies in `gutenberg_kg/scene.py` and
+  `pycode_kg/scene3d.py`: pure geometry with no domain knowledge, carried as
+  an open item in `VISUALIZATION_STACK.md` and the 2026-08-14 journal since
+  `_depth_report` went up into `quiltwright` 0.4.0. Their only dependency,
+  `fibonacci_sphere`, was already here.
+
+  `leaf_facing(outward, up_bias=0.6)` gives the direction a limb's foliage
+  cluster should face — the limb's own outward run tilted upward, rather than
+  world `+z`. A cluster that always points straight up is the clearest tell
+  that a tree was assembled rather than grown, and parallax on a light-field
+  panel makes that far more obvious than a flat projection does.
+  `oriented_cluster(n, centre, facing, radius)` scatters a hemisphere opening
+  along that facing, *reflecting* far-side points across the facing plane
+  rather than discarding them, so a cluster of any size fills its hemisphere
+  evenly and returns exactly the count asked for.
+
+  The two copies were verified equivalent before merging — 500 randomized
+  cases matching both originals exactly — with one real divergence:
+  **`gutenberg_kg`'s `oriented_cluster` raised `ValueError` on an empty
+  cluster** (`fibonacci_sphere` returns `[]`, and subtracting a `(3,)` centre
+  from a `(0,)` array fails to broadcast), where `pycode_kg`'s guarded and
+  returned `[]`. The promoted version takes the guard, so the latent crash
+  does not survive the merge.
+
+  Both assume a `+z`-up world, as the rest of the module does; the docstrings
+  now say so.
+
 ## [0.13.2] - 2026-08-15
 
 ### Fixed

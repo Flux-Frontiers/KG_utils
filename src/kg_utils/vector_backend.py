@@ -7,6 +7,18 @@ implementations ship here:
   * :class:`LanceDBBackend` — wraps the historical LanceDB table plumbing
     (dummy-row table creation, ``delete``-then-``add`` upsert, optional IVF ANN
     index gated on row count).  Behaviour is unchanged from the pre-seam code.
+
+    **Legacy, and only partly tested.**  The default backend is sqlite-vec and
+    nothing in the fleet builds a LanceDB index any more; ``doc_kg`` still
+    imports this class and :func:`_pq_subvectors` to read un-migrated stores.
+    The tests drive the ANN gate through a mock table, so
+    :meth:`LanceDBBackend.maybe_create_ann_index` and ``_pq_subvectors`` stay
+    covered — but the methods that need a live LanceDB connection (``open``,
+    ``upsert``, ``search``, ``delete_ids``, ``existing_ids``, ``count``) are
+    **not** exercised, because requiring the ``lancedb`` extra to run this
+    module's tests meant a CI job without it silently skipped the *sqlite-vec*
+    tests as well.  Change this class with that in mind: a regression here
+    surfaces in ``doc_kg``, not in this repo's suite.
   * :class:`SqliteVecBackend` — an exact brute-force store built on
     ``sqlite-vec`` (``vec0``).  Vectors live in a ``vec0`` virtual table
     row-aligned by ``rowid`` to a plain ``vec_meta`` table that carries the

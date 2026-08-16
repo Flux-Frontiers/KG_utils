@@ -41,6 +41,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from kg_utils.viz3d.layout import fibonacci_sphere
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import pyvista as pv
 
@@ -53,6 +55,11 @@ PIPE_EXPONENT: float = 2.2
 #: Default ceiling on attractors used for *growth*.  Past a few thousand the
 #: silhouette stops changing and the O(tips x attractors) inner loop dominates.
 MAX_ATTRACTORS: int = 3000
+
+#: Per-axis scale flattening the leaf prototype from a ball into a blade.
+#: Shared so a non-PyVista renderer can build the same shape from
+#: :func:`leaf_frames` rather than re-deriving it.
+LEAF_ASPECT: tuple[float, float, float] = (1.0, 0.55, 0.2)
 
 
 def _pyvista():
@@ -425,6 +432,89 @@ def smooth_paths(
     return out
 
 
+def limb_paths(
+    skeleton: Skeleton,
+    *,
+    subdivisions: int = 4,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """
+    Smooth root-to-tip limb paths with per-point radii, without PyVista.
+
+    The NumPy counterpart of :func:`smooth_paths`, for renderers that describe
+    a limb analytically — a POV-Ray ``sphere_sweep``, say — and so never need
+    a tessellated tube or the VTK stack that builds one.
+
+    The smoothing is a uniform Catmull-Rom through the same control points,
+    which interpolates them exactly as ``pv.Spline`` does but is **not
+    bit-identical** to VTK's parametric spline.  When two backends must agree
+    to the pixel, run :func:`smooth_paths` once and give both the same points
+    rather than letting each smooth its own.
+
+    The sample *count* matches :func:`smooth_paths` for every path of three or
+    more nodes.  It does not for a two-node path: Catmull-Rom needs three
+    control points to curve, so this returns the two points unchanged where
+    ``smooth_paths`` returns ``subdivisions + 1`` of them along the same
+    straight segment.  Both describe the same line and share both endpoints,
+    so nothing renders differently — but do not zip the two functions' outputs
+    together, or assert that they agree in length, without allowing for it.
+
+    :param skeleton: Skeleton with radii assigned by :func:`pipe_radii`;
+        :func:`pipe_radii` is called on it here if they are missing, which
+        sets ``skeleton.radii`` as a side effect.
+    :param subdivisions: Spline samples per skeleton segment.
+    :return: ``[(points (K, 3), radii (K,)), ...]`` per path.
+    """
+    if skeleton.radii is None:
+        pipe_radii(skeleton)
+    radii = skeleton.radii
+    assert radii is not None  # set above; keeps the type checker honest
+
+    out: list[tuple[np.ndarray, np.ndarray]] = []
+    for path in root_to_tip_paths(skeleton):
+        if len(path) < 2:
+            continue
+        raw = skeleton.points[path]
+        smoothed = _catmull_rom(raw, subdivisions)
+        src_t = np.linspace(0.0, 1.0, len(path))
+        dst_t = np.linspace(0.0, 1.0, smoothed.shape[0])
+        out.append((smoothed, np.interp(dst_t, src_t, radii[path])))
+    return out
+
+
+def _catmull_rom(points: np.ndarray, samples_per_segment: int) -> np.ndarray:
+    """
+    Resample a polyline through a uniform Catmull-Rom spline.
+
+    Endpoints are duplicated so the first and last segments have the
+    neighbours the basis needs, which keeps the curve pinned to the original
+    ends rather than shrinking away from them.
+
+    :param points: ``(K, 3)`` control points.
+    :param samples_per_segment: Output samples per input segment.
+    :return: ``(K', 3)`` resampled polyline.
+    """
+    pts = np.atleast_2d(np.asarray(points, dtype=float))
+    if pts.shape[0] < 3 or samples_per_segment < 2:
+        return pts
+    padded = np.vstack([pts[0], pts, pts[-1]])
+    out = [pts[0]]
+    for i in range(pts.shape[0] - 1):
+        p0, p1, p2, p3 = padded[i], padded[i + 1], padded[i + 2], padded[i + 3]
+        for step in range(1, samples_per_segment + 1):
+            t = step / samples_per_segment
+            t2, t3 = t * t, t * t * t
+            out.append(
+                0.5
+                * (
+                    (2 * p1)
+                    + (-p0 + p2) * t
+                    + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
+                    + (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+                )
+            )
+    return np.asarray(out, dtype=float)
+
+
 def tree_mesh(
     skeleton: Skeleton,
     *,
@@ -451,6 +541,129 @@ def tree_mesh(
     if not tubes:
         return pv.PolyData()
     return tubes[0] if len(tubes) == 1 else pv.merge(tubes)
+
+
+def _unit(vector: np.ndarray) -> np.ndarray:
+    """
+    Unit vector, falling back to ``+z`` for a degenerate input.
+
+    :param vector: Any 3-vector.
+    :return: Unit-length vector, or ``+z`` if the input is near zero.
+    """
+    norm = float(np.linalg.norm(vector))
+    return np.asarray(vector, dtype=float) / norm if norm > 1e-9 else np.array([0.0, 0.0, 1.0])
+
+
+def leaf_facing(outward: np.ndarray, up_bias: float = 0.6) -> np.ndarray:
+    """
+    Direction a limb's foliage cluster should face.
+
+    Foliage runs out along the branch and then reaches for light, so the
+    cluster axis is the limb's outward direction tilted upward — not world
+    ``+z``.  A cluster that always points straight up is the single clearest
+    tell that a tree was assembled rather than grown, and it is far more
+    obvious in parallax on a light-field panel than in a flat projection.
+
+    Assumes a ``+z``-up world, as the rest of this module does.
+
+    :param outward: Vector from the trunk axis to the branch tip.
+    :param up_bias: How strongly foliage reaches upward relative to running
+        outward; ``0`` follows the limb exactly, large values return to
+        vertical.
+    :return: Unit facing vector.
+    """
+    horizontal = np.asarray(outward, dtype=float).copy()
+    horizontal[2] = 0.0
+    if float(np.linalg.norm(horizontal)) < 1e-9:
+        return np.array([0.0, 0.0, 1.0])
+    return _unit(_unit(horizontal) + np.array([0.0, 0.0, up_bias]))
+
+
+def oriented_cluster(
+    n_points: int,
+    center: np.ndarray,
+    facing: np.ndarray,
+    radius: float,
+) -> list[np.ndarray]:
+    """
+    A hemispherical cluster of *n_points* around *center*, opening along *facing*.
+
+    Points on the far side are **reflected** across the facing plane rather
+    than discarded, so a cluster of any size fills its hemisphere evenly
+    instead of thinning out as half the samples are thrown away.
+
+    :param n_points: Number of positions to return.
+    :param center: Cluster centre, typically a branch tip.
+    :param facing: Unit direction the hemisphere opens toward, from
+        :func:`leaf_facing`.
+    :param radius: Cluster radius in scene units.
+    :return: List of ``(3,)`` positions; empty when *n_points* is not positive.
+    """
+    if n_points <= 0:
+        return []
+    sphere = np.asarray(fibonacci_sphere(n_points, radius=radius), dtype=float)
+    centre = np.asarray(center, dtype=float)
+    behind = np.minimum(sphere @ np.asarray(facing, dtype=float), 0.0)
+    return list(centre + sphere - 2.0 * behind[:, None] * np.asarray(facing, dtype=float))
+
+
+def leaf_frames(
+    positions: np.ndarray,
+    skeleton: Skeleton,
+    *,
+    size: float = 0.35,
+    cling: float = 0.7,
+    seed: int = 0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Leaf positions and aim vectors, without building any mesh.
+
+    This is the placement half of :func:`leaf_glyphs` — the clinging that
+    pulls each leaf in to its nearest twig, and the local branch direction
+    that orients it — separated out so it can be used by renderers other than
+    PyVista.  ``leaf_glyphs`` calls it and then glyphs the result; a POV-Ray
+    emitter calls it and instances an analytic ellipsoid per leaf instead.
+
+    Pure NumPy, so it stays available under the ``viz3d`` extra alone.
+
+    :param positions: ``(M, 3)`` leaf positions (the chunk attractors).
+    :param skeleton: Grown skeleton, used for local branch direction.
+    :param size: Leaf glyph radius, which sets the clearance a clung leaf
+        keeps from the wood.
+    :param cling: How far each leaf is pulled toward its nearest skeleton
+        node, from ``0`` to ``1``.  See :func:`leaf_glyphs`.
+    :param seed: RNG seed for the roll jitter.
+    :return: ``(points (M, 3), directions (M, 3))``, directions unit-length.
+        Both are empty arrays when *positions* is empty.
+    """
+    pts = np.atleast_2d(np.asarray(positions, dtype=float))
+    if pts.size == 0:
+        return np.zeros((0, 3)), np.zeros((0, 3))
+
+    rng = np.random.default_rng(seed)
+
+    # Local branch direction: the segment ending at the nearest skeleton node.
+    dists = np.linalg.norm(pts[:, None, :] - skeleton.points[None, :, :], axis=2)
+    nearest = dists.argmin(axis=1)
+    parents = skeleton.parents[nearest]
+
+    if cling > 0.0:
+        anchor = skeleton.points[nearest]
+        offset = pts - anchor
+        distance = np.linalg.norm(offset, axis=1, keepdims=True)
+        direction = offset / np.maximum(distance, 1e-9)
+        radii = skeleton.radii if skeleton.radii is not None else pipe_radii(skeleton)
+        clearance = (radii[nearest] + size)[:, None]
+        pts = anchor + direction * np.maximum(distance * (1.0 - cling), clearance)
+
+    vecs = np.where(
+        parents[:, None] >= 0,
+        skeleton.points[nearest] - skeleton.points[np.clip(parents, 0, None)],
+        np.array([0.0, 0.0, 1.0]),
+    )
+    vecs = vecs + rng.normal(0.0, 0.3, vecs.shape)
+    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+    return pts, vecs / np.maximum(norms, 1e-9)
 
 
 def leaf_glyphs(
@@ -490,42 +703,18 @@ def leaf_glyphs(
     :return: Glyphed ``PolyData``, one actor's worth.
     """
     pv = _pyvista()
-    pts = np.atleast_2d(np.asarray(positions, dtype=float))
+    pts, vecs = leaf_frames(positions, skeleton, size=size, cling=cling, seed=seed)
     if pts.size == 0:
         return pv.PolyData()
-
-    rng = np.random.default_rng(seed)
-
-    # Local branch direction: the segment ending at the nearest skeleton node.
-    dists = np.linalg.norm(pts[:, None, :] - skeleton.points[None, :, :], axis=2)
-    nearest = dists.argmin(axis=1)
-    parents = skeleton.parents[nearest]
-
-    if cling > 0.0:
-        anchor = skeleton.points[nearest]
-        offset = pts - anchor
-        distance = np.linalg.norm(offset, axis=1, keepdims=True)
-        direction = offset / np.maximum(distance, 1e-9)
-        radii = skeleton.radii if skeleton.radii is not None else pipe_radii(skeleton)
-        clearance = (radii[nearest] + size)[:, None]
-        pts = anchor + direction * np.maximum(distance * (1.0 - cling), clearance)
 
     cloud = pv.PolyData(pts)
     if tint is not None:
         cloud["tint"] = np.asarray(tint, dtype=float)
-
-    vecs = np.where(
-        parents[:, None] >= 0,
-        skeleton.points[nearest] - skeleton.points[np.clip(parents, 0, None)],
-        np.array([0.0, 0.0, 1.0]),
-    )
-    vecs = vecs + rng.normal(0.0, 0.3, vecs.shape)
-    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
-    cloud["direction"] = vecs / np.maximum(norms, 1e-9)
+    cloud["direction"] = vecs
 
     # A flattened ellipsoid: cheap, and it silhouettes like foliage.
     proto = pv.Sphere(radius=size, theta_resolution=8, phi_resolution=6)
-    proto.scale([1.0, 0.55, 0.2], inplace=True)
+    proto.scale(LEAF_ASPECT, inplace=True)
     return cloud.glyph(geom=proto, orient="direction", scale=False)
 
 
@@ -559,3 +748,97 @@ def grow_tree(
     )
     pipe_radii(skeleton, tip_radius=tip_radius)
     return skeleton
+
+
+@dataclass(frozen=True)
+class CameraFrame:
+    """Where to stand to photograph a tree, in world coordinates.
+
+    Renderer-independent on purpose.  A PyVista caller assigns the three fields
+    onto ``plotter.camera``; a POV-Ray caller converts them into a
+    ``PovCamera``.  Neither rule is written twice.
+
+    :param position: Eye position.
+    :param focal_point: Point looked at, which a light-field renderer also
+        takes as the focal plane — the depth that lands on the glass.
+    :param up: Up vector.  ``+z``, as everything in this module assumes.
+    """
+
+    position: tuple[float, float, float]
+    focal_point: tuple[float, float, float]
+    up: tuple[float, float, float] = (0.0, 0.0, 1.0)
+
+
+def frame_tree(
+    points: np.ndarray,
+    *,
+    fov: float | None = None,
+    margin: float = 0.12,
+    standoff: float = 1.5,
+    include_root: bool = True,
+) -> CameraFrame:
+    """
+    Frame a grown tree for a hero shot: level view, ``+z`` up, looking along ``+y``.
+
+    The camera stands off along ``-y`` by *standoff* times the subject's
+    vertical extent and looks at the centre of it, so the crown straddles the
+    focal plane rather than sitting entirely behind it.  On a light-field panel
+    that placement is what decides which half of the tree floats out of the
+    glass and which half recedes, so it is worth having exactly once.
+
+    **Frame the subject, not the scene.**  Pass the crown — the points the
+    skeleton grew toward.  Framing from a renderer's own bounds instead means
+    framing whatever happens to be in it: a ground plane three crown-widths
+    across drags the centre down and the camera back, and the tree ends up
+    small and high in the tile.
+
+    :param points: ``(N, 3)`` subject points, typically the crown attractors.
+    :param fov: Vertical field of view in degrees.  Given one, the camera is
+        placed at the distance that fits the subject's bounding sphere in it —
+        the answer ``plotter.reset_camera()`` computes, which a renderer
+        without one has to compute for itself.  ``None`` falls back to
+        *standoff*, which is what a PyVista caller wants: it sets a direction
+        and lets ``reset_camera()`` do the fitting.
+    :param margin: Headroom beyond the exact fit, as a fraction of the fitted
+        distance.  Used only when *fov* is given.  An exact fit puts the
+        subject's silhouette against the frame edge, which reads as cropped
+        even when it is not — and on a light-field panel it *is* cropped,
+        because the outermost views shear the subject sideways out of a frame
+        that had no room to give.  Nonzero by default for that reason.
+    :param standoff: Camera distance as a multiple of the subject's ``z``
+        extent, used only when *fov* is ``None``.  The default matches the
+        framing ``gutenkg quilt`` and ``pycodekg quilt`` have used since they
+        were written.
+    :param include_root: Extend the bounds to the origin, where a grown
+        skeleton's root node sits.  The trunk carries no attractors, so without
+        this the frame covers the canopy and cuts the tree off at the ankles.
+    :return: The :class:`CameraFrame`.
+    :raises ValueError: If *points* is empty.
+    """
+    pts = np.atleast_2d(np.asarray(points, dtype=float))
+    if pts.size == 0:
+        raise ValueError("cannot frame an empty point set")
+
+    lo, hi = pts.min(axis=0), pts.max(axis=0)
+    if include_root:
+        lo, hi = np.minimum(lo, 0.0), np.maximum(hi, 0.0)
+    centre = (lo + hi) / 2.0
+    depth = float(hi[2] - lo[2]) or 1.0
+
+    if fov is None:
+        # Historical rule: stand off from the near face, so the subject
+        # straddles the focal plane.  reset_camera() fixes up the distance.
+        eye_y = lo[1] - depth * standoff
+    else:
+        # A fit is a camera-to-centre distance, so it is measured from the
+        # focal point — measuring it from the near face would stand the
+        # camera a half-depth too far back and undersize the subject.
+        radius = float(np.linalg.norm(hi - lo)) / 2.0 or 1.0
+        fitted = radius / max(np.tan(np.radians(float(fov) / 2.0)), 1e-6)
+        eye_y = centre[1] - fitted * (1.0 + max(float(margin), 0.0))
+
+    return CameraFrame(
+        position=(float(centre[0]), float(eye_y), float(centre[2])),
+        focal_point=(float(centre[0]), float(centre[1]), float(centre[2])),
+        up=(0.0, 0.0, 1.0),
+    )
