@@ -58,6 +58,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING: `lancedb_dir` is now `vectors_path`.** The parameter named for the
+  retired backend was load-bearing for the *current* one — `KGModule` derived
+  `vectors.sqlite` from `self.lancedb_dir.parent`, so every downstream signature
+  kept LanceDB's name for a sqlite-vec store. `pycode_kg` had zero `lancedb`
+  occurrences in its own source and still could not shed the name, because
+  `SemanticIndex` handed it back.
+
+  Three classes change, all of them taking a *file* path where they used to take
+  a *directory*:
+
+  | Class | Was | Now |
+  |---|---|---|
+  | `kg_utils.pipeline.KGModule` | `lancedb_dir` (3rd positional) | `vectors_path` |
+  | `kg_utils.semantic.SemanticIndex` | `lancedb_dir` (1st positional) | `vectors_path` |
+  | `kg_utils.module.KGModule` | `lancedb_dir` | `vectors_path` |
+
+  Passing `lancedb_dir=` raises `TypeError`. No deprecation period, matching how
+  memory-kg 0.7.0, Metabo_kg 0.10.0 and diary-kg 0.95.0 each dropped the same
+  parameter — that hard break is what surfaced stale call sites in those repos
+  rather than letting them fail silently later.
+
+  `vector_backend="auto"` still finds an un-migrated LanceDB store: the probe
+  path is now derived as `vectors_path.parent / "lancedb"` behind the private
+  `KGModule._legacy_store_dir`. It is deliberately not a constructor argument —
+  exposing it was the whole reason the name propagated.
+
+  `SemanticIndex.build()` returns `vectors_path` in its stats dict where it
+  returned `lancedb_dir`; `repr()` changes to match.
+
+- **`SemanticIndex` no longer defaults to `LanceDBBackend`.** With no explicit
+  `backend=`, `_get_backend()` built a LanceDB store — years after the fleet
+  migrated off it. It now builds a `SqliteVecBackend` over `vectors_path`.
+  `KGModule` always passes an explicit backend, so no fleet code path hit this;
+  bare use of `SemanticIndex` did. Reading a pre-migration store now requires
+  constructing `LanceDBBackend` explicitly and passing it in, which is what
+  `dockg convert-index` already does.
+
 - **The vector-backend tests no longer require LanceDB, and CI now installs
   `viz3d-render`.** Two module-scope import gates were quietly costing most of
   this package's test coverage.

@@ -22,7 +22,8 @@ class KGModule:
 
     :param repo_root: Absolute path to the repository or corpus root.
     :param db_path: Path for the SQLite graph database.
-    :param lancedb_dir: Path for the LanceDB vector index directory.
+    :param vectors_path: Path for the sqlite-vec vector store file.  Replaced
+        ``lancedb_dir`` in 0.14.0; passing the old name raises :exc:`TypeError`.
     :param config: Optional domain-specific configuration dict.
     """
 
@@ -30,12 +31,12 @@ class KGModule:
         self,
         repo_root: Path,
         db_path: Path | None = None,
-        lancedb_dir: Path | None = None,
+        vectors_path: Path | None = None,
         config: dict[str, Any] | None = None,
     ) -> None:
         self.repo_root = repo_root
         self.db_path = db_path
-        self.lancedb_dir = lancedb_dir
+        self.vectors_path = vectors_path
         self.config = config or {}
 
     def make_extractor(self) -> KGExtractor:

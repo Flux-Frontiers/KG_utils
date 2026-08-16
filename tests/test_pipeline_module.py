@@ -339,27 +339,41 @@ class TestVectorBackendSelection:
         result = kg.query("vector embeddings")
         assert result.seeds > 0
 
-    def test_vectors_path_follows_explicit_lancedb_dir(self, corpus: Path, tmp_path: Path) -> None:
-        # CLI callers pass lancedb_dir explicitly (often with a placeholder
-        # repo_root); the sidecar must sit next to that dir, not under
+    def test_explicit_vectors_path_is_used_verbatim(self, corpus: Path, tmp_path: Path) -> None:
+        # CLI callers pass vectors_path explicitly (often with a placeholder
+        # repo_root); the store must land there, not under
         # repo_root/_default_dir.
         kg = _TextKG(
             corpus,
             db_path=tmp_path / "kg" / "graph.sqlite",
-            lancedb_dir=tmp_path / "kg" / "lancedb",
+            vectors_path=tmp_path / "kg" / "vectors.sqlite",
         )
         assert kg.vectors_path == tmp_path / "kg" / "vectors.sqlite"
+
+    def test_lancedb_dir_is_rejected(self, corpus: Path, tmp_path: Path) -> None:
+        """Removed in 0.14.0 with no deprecation period — it must fail loudly.
+
+        Matches memory-kg 0.7.0, Metabo_kg 0.10.0 and diary-kg 0.95.0, each of
+        which dropped the same parameter the same way.
+        """
+        with pytest.raises(TypeError, match="lancedb_dir"):
+            _TextKG(corpus, lancedb_dir=tmp_path / "kg" / "lancedb")  # ty: ignore[unknown-argument]
+
+    def test_legacy_store_dir_sits_beside_vectors_path(self, corpus: Path, tmp_path: Path) -> None:
+        """The "auto" probe path is derived, not configured."""
+        kg = _TextKG(corpus, vectors_path=tmp_path / "kg" / "vectors.sqlite")
+        assert kg._legacy_store_dir == tmp_path / "kg" / "lancedb"
 
     def test_sqlite_vec_build_then_fresh_instance_queries(
         self, corpus: Path, tmp_path: Path
     ) -> None:
         # Build and query through two separate KG instances with explicit
-        # paths — the exact CLI flow (build-lancedb then query) that broke
-        # when vectors_path was derived from repo_root/_default_dir.
+        # paths — the exact CLI flow (build then query) that broke when
+        # vectors_path was derived from repo_root/_default_dir.
         pytest.importorskip("sqlite_vec")
         paths = {
             "db_path": tmp_path / "kg" / "graph.sqlite",
-            "lancedb_dir": tmp_path / "kg" / "lancedb",
+            "vectors_path": tmp_path / "kg" / "vectors.sqlite",
         }
         builder = _TextKG(corpus, vector_backend="sqlite-vec", **paths)
         builder.build(wipe=True)
