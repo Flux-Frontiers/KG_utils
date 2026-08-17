@@ -4,7 +4,7 @@
 [![Version](https://img.shields.io/badge/version-0.16.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21284866.svg)](https://doi.org/10.5281/zenodo.21284866)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
 
 # kgmodule-utils
 
@@ -477,7 +477,7 @@ KG_EMBED_ENDPOINT=http://localhost:8080 poetry run pytest -m integration
 
 If you use kgmodule-utils in research or a project, please cite it:
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21284866.svg)](https://doi.org/10.5281/zenodo.21284866)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
 
 **APA**
 
