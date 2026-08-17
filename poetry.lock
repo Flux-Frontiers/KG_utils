@@ -70,7 +70,7 @@ description = "Classes Without Boilerplate"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"viz3d-render\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "attrs-26.1.0-py3-none-any.whl", hash = "sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"},
     {file = "attrs-26.1.0.tar.gz", hash = "sha256:d03ceb89cb322a8fd706d4fb91940737b6642aa36998fe130a9bc96c985eff32"},
@@ -87,7 +87,7 @@ files = [
     {file = "certifi-2026.7.22-py3-none-any.whl", hash = "sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775"},
     {file = "certifi-2026.7.22.tar.gz", hash = "sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55"},
 ]
-markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"synthesis\" or extra == \"viz3d-render\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"synthesis\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "cffi"
@@ -397,7 +397,7 @@ files = [
     {file = "charset_normalizer-3.5.0-py3-none-any.whl", hash = "sha256:993dfcbe75a85a3784abb5084f2c41b915767c90546fcc92803cffa28611baea"},
     {file = "charset_normalizer-3.5.0.tar.gz", hash = "sha256:49bd5feb59b0bf3cbf6ebcf4352e371c95b9da9bacd4449f8b64d0ad2c10a26e"},
 ]
-markers = {main = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "click"
@@ -435,7 +435,7 @@ description = "Python library for calculating contours of 2D quadrilateral grids
 optional = true
 python-versions = ">=3.11"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "contourpy-1.3.3-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:709a48ef9a690e1343202916450bc48b9e51c049b089c7f79a267b46cffcdaa1"},
     {file = "contourpy-1.3.3-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:23416f38bfd74d5d28ab8429cc4d63fa67d5068bd711a85edb1c3fb0c3e2f381"},
@@ -826,7 +826,7 @@ description = "Composable style cycles"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "cycler-0.12.1-py3-none-any.whl", hash = "sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30"},
     {file = "cycler-0.12.1.tar.gz", hash = "sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c"},
@@ -843,7 +843,7 @@ description = "Intuitive, easy CLIs based on type hints."
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"viz3d-render\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "cyclopts-4.22.5-py3-none-any.whl", hash = "sha256:cf9ce285836053d156730ea4ea0ad0c75cf63beb3f3d8edf222a795bc57666ab"},
     {file = "cyclopts-4.22.5.tar.gz", hash = "sha256:94044506317462cad90fb01a917dadce1f48a0915ba3605dc8d178dea1229e24"},
@@ -934,7 +934,7 @@ description = "Parse Python docstrings in reST, Google and Numpydoc format"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"viz3d-render\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "docstring_parser-0.18.0-py3-none-any.whl", hash = "sha256:b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b"},
     {file = "docstring_parser-0.18.0.tar.gz", hash = "sha256:292510982205c12b1248696f44959db3cdd1740237a968ea1e2e7a900eeb2015"},
@@ -994,7 +994,7 @@ description = "Tools to manipulate font files"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "fonttools-4.63.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:e3297a6a4059b4acc3a1e9a8b04741f240a80044eef08ebd32e8b5bcdddce75b"},
     {file = "fonttools-4.63.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:b1cd75a03ad8cb5bc40c90bfde68c0c47de423aa19e5c0f362b43520645eea94"},
@@ -1381,7 +1381,7 @@ files = [
     {file = "idna-3.18-py3-none-any.whl", hash = "sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2"},
     {file = "idna-3.18.tar.gz", hash = "sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848"},
 ]
-markers = {main = "(extra == \"synthesis\" or extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"synthesis\" or extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.extras]
 all = ["mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
@@ -1755,7 +1755,7 @@ description = "A fast implementation of the Cassowary constraint solver"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "kiwisolver-1.5.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:32cc0a5365239a6ea0c6ed461e8838d053b57e397443c0ca894dcc8e388d4374"},
     {file = "kiwisolver-1.5.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:cc0b66c1eec9021353a4b4483afb12dfd50e3669ffbb9152d6842eb34c7e29fd"},
@@ -1953,7 +1953,7 @@ description = "Python port of markdown-it. Markdown parsing, done right!"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "markdown_it_py-4.2.0-py3-none-any.whl", hash = "sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a"},
     {file = "markdown_it_py-4.2.0.tar.gz", hash = "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49"},
@@ -2078,7 +2078,7 @@ description = "Python plotting package"
 optional = true
 python-versions = ">=3.11"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "matplotlib-3.11.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:b7cf158e7add54a8d51ac9b5a84abd6d4e13ed4951b4f25f1c5139f41c2addb2"},
     {file = "matplotlib-3.11.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:d2ace7273b9a5061a3b420918a16fae1f2dc5dfee1abcc13aba71b5d94b1820c"},
@@ -2165,7 +2165,7 @@ description = "Markdown URL utilities"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
     {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
@@ -2499,7 +2499,7 @@ description = "Fundamental package for array computing in Python"
 optional = true
 python-versions = ">=3.12"
 groups = ["main"]
-markers = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d\" or extra == \"viz3d-render\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "numpy-2.5.2-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:14e373cfc6387177e8409dac3c7159be8eb05cd77096cd7c950268b86f62831c"},
     {file = "numpy-2.5.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:4bbd96c833ecc8cc069ce518078fc8c60cb9cbfb0fea5b7a803ad65035596d03"},
@@ -2904,7 +2904,7 @@ files = [
     {file = "packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"},
     {file = "packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79"},
 ]
-markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "parso"
@@ -2959,7 +2959,7 @@ description = "Python Imaging Library (fork)"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\" or extra == \"synthesis\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\" or extra == \"synthesis\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pillow-12.3.0-cp310-cp310-macosx_10_10_x86_64.whl", hash = "sha256:6c0016e7b354317c4e9e525b937ac8596c38d2d232b419529b9cd7a1cd46e39a"},
     {file = "pillow-12.3.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:bcc33feacfaefce60c12fd500a277533bdc02b10a19f7f6d348763d8140bbba7"},
@@ -3069,7 +3069,7 @@ files = [
     {file = "platformdirs-4.11.2-py3-none-any.whl", hash = "sha256:7f89089b6ea71bda7962953edcf784b2e2d9d285b40ad88be2bb75c6e9d82ab4"},
     {file = "platformdirs-4.11.2.tar.gz", hash = "sha256:3a2ae5fca3520a01ab1be8b45613537f52ddf5b5f6f53d88233892dfbf0cd82d"},
 ]
-markers = {main = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "pluggy"
@@ -3095,7 +3095,7 @@ description = "A friend to fetch your data files"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"viz3d-render\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pooch-1.9.0-py3-none-any.whl", hash = "sha256:f265597baa9f760d25ceb29d0beb8186c243d6607b0f60b83ecf14078dbc703b"},
     {file = "pooch-1.9.0.tar.gz", hash = "sha256:de46729579b9857ffd3e741987a2f6d5e0e03219892c167c6578c0091fb511ed"},
@@ -3467,7 +3467,7 @@ files = [
     {file = "pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176"},
     {file = "pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f"},
 ]
-markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"viz\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.extras]
 windows-terminal = ["colorama (>=0.4.6)"]
@@ -3479,7 +3479,7 @@ description = "pyparsing - Classes and methods to define and execute parsing gra
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d"},
     {file = "pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc"},
@@ -3487,6 +3487,73 @@ files = [
 
 [package.extras]
 diagrams = ["jinja2", "railroad-diagrams"]
+
+[[package]]
+name = "pyqt5"
+version = "5.15.11"
+description = "Python bindings for the Qt cross platform application toolkit"
+optional = true
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "extra == \"viz3d-qt\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+files = [
+    {file = "PyQt5-5.15.11-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:c8b03dd9380bb13c804f0bdb0f4956067f281785b5e12303d529f0462f9afdc2"},
+    {file = "PyQt5-5.15.11-cp38-abi3-macosx_11_0_x86_64.whl", hash = "sha256:6cd75628f6e732b1ffcfe709ab833a0716c0445d7aec8046a48d5843352becb6"},
+    {file = "PyQt5-5.15.11-cp38-abi3-manylinux_2_17_x86_64.whl", hash = "sha256:cd672a6738d1ae33ef7d9efa8e6cb0a1525ecf53ec86da80a9e1b6ec38c8d0f1"},
+    {file = "PyQt5-5.15.11-cp38-abi3-win32.whl", hash = "sha256:76be0322ceda5deecd1708a8d628e698089a1cea80d1a49d242a6d579a40babd"},
+    {file = "PyQt5-5.15.11-cp38-abi3-win_amd64.whl", hash = "sha256:bdde598a3bb95022131a5c9ea62e0a96bd6fb28932cc1619fd7ba211531b7517"},
+    {file = "PyQt5-5.15.11.tar.gz", hash = "sha256:fda45743ebb4a27b4b1a51c6d8ef455c4c1b5d610c90d2934c7802b5c1557c52"},
+]
+
+[package.dependencies]
+PyQt5-Qt5 = ">=5.15.2,<5.16.0"
+PyQt5-sip = ">=12.15,<13"
+
+[[package]]
+name = "pyqt5-qt5"
+version = "5.15.19"
+description = "The subset of a Qt installation needed by PyQt5."
+optional = true
+python-versions = "*"
+groups = ["main"]
+markers = "extra == \"viz3d-qt\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+files = [
+    {file = "pyqt5_qt5-5.15.19-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:cac6b78e4805848c25979a0622660251070781b6b4f810688a960cb44d1ae5a2"},
+    {file = "pyqt5_qt5-5.15.19-py3-none-macosx_11_0_arm64.whl", hash = "sha256:66fa299dcdea1f430edbd6f6ca3dcb20430f19c508d13e3aa851d19034b7be7e"},
+    {file = "pyqt5_qt5-5.15.19-py3-none-manylinux2014_x86_64.whl", hash = "sha256:31421d9c31fb29a8faee4b8b3c32658fb51a9e8c4c708075121162fa44faf80e"},
+]
+
+[[package]]
+name = "pyqt5-sip"
+version = "12.19.0"
+description = "The sip module support for PyQt5"
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"viz3d-qt\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+files = [
+    {file = "pyqt5_sip-12.19.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:d3d1348235e0b2e01c962d14d5fe410b962ae49ee2cfaac5c66fe5f1edd50487"},
+    {file = "pyqt5_sip-12.19.0-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:ec8d8cbada7a92a8ab5994503ee6f6274b41c4ecbb7d60ebf858450ba5e1cc01"},
+    {file = "pyqt5_sip-12.19.0-cp310-cp310-win32.whl", hash = "sha256:92df9d2ddf99d3a8a3fab6736077cc8d0531be4db4d8ff01d03ce6e0b07e00bf"},
+    {file = "pyqt5_sip-12.19.0-cp310-cp310-win_amd64.whl", hash = "sha256:0a7ca72b06a98e4456d7f5a25e741064fb0d6f7c5d0f7302fd41384e2ec9e1c5"},
+    {file = "pyqt5_sip-12.19.0-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:b29e97d6aacbdc3535f17f83d11d6bd95abb0e36865a250c3d1c14719bb2f1b4"},
+    {file = "pyqt5_sip-12.19.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:40ed8341b7c6681d102708b65acbccf0c26908189bfa2e05e180a3b515296a87"},
+    {file = "pyqt5_sip-12.19.0-cp311-cp311-win32.whl", hash = "sha256:3d8a08fad1bc89e083d712378af4fddee9f6102cd4254e6a5c0ad7055a09670a"},
+    {file = "pyqt5_sip-12.19.0-cp311-cp311-win_amd64.whl", hash = "sha256:f01cd36afef40bd0d81d0d98ff125112ce0df725b936d9eee3f1be1cc7e96e91"},
+    {file = "pyqt5_sip-12.19.0-cp312-cp312-macosx_10_9_universal2.whl", hash = "sha256:6f7cd8a868f20fe450b6d17016ff0b0e0c8fecf32d620dcbf319a2174cbcad00"},
+    {file = "pyqt5_sip-12.19.0-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:3c5e0da86b5ae71b7acf2134e15fc8734a129549119cade25accddb3f28cb950"},
+    {file = "pyqt5_sip-12.19.0-cp312-cp312-win32.whl", hash = "sha256:aa94140b8f8255f87f85b55a471b0cabfd6c8a41a752a6d3f3d3f34942b8ee3d"},
+    {file = "pyqt5_sip-12.19.0-cp312-cp312-win_amd64.whl", hash = "sha256:628f58e13d47bd7f1a002c0c1d874b5ad7e5644c10d9334c7de4b91b001f6607"},
+    {file = "pyqt5_sip-12.19.0-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:a50aacf432f62e288af179040aea7bf79571f7671a89ac7064d7224a3734c22b"},
+    {file = "pyqt5_sip-12.19.0-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:16f31c35b767e45c017ce3966a48a57ff6e9a3cf9317b1e5bb71ac3cf3718e6b"},
+    {file = "pyqt5_sip-12.19.0-cp313-cp313-win32.whl", hash = "sha256:2de029b867c725f3bc5806d7640ab48696abd4e9e044cf5e26dc958dec9233b8"},
+    {file = "pyqt5_sip-12.19.0-cp313-cp313-win_amd64.whl", hash = "sha256:ab5f4753a67663ba773babf7d32d1c4a447740aa0acdc5f33d385b70952d8cc5"},
+    {file = "pyqt5_sip-12.19.0-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:2cee6450c8646b40fd8f9e75b0a340b6dfc652a4bfec338cf126b66ac61d5638"},
+    {file = "pyqt5_sip-12.19.0-cp314-cp314-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:e7bef99160b0b812be12789b5febe005ca8ed07e4804df32f0a9dbd0f747e32e"},
+    {file = "pyqt5_sip-12.19.0-cp314-cp314-win32.whl", hash = "sha256:b7a651db2339f81831050029e5363aa7adb6873ac7002e786dc07782538da6cd"},
+    {file = "pyqt5_sip-12.19.0-cp314-cp314-win_amd64.whl", hash = "sha256:4058fcb39306719c79c5c52da45208093b11c2c92c09eb2f77b950b12a5a87c2"},
+    {file = "pyqt5_sip-12.19.0.tar.gz", hash = "sha256:71cacf1879da2cd3e50cb239e21673cfe02d358af70ab6768817c960428868c3"},
+]
 
 [[package]]
 name = "pytest"
@@ -3538,7 +3605,7 @@ description = "Extensions to the standard Python datetime module"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
     {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
@@ -3588,7 +3655,7 @@ description = "3D visualization and mesh analysis for science and engineering."
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"viz3d-render\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pyvista-0.48.4-py3-none-any.whl", hash = "sha256:a46eda178e10e279afda550c341676a82dcee607c86db74565fa455ac0bd23e2"},
     {file = "pyvista-0.48.4.tar.gz", hash = "sha256:c639dad1bddff5e366d77371f66f783f6e6a0581446810a66439902222d8db07"},
@@ -3706,6 +3773,27 @@ files = [
     {file = "pyyaml-6.0.3.tar.gz", hash = "sha256:d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f"},
 ]
 markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+
+[[package]]
+name = "quiltwright"
+version = "0.6.0"
+description = "Holographic output for Looking Glass displays: off-axis multi-view quilts from PyVista or POV-Ray scenes"
+optional = true
+python-versions = "<3.14,>=3.12"
+groups = ["main"]
+markers = "extra == \"viz3d-qt\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+files = [
+    {file = "quiltwright-0.6.0-py3-none-any.whl", hash = "sha256:c61cc1c1cd84b0cda7e9695d8f2f9d12bbf49f363d69303108f8bf2ddecd493f"},
+    {file = "quiltwright-0.6.0.tar.gz", hash = "sha256:bddc2e320e7bf3df1db8dc998ed25b7e3e1ae07babd0dd60e06b98ea8af55742"},
+]
+
+[package.dependencies]
+numpy = ">=1.26"
+pillow = ">=10.0"
+
+[package.extras]
+video = ["imageio-ffmpeg (>=0.4)"]
+viz = ["pyvista (>=0.44)"]
 
 [[package]]
 name = "readme-renderer"
@@ -3864,7 +3952,7 @@ files = [
     {file = "requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"},
     {file = "requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed"},
 ]
-markers = {main = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.dependencies]
 certifi = ">=2023.5.7"
@@ -3915,7 +4003,7 @@ description = "Render rich text, tables, progress bars, syntax highlighting, mar
 optional = true
 python-versions = ">=3.8.0"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "rich-14.3.4-py3-none-any.whl", hash = "sha256:07e7adb4690f68864777b1450859253bed81a99a31ac321ac1817b2313558952"},
     {file = "rich-14.3.4.tar.gz", hash = "sha256:817e02727f2b25b40ef56f5aa2217f400c8489f79ca8f46ea2b70dd5e14558a9"},
@@ -3935,7 +4023,7 @@ description = "A beautiful reStructuredText renderer for rich"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "extra == \"viz3d-render\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "rich_rst-2.1.0-py3-none-any.whl", hash = "sha256:7ecd1343ee12c879d0e7ae74c3eb6d263b023d2929c6d114212eb1fd91057255"},
     {file = "rich_rst-2.1.0.tar.gz", hash = "sha256:f4d117b49697f338769759fa5cacf5197da4888b347b9fda2e50aef5cd8d93bd"},
@@ -4147,7 +4235,7 @@ description = "A Great Dane turned Python environment detective"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"viz3d-render\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "scooby-0.11.2-py3-none-any.whl", hash = "sha256:f34c36bbee749b2c55816a080521f216d88304e635017e911c12249607d38c49"},
     {file = "scooby-0.11.2.tar.gz", hash = "sha256:0575c73636ec4c2587bea1f8a038798ddcb249e02067fae897dac3bf4f4e444d"},
@@ -4322,7 +4410,7 @@ description = "Python 2 and 3 compatibility utilities"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
@@ -4739,7 +4827,7 @@ description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"synthesis\" or extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"lancedb\" or python_version == \"3.13\") and (sys_platform == \"darwin\" or sys_platform == \"linux\") and (extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"lancedb\" or extra == \"synthesis\")"
+markers = "(python_version == \"3.13\" or extra == \"synthesis\" or extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\") and (extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\" or extra == \"synthesis\")"
 files = [
     {file = "typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
     {file = "typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"},
@@ -4772,7 +4860,7 @@ files = [
     {file = "urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897"},
     {file = "urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c"},
 ]
-markers = {main = "(extra == \"viz3d-render\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.extras]
 brotli = ["brotli (>=1.2.0) ; platform_python_implementation == \"CPython\"", "brotlicffi (>=1.2.0.0) ; platform_python_implementation != \"CPython\""]
@@ -4806,7 +4894,7 @@ description = "VTK is an open-source toolkit for 3D computer graphics, image pro
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "extra == \"viz3d-render\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "vtk-9.6.2-cp310-cp310-macosx_10_10_x86_64.whl", hash = "sha256:8ed0c1e329fd857c696c44609df7be952fcb08c69e30c94e025fbcef712480ee"},
     {file = "vtk-9.6.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:809065272b207439f13ef0f62767f9041b4c6d61dd4dc2f60a1a62201843dc4b"},
@@ -4870,9 +4958,10 @@ synthesis = ["httpx", "openai", "pillow"]
 synthesis-mflux = ["httpx", "mflux", "openai", "pillow"]
 viz = ["pyvis"]
 viz3d = ["numpy"]
+viz3d-qt = ["PyQt5", "numpy", "pyvista", "quiltwright"]
 viz3d-render = ["numpy", "pyvista"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "009e7f3003d219204e0fe038b2db9d9cbb269099bd4233419156060cddca5d61"
+content-hash = "ed0e9fc5cc20184db7ecc67599a812862d996076b0784ea222f5e3b05a3a9232"
