@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.14.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21284866.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -38,6 +38,7 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 - **`kg_utils.synthesis`** — Unified text + image synthesis: oMLX, Ollama, and OpenAI text backends; mflux-local, mflux-serve, and DALL-E image backends; all env-var configurable
 - **`kg_utils.viz`** — Shared interactive-HTML graph rendering (`viz` extra): `build_graph_html()`, `select_nodes()`, `GraphTheme`, `TooltipSpec` — one renderer for code, document, and metabolic graphs, with domain differences supplied as data
 - **`kg_utils.viz3d`** — Shared 3-D graph layout (`viz3d` extra): `Layout3D`, `AlliumLayout`, `FunnelLayout`, `LayoutNode`, `LayoutEdge` — coordinates only, no renderer, so each module keeps its own viewer and shares the spatial reasoning. `kg_utils.viz3d.organic` adds space-colonization tree skeletons (`grow_tree`, `tree_mesh`) for corpora that should read as wood rather than as a scatter plot
+- **`kg_utils.viz3d.qt`** — Qt render lifecycle for light-field output (`viz3d-qt` extra): `PovRenderSession` and `PovRenderWorker` keep POV-Ray off the GUI thread and clean up safely on window close, `ImagePopup` previews the result, and `cast_scene_to_looking_glass` runs the build → render → write → cast path to a Looking Glass display
 - **`kg_utils.analysis`** — Read persisted centrality back out of SQLite: `load_scores()`, `available_metrics()`, `ScoreSet` (raw score, dense rank, percentile, range scaling); stdlib only
 
 ---
@@ -98,6 +99,15 @@ The layouts above return coordinates and draw nothing. To build meshes from them
 
 ```bash
 pip install 'kgmodule-utils[viz3d-render]'
+```
+
+### With the Qt render lifecycle (PyQt5 + quiltwright)
+
+To ray-trace and cast to a Looking Glass display from a Qt viewer — the
+`kg_utils.viz3d.qt` worker thread, session lifecycle, and cast path:
+
+```bash
+pip install 'kgmodule-utils[viz3d-qt]'
 ```
 
 ### In a Poetry project
@@ -325,6 +335,25 @@ layout = FunnelLayout(
 positions = layout.compute(nodes, edges)   # {node_id: np.array([x, y, z])}
 ```
 
+#### Qt render lifecycle — `kg_utils.viz3d.qt`
+
+> Requires the `viz3d-qt` extra. Not re-exported from `kg_utils.viz3d`:
+> these classes subclass `QThread`/`QDialog`/`QObject`, so importing them
+> requires PyQt5 at class-definition time, and importing a layout must not.
+
+The machinery a Qt viewer needs to ray-trace a scene and cast it to a
+Looking Glass display, factored out of `pycode_kg` and `gutenberg_kg`.
+Which node becomes a trunk stays per-repo; the session takes its progress
+bar and status callback as constructor arguments and makes no assumptions
+about the host window.
+
+| Class / function | Description |
+|---|---|
+| `PovRenderSession` | Owns the render lifecycle: temp views directory, file-count progress, cleanup, and a `shutdown()` that detaches from a live worker so closing the window mid-render cannot abort the process |
+| `PovRenderWorker` | `QThread` that runs POV-Ray off the GUI thread |
+| `ImagePopup` | Dialog that previews the rendered image |
+| `cast_scene_to_looking_glass()` | Build the PyVista scene, render, write the quilt, and cast it to the display |
+
 ### `kg_utils.analysis`
 
 | Class / function | Description |
@@ -341,7 +370,9 @@ positions = layout.compute(nodes, edges)   # {node_id: np.array([x, y, z])}
 KG_utils/
 ├── pyproject.toml
 ├── docs/
-│   └── synthesis.md          # Synthesis sub-package reference
+│   ├── synthesis.md          # Synthesis sub-package reference
+│   ├── encode-batch-memory-postmortem.md
+│   └── viz-bootstrap-selfcontainment.md
 ├── src/
 │   └── kg_utils/
 │       ├── __init__.py
@@ -379,20 +410,14 @@ KG_utils/
 │       │   └── tooltip.py    # TooltipSpec, TooltipRow
 │       ├── viz3d/            # Shared 3-D graph layout (viz3d extra)
 │       │   ├── __init__.py   # Layout3D, AlliumLayout, FunnelLayout, LayoutNode, LayoutEdge
-│       │   └── layout.py     # Layout engine + Fibonacci point distributions
+│       │   ├── layout.py     # Layout engine + Fibonacci point distributions
+│       │   ├── organic.py    # Space-colonization trees + POV-Ray export (viz3d-render extra for meshes)
+│       │   └── qt.py         # Qt render lifecycle: worker thread, session, cast path (viz3d-qt extra)
 │       └── analysis/
 │           ├── __init__.py   # load_scores, available_metrics, ScoreSet
 │           └── scores.py     # Read persisted centrality out of SQLite
-└── tests/
-    ├── test_store.py               # GraphStore unit tests
-    ├── test_pipeline_utils.py      # Pipeline utility function tests
-    ├── test_pipeline_module.py     # End-to-end integration tests (--integration)
-    ├── test_types.py               # Spec dataclass and KGExtractor tests
-    ├── test_snapshots.py           # Snapshot lifecycle tests
-    ├── test_integration.py         # Cross-module integration tests
-    ├── test_synthesis_config.py    # Config defaults and env-var priority chains (44 tests)
-    ├── test_synthesis_text.py      # TextSynthesizer with mocked openai client (38 tests)
-    └── test_synthesis_image.py     # ImageSynthesizer with mocked backends (34 tests)
+└── tests/                    # One test module per source module; conftest.py
+                              # forces Qt onto the offscreen platform
 ```
 
 ---
@@ -406,30 +431,29 @@ Requires Python 3.12 or 3.13 (`requires-python = ">=3.12,<3.14"`); CI builds on
 git clone https://github.com/Flux-Frontiers/KG_utils.git
 cd KG_utils
 poetry env use python3.12
-poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz"
+poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" \
+  --extras "lancedb" --extras "viz3d-render" --extras "viz3d-qt"
 ```
 
 **The extras are not optional for testing.** The core install is deliberately
 zero-dependency (`dependencies = []`), so `poetry install --with dev` on its own
 installs no runtime packages at all — pytest then aborts during *collection* on
-missing `numpy` and `httpx` and runs nothing. The three extras above are exactly
-what the CI test job installs.
+missing `numpy` and `httpx` and runs nothing. The six extras above are what CI
+installs: the test job omits `lancedb` (the vector-backend tests no longer need
+it), but the type-check job requires it so ty can resolve the legacy backend's
+imports — and pre-commit runs ty, so install it locally.
 
-Run the fast test suite (no model downloads) — **520 passed, 5 skipped**:
+Run the fast test suite (no model downloads) — **618 passed, 1 skipped** (the
+skip is a test that only runs when PyVista is *absent*):
 
 ```bash
 poetry run pytest -m "not integration"
 ```
 
-The 5 skips are optional backends. Add two more extras to cover the LanceDB
-backend and the PyVista renderers as well — **554 passed, 2 skipped** (the
-remainder are the `doc_kg` sibling package, and one test that only runs when
-PyVista is *absent*):
-
-```bash
-poetry install --with dev --extras "semantic" --extras "synthesis" \
-  --extras "viz" --extras "lancedb" --extras "viz3d-render"
-```
+The Qt suite runs on the offscreen platform automatically (`tests/conftest.py`
+sets `QT_QPA_PLATFORM=offscreen`), so no windows appear during a test run. To
+see real widgets while debugging one, override it:
+`QT_QPA_PLATFORM=cocoa poetry run pytest tests/test_viz3d_qt.py`.
 
 Run everything, including the `integration` marker — these download embedding
 models on first use and are excluded from CI:
@@ -455,7 +479,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.14.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.15.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -463,7 +487,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.14.0},
+  version   = {0.15.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

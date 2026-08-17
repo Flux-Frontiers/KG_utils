@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-16
+
 ### Added
 
 - **`kg_utils.viz3d.qt` — the Qt machinery a viewer needs to ray-trace and
@@ -33,6 +35,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   importing PyVista inside its functions, Qt cannot be deferred that way:
   these classes subclass `QThread`/`QDialog`/`QObject`, so the base class must
   exist when the class body runs. `TestExtraBoundaries` pins the boundary.
+
+- **Tag pushes publish to PyPI.** The Release workflow now hands the built
+  wheel and sdist to a `publish` job that uploads them through PyPI trusted
+  publishing (OIDC) — the same files the GitHub Release carries, no API token
+  in the repository secrets. Releases no longer end with a manual upload.
+
+### Changed
+
+- CI covers the new extra: the type-check job installs `viz3d-qt` so ty can
+  resolve the PyQt5 and quiltwright imports, and the test job runs the Qt
+  suite headless. `tests/conftest.py` sets `QT_QPA_PLATFORM=offscreen` for
+  every run, local ones included, so widget windows no longer flash up during
+  a test pass; override the variable to see real widgets while debugging.
+
+- `quiltwright` floor raised to `>=0.6.0` for the Qt cast path.
 
 ## [0.14.0] - 2026-08-16
 

@@ -53,4 +53,4 @@ The core install is stdlib-only; everything heavier is opt-in.
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"
