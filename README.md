@@ -352,7 +352,9 @@ about the host window.
 | `PovRenderSession` | Owns the render lifecycle: temp views directory, file-count progress, cleanup, and a `shutdown()` that detaches from a live worker so closing the window mid-render cannot abort the process |
 | `PovRenderWorker` | `QThread` that runs POV-Ray off the GUI thread |
 | `ImagePopup` | Dialog that previews the rendered image |
-| `cast_scene_to_looking_glass()` | Build the PyVista scene, render, write the quilt, and cast it to the display |
+| `cast_scene_to_looking_glass()` | Build the PyVista scene, render, write the quilt, and cast it to the display; returns a `CastResult` |
+| `CastResult` | Outcome of one cast: `path`, `error`, `elapsed`, and the `message` a status bar shows |
+| `DEFAULT_QUILT_PRESET` / `DEFAULT_CAST_SCALE` | The preset and scale a cast uses when no `spec` is given (`"16-landscape"` at half size) |
 
 ### `kg_utils.analysis`
 

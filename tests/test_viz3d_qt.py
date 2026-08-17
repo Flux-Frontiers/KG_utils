@@ -221,11 +221,46 @@ class TestCastSceneToLookingGlass:
         def explode(_plotter):
             raise RuntimeError("scene build failed")
 
-        path, error = cast_scene_to_looking_glass(
-            explode, None, "unused", _tiny_spec(), progress=None
+        result = cast_scene_to_looking_glass(explode, None, "unused", _tiny_spec(), progress=None)
+        assert result.path is None
+        assert result.error is not None and "scene build failed" in result.error
+
+    def test_a_failure_carries_a_status_line(self, qapp):
+        """The caller shows ``message``; branching on the tuple is this module's job."""
+        _needs_cast_support()
+
+        def explode(_plotter):
+            raise RuntimeError("scene build failed")
+
+        result = cast_scene_to_looking_glass(explode, None, "unused", _tiny_spec())
+        assert "Bridge" in result.message and "scene build failed" in result.message
+        assert result.elapsed >= 0.0
+
+    def test_a_builder_may_return_a_value(self, qapp):
+        """Both consumers' scene builders return a plotter; wrapping them is noise."""
+        _needs_cast_support()
+        built: list[object] = []
+
+        def build(plotter):
+            built.append(plotter)
+            raise RuntimeError("stop before rendering")
+
+        cast_scene_to_looking_glass(build, None, "unused", _tiny_spec())
+        assert built
+
+    def test_spec_defaults_to_the_shared_preset(self, qapp):
+        """Omitting the spec must not raise; it resolves the default preset."""
+        _needs_cast_support()
+        seen: list[tuple[int, int, str]] = []
+
+        def explode(_plotter):
+            raise RuntimeError("stop here")
+
+        result = cast_scene_to_looking_glass(
+            explode, None, "unused", progress=lambda *a: seen.append(a)
         )
-        assert path is None
-        assert error is not None and "scene build failed" in error
+        assert result.path is None
+        assert seen and seen[0][0] == 1
 
     def test_progress_is_reported_before_each_stage(self, qapp):
         _needs_cast_support()

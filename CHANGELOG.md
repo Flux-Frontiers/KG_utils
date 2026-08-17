@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`cast_scene_to_looking_glass` now owns the whole button press.** It returns
+  a `CastResult` — `path`, `error`, `elapsed`, and the `message` to put on a
+  status bar — instead of a `(path, error)` tuple the caller had to branch on,
+  takes `build_scene` as `Callable[[Any], object]` so a builder that returns
+  its plotter needs no wrapper, and defaults `spec` to `DEFAULT_QUILT_PRESET`
+  scaled by `DEFAULT_CAST_SCALE`.
+
+  **Breaking for callers of the tuple form**, which is both consumers. The
+  function was extracted with one caller; the second showed the seam was drawn
+  in the middle of the cast: `pycode_kg` and `gutenberg_kg` each still carried
+  the same three-way `(path, error)` branch in the same words, the same
+  `QUILT_SPEC = "16-landscape"` and `CAST_SCALE = 0.5`, and a named `-> None`
+  wrapper whose only job was to discard a scene builder's return value —
+  because `ty` rejects a lambda there. A signature every caller must wrap is
+  drawn wrong.
+
+  Neither constant is a claim about a corpus: `CAST_SCALE` is a fact about
+  Bridge's PNG decode time, `QUILT_PRESET` is which panel is plugged in. They
+  are exported as overridable defaults rather than something each viewer
+  redeclares.
+
 ## [0.15.0] - 2026-08-16
 
 ### Added

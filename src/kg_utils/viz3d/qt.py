@@ -39,6 +39,7 @@ import shutil
 import tempfile
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -47,11 +48,25 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QDialog, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
 
 __all__ = [
+    "DEFAULT_CAST_SCALE",
+    "DEFAULT_QUILT_PRESET",
+    "CastResult",
     "ImagePopup",
     "PovRenderSession",
     "PovRenderWorker",
     "cast_scene_to_looking_glass",
 ]
+
+#: Quilt preset cast to by default.  Which panel is physically plugged in is
+#: deployment config, not a claim about anyone's data — hence a default with an
+#: override rather than a constant each consumer redeclares.
+DEFAULT_QUILT_PRESET: str = "16-landscape"
+
+#: Fraction of the preset's pixel size the default cast renders at.  The local
+#: render costs about a second at full size; the wait is Bridge loading the
+#: resulting PNG, and its decode time scales with the image's area.  Half-size
+#: is roughly a quarter of the pixels for a difference the panel does not show.
+DEFAULT_CAST_SCALE: float = 0.5
 
 #: Workers that outlived their window.  A ``QThread`` destroyed while running
 #: takes the process with it, so a session that cannot stop one in time parks
@@ -408,14 +423,36 @@ class ImagePopup(QDialog):
         layout.addWidget(close_btn)
 
 
+@dataclass(frozen=True)
+class CastResult:
+    """What came of one cast, including the line to put on a status bar.
+
+    A cast has three outcomes, not two: it can fail before anything is written,
+    write a quilt that Bridge then refuses to display, or succeed.  Both viewers
+    branched on ``(path, error)`` to say the same three things in the same
+    words, so the wording lives here and :attr:`message` is what a caller shows.
+
+    :param path: The quilt written, or ``None`` if the render itself failed.
+    :param error: Why it failed; ``None`` on a clean cast.  Set alongside a
+        *path* when the file was written but the display did not happen.
+    :param elapsed: Wall-clock seconds the whole cast took.
+    :param message: Human-readable summary of the three cases above.
+    """
+
+    path: Path | None
+    error: str | None
+    elapsed: float
+    message: str
+
+
 def cast_scene_to_looking_glass(
-    build_scene: Callable[[Any], None],
+    build_scene: Callable[[Any], object],
     camera_position: Any,
     out_stem: str | Path,
-    spec: Any,
+    spec: Any | None = None,
     *,
     progress: Callable[[int, int, str], None] | None = None,
-) -> tuple[Path | None, str | None]:
+) -> CastResult:
     """Render a scene off-screen as a quilt and push it to the Looking Glass.
 
     The PyVista path, as distinct from the ray-traced one: composes into a
@@ -424,23 +461,33 @@ def cast_scene_to_looking_glass(
     the GUI thread, which is why this is a function and not a
     :class:`PovRenderSession`.
 
+    What is left to the caller is what is genuinely its own — which nodes to
+    draw, where the file lands, which button to grey out while it happens.
+
     :param build_scene: Called with the off-screen ``pv.Plotter`` to compose
-        into.  Which nodes become what is the consumer's business.
+        into.  Which nodes become what is the consumer's business.  Its return
+        value is ignored, so a builder that returns its plotter can be passed
+        directly rather than wrapped.
     :param camera_position: ``camera_position`` copied from the live viewport.
     :param out_stem: Output path stem; the quilt suffix is appended.
-    :param spec: Quilt spec to render at — see :func:`scaled_spec`.
+    :param spec: Quilt spec to render at.  Defaults to
+        :data:`DEFAULT_QUILT_PRESET` scaled by :data:`DEFAULT_CAST_SCALE`.
     :param progress: Called as ``(step, total, message)`` before each stage,
         for a status bar.  A Qt caller should pump its event loop here.
-    :return: ``(written path, error message or None)``.  The path is ``None``
-        only if the render itself failed, in which case nothing was written.
+    :return: A :class:`CastResult`; nothing here raises, because a dark panel
+        must not take the viewer with it.
     """
     import pyvista as pv
-    from quiltwright import render_quilt, save_and_cast_quilt
+    from quiltwright import QUILT_PRESETS, render_quilt, save_and_cast_quilt
+
+    if spec is None:
+        spec = QUILT_PRESETS[DEFAULT_QUILT_PRESET].scaled(DEFAULT_CAST_SCALE)
 
     def _step(n: int, message: str) -> None:
         if progress:
             progress(n, 4, message)
 
+    started = time.perf_counter()
     offscreen = pv.Plotter(off_screen=True)
     try:
         _step(1, "building scene...")
@@ -452,8 +499,18 @@ def cast_scene_to_looking_glass(
 
         _step(3, f"writing {spec.quilt_width}x{spec.quilt_height} quilt...")
         _step(4, "handing to Bridge...")
-        return save_and_cast_quilt(quilt, out_stem, spec)
+        path, error = save_and_cast_quilt(quilt, out_stem, spec)
     except Exception as exc:  # noqa: BLE001 - a dark panel must not kill the viewer
-        return None, str(exc)
+        path, error = None, str(exc)
     finally:
         offscreen.close()
+
+    elapsed = time.perf_counter() - started
+    if path is None:
+        message = f"Cast failed (is Bridge running?): {error}"
+    elif error:
+        # The quilt is on disk; only the display is missing.
+        message = f"Wrote {path.name}, casting failed: {error}"
+    else:
+        message = f"Cast {path.name} in {elapsed:.1f}s"
+    return CastResult(path=path, error=error, elapsed=elapsed, message=message)

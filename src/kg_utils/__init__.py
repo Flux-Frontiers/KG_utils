@@ -29,8 +29,9 @@ Sub-packages / modules:
                           'viz3d'; smooth_paths, tree_mesh and leaf_glyphs build
                           PyVista meshes and need 'viz3d-render'.
     kg_utils.viz3d.qt   — PovRenderSession, PovRenderWorker, ImagePopup,
-                          cast_scene_to_looking_glass: the Qt machinery a viewer needs
-                          to ray-trace and cast without freezing (needs 'viz3d-qt').
+                          cast_scene_to_looking_glass, CastResult: the Qt machinery a
+                          viewer needs to ray-trace and cast without freezing (needs
+                          'viz3d-qt').
                           Deliberately not re-exported from kg_utils.viz3d — importing
                           a layout must not require PyQt.
 
