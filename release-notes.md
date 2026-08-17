@@ -1,50 +1,63 @@
-# Release Notes — v0.15.0
+# Release Notes — v0.16.0
 
 > Released: 2026-08-16
 
-This release adds `kg_utils.viz3d.qt`, a shared Qt render lifecycle for
-light-field output, behind a new `viz3d-qt` extra. It also completes the
-release pipeline: pushing a tag now publishes the package to PyPI.
+One function changes shape. `cast_scene_to_looking_glass` was extracted from
+`gutenberg_kg` in 0.15.0 with exactly one caller; `pycode_kg` became the second
+within hours, and the second consumer showed the seam had been drawn through
+the middle of the cast rather than around it. The function now owns the whole
+button press and returns a `CastResult` instead of a tuple the caller has to
+interpret. This is breaking for anyone calling the tuple form — which is both
+viewers — and the fix in each is a deletion.
 
 ## What changed
 
-**Qt render lifecycle.** A viewer that casts a knowledge graph to a Looking
-Glass display needs a worker thread to keep POV-Ray off the GUI loop, a
-progress bar fed by counting rendered views, a temporary directory, a preview
-window, and the build → render → write → cast sequence. `pycode_kg` and
-`gutenberg_kg` each carried a near-identical copy of that machinery.
-`kg_utils.viz3d.qt` replaces both copies with one module: `PovRenderWorker`,
-`PovRenderSession`, `ImagePopup`, and `cast_scene_to_looking_glass`. Domain
-decisions — which node becomes a trunk, what the window looks like — stay in
-each repo; the session takes its progress bar and status callback as
-constructor arguments.
+**A signature every caller had to wrap.** `build_scene` was annotated
+`Callable[[Any], None]`, but neither consumer's scene builder returns `None` —
+both return a `(plotter, label, meta)` triple. Neither could pass its builder
+directly, `ty` rejects a lambda in that position, and so both repos declared a
+named wrapper function whose entire job was to discard a return value. The
+parameter is now `Callable[[Any], object]`, the idiomatic way to say the result
+is ignored, and both wrappers can go.
 
-The shared version also fixes a crash both copies had: closing the window
-during a render left a running `QThread` for Qt to destroy, which aborts the
-process. `PovRenderSession.shutdown()` disconnects the worker's signals before
-waiting, and parks a worker that does not stop in time instead of dropping it.
+**The bookends had stayed duplicated.** After the 0.15.0 migration, each
+viewer's `cast_to_looking_glass` still contained the same three-way branch on
+`(path, error)`, phrased identically down to the parenthetical asking whether
+Bridge is running, wrapped in the same `perf_counter` timing. That wording now
+lives in the SDK: `CastResult` carries `path`, `error`, `elapsed`, and a
+`message` a status bar can display unread. The consumer keeps only what is
+genuinely its own — which nodes to draw, where the file lands, which button to
+grey out.
 
-The module is not re-exported from `kg_utils.viz3d`, because its classes
-subclass `QThread`, `QDialog`, and `QObject` — importing them requires PyQt5,
-and importing a layout must not. Install the extra to use it:
-`pip install 'kgmodule-utils[viz3d-qt]'`.
-
-**Automated PyPI publishing.** The Release workflow now uploads the wheel and
-sdist to PyPI through trusted publishing (OIDC) after it creates the GitHub
-Release, using the same built files for both. No API token lives in the
-repository secrets, and releases no longer end with a manual upload.
-
-**Headless Qt tests.** The test suite forces Qt onto the offscreen platform,
-in CI and locally, so the Qt lifecycle tests run without a display and without
-flashing windows during a local run. Set `QT_QPA_PLATFORM` yourself to
-override this while debugging a widget.
+**Two constants that were never domain claims.** Both repos declared
+`QUILT_SPEC = "16-landscape"` and `CAST_SCALE = 0.5` with the same justifying
+comment. Neither says anything about a corpus: the scale is a fact about how
+Looking Glass Bridge's decode time grows with PNG area, and the preset is which
+panel happens to be plugged in. They ship as `DEFAULT_QUILT_PRESET` and
+`DEFAULT_CAST_SCALE`, and `spec` is now optional — omit it and the default
+preset is resolved and scaled for you.
 
 ## Upgrading
 
-No action required. Existing APIs are unchanged; the `viz3d-qt` extra is new
-and opt-in. Downstream viewers that carry their own copy of the render
-machinery (`pycode_kg`, `gutenberg_kg`) can delete it and depend on
-`kg_utils.viz3d.qt` instead.
+Callers of `cast_scene_to_looking_glass` must stop unpacking a tuple:
+
+```python
+result = cast_scene_to_looking_glass(build, camera, out_stem, progress=step)
+if result.path is None:
+    logger.error("Cast failed: %s", result.error)
+self.visualizer.status = result.message
+```
+
+Passing a `spec` explicitly still works and still wins over the default. Scene
+builders that return a value no longer need a wrapper, and the local `elapsed`
+timing around the call can go — `CastResult.elapsed` already has it.
+
+Two things deliberately stayed in the consuming repo, because they are the only
+parts that are actually repo-specific: the `try: from quiltwright import …
+except ImportError` guard, whose message names your package's extra, and the
+"nothing to cast" check, whose attribute differs per viewer.
+
+Nothing else in the SDK changed, and no rebuild of any index is required.
 
 ---
 
