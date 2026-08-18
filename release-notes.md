@@ -1,63 +1,62 @@
-# Release Notes — v0.16.0
+# Release Notes — v0.17.0
 
-> Released: 2026-08-16
+> Released: 2026-08-18
 
-One function changes shape. `cast_scene_to_looking_glass` was extracted from
-`gutenberg_kg` in 0.15.0 with exactly one caller; `pycode_kg` became the second
-within hours, and the second consumer showed the seam had been drawn through
-the middle of the cast rather than around it. The function now owns the whole
-button press and returns a `CastResult` instead of a tuple the caller has to
-interpret. This is breaking for anyone calling the tuple form — which is both
-viewers — and the fix in each is a deletion.
+This release adds the acquisition stage the SDK was missing. Until now a
+corpus had to already exist as Markdown or plain text on disk before any
+builder could touch it. `kg_utils.ingest`, behind a new `ingest` extra, walks
+arbitrary sources — PDF, Word, PowerPoint, Excel, OpenDocument, RTF, EPUB,
+CSV — converts what it can to Markdown, and materializes a staging corpus the
+existing builders consume unchanged. No builder code changed; every `KGModule`
+gained multi-format ingestion for free. The command-line surface lives one
+level up, as `kgrag ingest` in KGRAG; this package supplies the library.
 
 ## What changed
 
-**A signature every caller had to wrap.** `build_scene` was annotated
-`Callable[[Any], None]`, but neither consumer's scene builder returns `None` —
-both return a `(plotter, label, meta)` triple. Neither could pass its builder
-directly, `ty` rejects a lambda in that position, and so both repos declared a
-named wrapper function whose entire job was to discard a return value. The
-parameter is now `Callable[[Any], object]`, the idiomatic way to say the result
-is ignored, and both wrappers can go.
+**Conversion is anydoc.** The converter is `anydoc` (PyPI `firecrawl-anydoc`),
+a Rust library with Python bindings that emits consistent GitHub-Flavored
+Markdown; a real 40-page text PDF converts in about 20 ms. Markdown, plain
+text and reStructuredText take a passthrough path that needs no dependency at
+all, which is why the extra is optional rather than folded into the core.
+Passthrough deliberately preserves the source suffix — a `.txt` stays `.txt`
+in the staging corpus, because DocKG parses the two differently and silently
+promoting flat text to Markdown would invent a heading hierarchy the document
+never had.
 
-**The bookends had stayed duplicated.** After the 0.15.0 migration, each
-viewer's `cast_to_looking_glass` still contained the same three-way branch on
-`(path, error)`, phrased identically down to the parenthetical asking whether
-Bridge is running, wrapped in the same `perf_counter` timing. That wording now
-lives in the SDK: `CastResult` carries `path`, `error`, `elapsed`, and a
-`message` a status bar can display unread. The consumer keeps only what is
-genuinely its own — which nodes to draw, where the file lands, which button to
-grey out.
+**A corpus now explains its own gaps.** Every file a run *examines* gets an
+`IngestRecord` — not just the ones that succeed — carrying the source path,
+the SHA-256 of the source bytes, the converter and its version, a timestamp,
+and a status of `ingested`, `skipped` or `failed` with a reason.
+`IngestManifest.problems()` returns exactly the documents the KG does not
+contain and why. This answers a real failure mode: DocKG's PDF path caught its
+parse error and continued, so an unparseable PDF vanished from the corpus with
+no record anywhere. `anydoc` performs no OCR, so scanned PDFs are a routine
+occurrence rather than an edge case, and they now surface as a skip with a
+reason instead of an absence. The manifest is plain JSON at
+`<staging_root>/.ingest/manifest.json`, written atomically so an interrupted
+run cannot leave a half-written ledger.
 
-**Two constants that were never domain claims.** Both repos declared
-`QUILT_SPEC = "16-landscape"` and `CAST_SCALE = 0.5` with the same justifying
-comment. Neither says anything about a corpus: the scale is a fact about how
-Looking Glass Bridge's decode time grows with PNG area, and the preset is which
-panel happens to be plugged in. They ship as `DEFAULT_QUILT_PRESET` and
-`DEFAULT_CAST_SCALE`, and `spec` is now optional — omit it and the default
-preset is resolved and scaled for you.
+**A run rebuilds from nothing by default; `update=True` is the incremental
+path.** The same contract the fleet's builders already settled on —
+`dockg build` / `dockg build --update`, `pycodekg build` / `pycodekg update`.
+Defaulting to a rebuild eliminates the phantom footgun where deleted or
+renamed sources silently persist in the staging corpus, and means a converter
+upgrade needs no special flag. Dedup is keyed on the SHA-256 of source bytes
+rather than the filename, so the same document arriving twice under different
+names is ingested once; two *different* documents that would land on the same
+staged name get a short digest suffix instead of one overwriting the other.
 
-## Upgrading
+## Compatibility
 
-Callers of `cast_scene_to_looking_glass` must stop unpacking a tuple:
+No breaking changes. The new sub-package is additive and its heavy dependency
+is opt-in:
 
-```python
-result = cast_scene_to_looking_glass(build, camera, out_stem, progress=step)
-if result.path is None:
-    logger.error("Cast failed: %s", result.error)
-self.visualizer.status = result.message
+```bash
+pip install 'kgmodule-utils[ingest]'
 ```
 
-Passing a `spec` explicitly still works and still wins over the default. Scene
-builders that return a value no longer need a wrapper, and the local `elapsed`
-timing around the call can go — `CastResult.elapsed` already has it.
-
-Two things deliberately stayed in the consuming repo, because they are the only
-parts that are actually repo-specific: the `try: from quiltwright import …
-except ImportError` guard, whose message names your package's extra, and the
-"nothing to cast" check, whose attribute differs per viewer.
-
-Nothing else in the SDK changed, and no rebuild of any index is required.
+Sources that are already `.md`, `.txt` or `.rst` ingest with no extra
+dependency at all.
 
 ---
 

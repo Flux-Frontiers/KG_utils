@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.16.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.17.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -18,29 +18,45 @@
 
 ## Overview
 
-kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through pluggable vector indexing (sqlite-vec by default, LanceDB optional) and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
+kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through pluggable vector indexing (sqlite-vec; a deprecated LanceDB backend remains only for un-migrated stores) and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
 
-Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [DocKG](https://github.com/Flux-Frontiers/doc_kg), and others — subclasses `KGModule` from here and implements exactly three methods: `make_extractor()`, `kind()`, and `analyze()`.
+Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [TypeScriptKG](https://github.com/Flux-Frontiers/tscode_kg), and [FTreeKG](https://github.com/Flux-Frontiers/ftree_kg) subclass `KGModule` from here and implement exactly three methods: `make_extractor()`, `kind()`, and `analyze()`. The rest — [DocKG](https://github.com/Flux-Frontiers/doc_kg), MemoryKG, MetaboKG, and others — keep their own pipelines and pull in the shared pieces they need: embedders, vector backends, snapshots, synthesis.
+
+---
+
+## Latest News
+
+- **0.17.0 (2026-08-18)** — New `kg_utils.ingest` sub-package behind an
+  `ingest` extra: `IngestPipeline` turns a folder of mixed-format documents
+  (PDF, Word, PowerPoint, Excel, EPUB, and more) into a staged Markdown corpus
+  any builder can consume. Conversion is anydoc; a 40-page text PDF converts in
+  about 20 ms. Every file examined gets a manifest record — including the
+  skips and failures — so a corpus explains its own gaps. The CLI surface is
+  `kgrag ingest` in kg-rag; this package supplies the library. See
+  [Document ingestion](#document-ingestion).
+- **0.16.0 (2026-08-16)** — `cast_scene_to_looking_glass()` now returns a
+  `CastResult` (`path`, `error`, `elapsed`, status-bar `message`) instead of a
+  `(path, error)` tuple, and defaults its quilt spec sensibly. Breaking for
+  callers of the tuple form.
+- **0.15.0 (2026-08-16)** — New `viz3d-qt` extra: `PovRenderSession` and
+  `PovRenderWorker` keep POV-Ray off the GUI thread and shut down safely on
+  window close. Tag pushes now publish to PyPI through trusted publishing.
+
+Older changes are in the [CHANGELOG](CHANGELOG.md).
 
 ---
 
 ## Features
 
-- **`kg_utils.specs`** — `NodeSpec`, `EdgeSpec`, `BuildStats`, `QueryResult`, `SnippetPack` dataclasses
-- **`kg_utils.extractor`** — `KGExtractor` ABC: `extract()`, `node_kinds()`, `edge_kinds()`, `coverage_metric()`
-- **`kg_utils.store`** — `GraphStore`: SQLite-backed node/edge store with BFS expansion, symbol resolution, caller lookup, and provenance recording
-- **`kg_utils.semantic`** — `SemanticIndex`, `SentenceTransformerEmbedder`, `SeedHit`, model registry, `resolve_model_path()`
-- **`kg_utils.vector_backend`** — `VectorBackend` protocol with `SqliteVecBackend` (default, exact recall) and `LanceDBBackend` (legacy); `make_backend()`, `resolve_backend_name()`
-- **`kg_utils.pipeline`** — `KGModule`: full build → query → pack pipeline base with hybrid semantic + lexical reranking and snippet extraction
-- **`kg_utils.ingest`** — `IngestPipeline`, `IngestManifest`, `AnydocConverter`: heterogeneous documents (PDF, Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV) → a staged Markdown corpus any builder can consume, with per-file provenance (`ingest` extra)
-- **`kg_utils.embedder`** — `get_embedder()`, `wrap_embedder()`, `load_sentence_transformer()` factory functions
-- **`kg_utils.embed`** — `Embedder` protocol, `DEFAULT_MODEL`, `KNOWN_MODELS`, `resolve_model_path()`
-- **`kg_utils.snapshots`** — `Snapshot`, `SnapshotManager`, `SnapshotManifest` for temporal metric tracking
-- **`kg_utils.synthesis`** — Unified text + image synthesis: oMLX, Ollama, and OpenAI text backends; mflux-local, mflux-serve, and DALL-E image backends; all env-var configurable
-- **`kg_utils.viz`** — Shared interactive-HTML graph rendering (`viz` extra): `build_graph_html()`, `select_nodes()`, `GraphTheme`, `TooltipSpec` — one renderer for code, document, and metabolic graphs, with domain differences supplied as data
-- **`kg_utils.viz3d`** — Shared 3-D graph layout (`viz3d` extra): `Layout3D`, `AlliumLayout`, `FunnelLayout`, `LayoutNode`, `LayoutEdge` — coordinates only, no renderer, so each module keeps its own viewer and shares the spatial reasoning. `kg_utils.viz3d.organic` adds space-colonization tree skeletons (`grow_tree`, `tree_mesh`) for corpora that should read as wood rather than as a scatter plot
-- **`kg_utils.viz3d.qt`** — Qt render lifecycle for light-field output (`viz3d-qt` extra): `PovRenderSession` and `PovRenderWorker` keep POV-Ray off the GUI thread and clean up safely on window close, `ImagePopup` previews the result, and `cast_scene_to_looking_glass` runs the build → render → write → cast path to a Looking Glass display
-- **`kg_utils.analysis`** — Read persisted centrality back out of SQLite: `load_scores()`, `available_metrics()`, `ScoreSet` (raw score, dense rank, percentile, range scaling); stdlib only
+The SDK covers the full life of a knowledge graph: core contracts and SQLite
+storage (`specs`, `extractor`, `store`, `pipeline`), semantic indexing over
+pluggable vector backends (`semantic`, `vector_backend`, `embed`, `embedder`),
+document ingestion (`ingest`), temporal snapshots (`snapshots`), text + image
+synthesis (`synthesis`), centrality analysis (`analysis`), and a visualization
+stack that runs from interactive HTML (`viz`) through 3-D layouts and organic
+trees (`viz3d`) to Looking Glass light-field casting (`viz3d.qt`).
+
+The module-by-module feature list lives in [docs/features.md](docs/features.md).
 
 ---
 
@@ -69,10 +85,12 @@ extra dependency at all.
 pip install 'kgmodule-utils[ingest]'
 ```
 
-### With legacy LanceDB support (only for an un-migrated LanceDB store)
+### With deprecated LanceDB support (only for an un-migrated LanceDB store)
 
-As of 0.10.0 `lancedb` is no longer part of `[semantic]`. Install it explicitly
-only if you have a pre-existing, un-migrated LanceDB store on disk.
+**LanceDB is deprecated** — sqlite-vec is the backend for all new stores. As of
+0.10.0 `lancedb` is no longer part of `[semantic]`. Install it explicitly only
+if you have a pre-existing, un-migrated LanceDB store on disk; migrate when you
+can.
 
 ```bash
 pip install 'kgmodule-utils[semantic,lancedb]'
@@ -232,7 +250,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class / function | Description |
 |---|---|
-| `SemanticIndex` | Vector index over a pluggable backend (sqlite-vec default, LanceDB optional): `build()`, `search()` |
+| `SemanticIndex` | Vector index over a pluggable backend (sqlite-vec default; LanceDB deprecated): `build()`, `search()` |
 | `SentenceTransformerEmbedder` | Local embedding via sentence-transformers |
 | `resolve_model_path()` | Resolve model name / alias to local cache path |
 | `suppress_ingestion_logging()` | Silence verbose HF / tqdm output during ingestion |
@@ -382,6 +400,7 @@ about the host window.
 KG_utils/
 ├── pyproject.toml
 ├── docs/
+│   ├── features.md           # Module-by-module feature list
 │   ├── synthesis.md          # Synthesis sub-package reference
 │   ├── encode-batch-memory-postmortem.md
 │   └── viz-bootstrap-selfcontainment.md
@@ -392,7 +411,7 @@ KG_utils/
 │       ├── extractor.py      # KGExtractor ABC
 │       ├── store.py          # GraphStore (SQLite)
 │       ├── semantic.py       # SemanticIndex, SentenceTransformerEmbedder, SeedHit
-│       ├── vector_backend.py # VectorBackend protocol, SqliteVecBackend (default), LanceDBBackend
+│       ├── vector_backend.py # VectorBackend protocol, SqliteVecBackend (default), LanceDBBackend (deprecated)
 │       ├── pipeline.py       # KGModule concrete base class
 │       ├── module.py         # Re-export shim
 │       ├── embed.py          # Embedder protocol, model registry
@@ -455,6 +474,11 @@ print(f"{stats.ingested} staged, {stats.skipped} skipped, {stats.failed} failed"
 
 Then build over the staged corpus as usual — `dockg build --repo corpora/specs`.
 
+This module is the library layer; the command-line surface lives one level up
+in [kg-rag](https://github.com/Flux-Frontiers/KGRAG), whose `kgrag ingest`
+stages a source tree, registers the corpus, and runs `dockg build` over it in
+one step. kgmodule-utils itself ships no CLI.
+
 A run rebuilds the staging corpus from nothing by default — the same contract
 as `dockg build` and `pycodekg build`. The corpus therefore reflects exactly the
 sources given: a document removed upstream does not linger as a phantom, and a
@@ -501,7 +525,7 @@ installs: the test job omits `lancedb` (the vector-backend tests no longer need
 it), but the type-check job requires it so ty can resolve the legacy backend's
 imports — and pre-commit runs ty, so install it locally.
 
-Run the fast test suite (no model downloads) — **618 passed, 1 skipped** (the
+Run the fast test suite (no model downloads) — **650 passed, 1 skipped** (the
 skip is a test that only runs when PyVista is *absent*):
 
 ```bash
@@ -537,7 +561,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.16.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.17.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -545,7 +569,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.16.0},
+  version   = {0.17.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},
