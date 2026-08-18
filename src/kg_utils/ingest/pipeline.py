@@ -9,8 +9,10 @@ Materializing rather than streaming is deliberate.  The staged corpus is
 inspectable, diffable and re-buildable without re-running conversion, and no
 builder internals had to change to gain multi-format ingestion.
 
-The run contract mirrors Agno's ``KnowledgeBase.load()`` — ``recreate`` and
-``skip_existing`` mean here what they mean there, so the paradigm transfers::
+Re-running is the normal case, not the exception, so the run contract is built
+around it: ``wipe`` rebuilds from nothing, ``skip_existing`` converts only what
+is new. Flag naming follows the fleet — ``wipe`` is what ``kgrag init`` and
+``pycodekg build`` already call destroying a store and rebuilding it::
 
     from kg_utils.ingest import IngestPipeline
 
@@ -99,15 +101,13 @@ class IngestPipeline:
     def run(
         self,
         sources: Iterable[str | Path],
-        recreate: bool = False,
+        wipe: bool = False,
         skip_existing: bool = True,
         on_progress: ProgressHook | None = None,
     ) -> IngestStats:
         """Ingest *sources* into the staging corpus.
 
-        Mirrors Agno's ``KnowledgeBase.load()`` contract:
-
-        * ``recreate`` — delete the staging corpus and its manifest first, so
+        * ``wipe`` — delete the staging corpus and its manifest first, so
           the run rebuilds from nothing.
         * ``skip_existing`` — skip source bytes already recorded as ingested.
           Set ``False`` to re-convert everything in place, which is what you
@@ -118,13 +118,13 @@ class IngestPipeline:
 
         :param sources: Files and/or directories to ingest. Directories are
                         walked recursively.
-        :param recreate: Wipe the staging corpus before ingesting.
+        :param wipe: Delete the staging corpus before ingesting.
         :param skip_existing: Skip sources whose digest was already ingested.
         :param on_progress: Called with ``(source_path, record)`` after each
                             file is processed — for progress bars and logging.
         :return: Totals and per-file records for this run.
         """
-        if recreate and self.staging_root.exists():
+        if wipe and self.staging_root.exists():
             shutil.rmtree(self.staging_root)
         self.staging_root.mkdir(parents=True, exist_ok=True)
 
@@ -353,7 +353,7 @@ class IngestPipeline:
 def ingest(
     sources: Iterable[str | Path],
     staging_root: str | Path,
-    recreate: bool = False,
+    wipe: bool = False,
     skip_existing: bool = True,
     converters: Sequence[Converter] | None = None,
     on_progress: ProgressHook | None = None,
@@ -362,7 +362,7 @@ def ingest(
 
     :param sources: Files and/or directories to ingest.
     :param staging_root: Directory to write the normalized corpus into.
-    :param recreate: Wipe the staging corpus before ingesting.
+    :param wipe: Delete the staging corpus before ingesting.
     :param skip_existing: Skip sources whose digest was already ingested.
     :param converters: Converter chain override.
     :param on_progress: Called with ``(source_path, record)`` per file.
@@ -371,7 +371,7 @@ def ingest(
     pipeline = IngestPipeline(staging_root=staging_root, converters=converters)
     return pipeline.run(
         sources,
-        recreate=recreate,
+        wipe=wipe,
         skip_existing=skip_existing,
         on_progress=on_progress,
     )

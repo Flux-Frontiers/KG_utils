@@ -262,13 +262,13 @@ def test_name_collision_does_not_overwrite(tmp_path: Path) -> None:
     assert bodies == {"first report", "second report"}
 
 
-def test_recreate_wipes_staging(corpus: Path, tmp_path: Path) -> None:
+def test_wipe_clears_staging(corpus: Path, tmp_path: Path) -> None:
     staging = tmp_path / "staged"
     pipeline = IngestPipeline(staging_root=staging)
     pipeline.run([corpus])
     (staging / "stale.md").write_text("left over", encoding="utf-8")
 
-    pipeline.run([corpus], recreate=True)
+    pipeline.run([corpus], wipe=True)
 
     assert not (staging / "stale.md").exists()
     assert (staging / "guide.md").exists()

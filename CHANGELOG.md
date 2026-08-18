@@ -49,10 +49,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diffable in review, readable without this library, written atomically so an
   interrupted run cannot leave a half-written ledger.
 
-- **Re-run semantics borrowed from Agno's `KnowledgeBase.load()`.**
-  `IngestPipeline.run()` takes `recreate` and `skip_existing` and means by them
-  what Agno means, so the paradigm transfers. Dedup is keyed on the SHA-256 of
-  source *bytes*, not the filename, so the same document arriving twice under
+- **Re-running is the normal case, so the run contract is built around it.**
+  `IngestPipeline.run()` takes `wipe` and `skip_existing`. `wipe` is named for
+  the fleet, not invented here: it is already what `kgrag init` and `pycodekg
+  build` call destroying a store and rebuilding it, and what
+  `KGModule.build(wipe=True)` means at the Python level.
+
+  Dedup is keyed on the SHA-256 of source *bytes*, not the filename, so the
+  same document arriving twice under
   different names is ingested once; pointing the pipeline at a growing folder
   only converts what is new. `skip_existing=False` re-converts in place, which
   is what you want after a converter upgrade.

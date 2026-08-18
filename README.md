@@ -458,7 +458,7 @@ Then build over the staged corpus as usual — `dockg build --repo corpora/specs
 Re-running is idempotent: sources are deduplicated by the SHA-256 of their
 *bytes*, not their filename, so pointing the pipeline at a growing folder only
 converts what is new. Pass `skip_existing=False` to re-convert in place after a
-converter upgrade, or `recreate=True` to rebuild the staging corpus from
+converter upgrade, or `wipe=True` to rebuild the staging corpus from
 nothing.
 
 Every file examined is accounted for, including the ones that did not make it —
