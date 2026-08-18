@@ -480,6 +480,11 @@ for record in pipeline.manifest().problems():
 The same records live in `<staging_root>/.ingest/manifest.json`, with the
 converter and version that produced each staged file.
 
+For the end-to-end pipeline — converters, staging layout, manifest schema,
+re-run semantics, and the `kgrag ingest` command that drives build and
+registration — see
+[KGRAG's ingestion guide](https://github.com/Flux-Frontiers/KGRAG/blob/main/docs/INGESTION.md).
+
 ## Development
 
 Requires Python 3.12 or 3.13 (`requires-python = ">=3.12,<3.14"`); CI builds on
