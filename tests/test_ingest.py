@@ -76,6 +76,12 @@ def test_anydoc_rejects_unknown_format(tmp_path: Path) -> None:
         AnydocConverter(extensions=frozenset({".bin"})).convert(src)
 
 
+def test_converters_report_a_version_without_converting() -> None:
+    """Readable off the instance, so a failure can record it too."""
+    assert PassthroughConverter().version
+    assert AnydocConverter().version not in ("", None)
+
+
 def test_converter_resolution_prefers_passthrough() -> None:
     """Markdown must never be round-tripped through anydoc."""
     converter = resolve_converter(Path("a.md"), default_converters())
@@ -196,6 +202,20 @@ def test_pipeline_stages_mixed_formats(corpus: Path, tmp_path: Path) -> None:
     assert (staging / "notes.txt").exists()  # suffix preserved
     assert (staging / "data.md").exists()  # csv converted to markdown
     assert (staging / "deep.md").exists()  # nested source flattened into staging
+
+
+def test_failed_records_carry_the_converter_version(tmp_path: Path) -> None:
+    """Which converter rejected a file is only actionable with its version."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "scan.pdf").write_text("not actually a pdf", encoding="utf-8")
+
+    stats = IngestPipeline(staging_root=tmp_path / "staged").run([src])
+
+    (record,) = [r for r in stats.records if r.status == "failed"]
+    assert record.converter == "anydoc"
+    assert record.converter_version == AnydocConverter().version
+    assert record.converter_version  # not blank
 
 
 def test_unsupported_files_are_recorded_with_a_reason(corpus: Path, tmp_path: Path) -> None:

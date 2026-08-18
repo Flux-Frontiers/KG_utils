@@ -100,6 +100,16 @@ class Converter(Protocol):
 
     name: str
 
+    @property
+    def version(self) -> str:
+        """Version of the underlying converting library.
+
+        Readable without performing a conversion, so a *failed* conversion can
+        still record which version rejected the file. Returns ``"unknown"``
+        when the version cannot be determined.
+        """
+        ...
+
     def handles(self, path: Path) -> bool:
         """Return ``True`` if this converter can convert *path*.
 
@@ -118,6 +128,11 @@ class Converter(Protocol):
         ...
 
 
+#: Passthrough performs no transformation, so its "version" only needs to
+#: change if the decoding policy in :meth:`PassthroughConverter.convert` changes.
+_PASSTHROUGH_VERSION = "1"
+
+
 class PassthroughConverter:
     """Decode already-textual sources without transforming them.
 
@@ -130,6 +145,11 @@ class PassthroughConverter:
     def __init__(self, extensions: frozenset[str] | None = None) -> None:
         """:param extensions: Suffixes to accept (default: :data:`PASSTHROUGH_EXTENSIONS`)."""
         self.extensions = extensions if extensions is not None else PASSTHROUGH_EXTENSIONS
+
+    @property
+    def version(self) -> str:
+        """Version of the passthrough decoding policy."""
+        return _PASSTHROUGH_VERSION
 
     def handles(self, path: Path) -> bool:
         """Return ``True`` for suffixes in this converter's extension set."""
@@ -160,14 +180,9 @@ class PassthroughConverter:
         return ConversionResult(
             markdown=text,
             converter=self.name,
-            converter_version=_PASSTHROUGH_VERSION,
+            converter_version=self.version,
             suffix=".md" if suffix == ".markdown" else suffix,
         )
-
-
-#: Passthrough performs no transformation, so its "version" only needs to
-#: change if the decoding policy above changes.
-_PASSTHROUGH_VERSION = "1"
 
 
 class AnydocConverter:
@@ -185,6 +200,18 @@ class AnydocConverter:
         self.extensions = extensions if extensions is not None else ANYDOC_EXTENSIONS
         self._module = None
         self._version = ""
+
+    @property
+    def version(self) -> str:
+        """Installed ``firecrawl-anydoc`` version.
+
+        Read from distribution metadata rather than the imported module, so it
+        resolves without importing ``anydoc`` — and therefore still answers on
+        the failure path, where the conversion never succeeded.
+        """
+        if not self._version:
+            self._version = _installed_version("firecrawl-anydoc")
+        return self._version
 
     def handles(self, path: Path) -> bool:
         """Return ``True`` for suffixes in this converter's extension set."""
@@ -205,7 +232,6 @@ class AnydocConverter:
                     "pip install 'kgmodule-utils[ingest]'"
                 ) from exc
             self._module = anydoc
-            self._version = _installed_version("firecrawl-anydoc")
         return self._module
 
     def convert(self, path: Path) -> ConversionResult:
@@ -237,7 +263,7 @@ class AnydocConverter:
         return ConversionResult(
             markdown=markdown,
             converter=self.name,
-            converter_version=self._version,
+            converter_version=self.version,
             suffix=".md",
             metadata={"source_format": str(detected)} if detected else {},
         )
