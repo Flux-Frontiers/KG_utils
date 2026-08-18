@@ -32,6 +32,7 @@ Every KGModule implementation — [PyCodeKG](https://github.com/Flux-Frontiers/p
 - **`kg_utils.semantic`** — `SemanticIndex`, `SentenceTransformerEmbedder`, `SeedHit`, model registry, `resolve_model_path()`
 - **`kg_utils.vector_backend`** — `VectorBackend` protocol with `SqliteVecBackend` (default, exact recall) and `LanceDBBackend` (legacy); `make_backend()`, `resolve_backend_name()`
 - **`kg_utils.pipeline`** — `KGModule`: full build → query → pack pipeline base with hybrid semantic + lexical reranking and snippet extraction
+- **`kg_utils.ingest`** — `IngestPipeline`, `IngestManifest`, `AnydocConverter`: heterogeneous documents (PDF, Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV) → a staged Markdown corpus any builder can consume, with per-file provenance (`ingest` extra)
 - **`kg_utils.embedder`** — `get_embedder()`, `wrap_embedder()`, `load_sentence_transformer()` factory functions
 - **`kg_utils.embed`** — `Embedder` protocol, `DEFAULT_MODEL`, `KNOWN_MODELS`, `resolve_model_path()`
 - **`kg_utils.snapshots`** — `Snapshot`, `SnapshotManager`, `SnapshotManifest` for temporal metric tracking
@@ -57,6 +58,15 @@ pip install kgmodule-utils
 
 ```bash
 pip install 'kgmodule-utils[semantic]'
+```
+
+### With document ingestion (PDF, Word, PowerPoint, Excel, EPUB, …)
+
+Only needed for non-textual sources — `.md`, `.txt` and `.rst` ingest with no
+extra dependency at all.
+
+```bash
+pip install 'kgmodule-utils[ingest]'
 ```
 
 ### With legacy LanceDB support (only for an un-migrated LanceDB store)
@@ -388,6 +398,11 @@ KG_utils/
 │       ├── embed.py          # Embedder protocol, model registry
 │       ├── embedder.py       # SentenceTransformerEmbedder factory functions
 │       ├── corpus_embedder.py # CorpusEmbedder / EmbeddingCache: multi-worker corpus embedding
+│       ├── ingest/          # Documents → staged Markdown corpus (ingest extra)
+│       │   ├── __init__.py
+│       │   ├── converters.py # Converter protocol, PassthroughConverter, AnydocConverter
+│       │   ├── manifest.py   # IngestRecord, IngestManifest, IngestStats — per-file provenance
+│       │   └── pipeline.py   # IngestPipeline: walk, convert, stage, dedup by content digest
 │       ├── retrieval/        # Serialize + enrich KG hits (hit_to_dict, attach_content_by_sqlite)
 │       │   ├── __init__.py
 │       │   └── hits.py
@@ -423,6 +438,47 @@ KG_utils/
 ```
 
 ---
+
+## Document ingestion
+
+Turn a folder of mixed-format documents into a corpus any KGModule builder can
+consume:
+
+```python
+from kg_utils.ingest import IngestPipeline
+
+pipeline = IngestPipeline(staging_root="corpora/specs")
+stats = pipeline.run(["~/Documents/specs", "handbook.docx"])
+
+print(f"{stats.ingested} staged, {stats.skipped} skipped, {stats.failed} failed")
+```
+
+Then build over the staged corpus as usual — `dockg build --repo corpora/specs`.
+
+A run rebuilds the staging corpus from nothing by default — the same contract
+as `dockg build` and `pycodekg build`. The corpus therefore reflects exactly the
+sources given: a document removed upstream does not linger as a phantom, and a
+converter upgrade is picked up with no special flag.
+
+Pass `update=True` for the incremental path (`dockg build --update`,
+`pycodekg update`), which keeps what is already staged and converts only what is
+new. The trade is that a source deleted upstream keeps its staged copy.
+
+Either way, sources are deduplicated by the SHA-256 of their *bytes* rather than
+their filename, so the same document arriving twice under different names is
+ingested once.
+
+Every file examined is accounted for, including the ones that did not make it —
+`anydoc` performs no OCR, so scanned PDFs are skipped rather than converted, and
+a corpus should say so rather than simply lack them:
+
+```python
+for record in pipeline.manifest().problems():
+    print(f"{record.source_path}: {record.status} — {record.reason}")
+```
+
+The same records live in `<staging_root>/.ingest/manifest.json`, with the
+converter and version that produced each staged file.
 
 ## Development
 

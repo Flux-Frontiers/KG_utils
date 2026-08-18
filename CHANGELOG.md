@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-18
+
+### Added
+
+- **`kg_utils.ingest` — the acquisition stage every KG module was missing,
+  behind a new `ingest` extra.** Until now a corpus had to *already* exist as
+  Markdown or plain text on disk; `IngestPipeline` walks arbitrary sources,
+  converts what it can to Markdown, and materializes a staging corpus that the
+  existing builders consume unchanged. `dockg build`, `memorykg build` and
+  every other `KGModule` gained multi-format ingestion without a line of
+  builder code changing.
+
+  Conversion is `anydoc` (PyPI `firecrawl-anydoc`), a Rust library with Python
+  bindings that emits consistent GitHub-Flavored Markdown for Word,
+  PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV and text-based PDF — a real
+  40-page PDF converts in ~20 ms. Markdown, plain text and reStructuredText
+  take a passthrough path that needs no dependency at all, which is why the
+  extra is optional rather than folded into the core.
+
+  Passthrough deliberately **preserves the source suffix**: a `.txt` stays
+  `.txt` in the staging corpus rather than becoming `.md`, because DocKG parses
+  the two differently and silently promoting flat text to Markdown would invent
+  a heading hierarchy the document never had.
+
+- **An ingest manifest, so a corpus explains its own gaps.** Every file a run
+  *examines* gets an `IngestRecord` — not just the ones that succeed — carrying
+  the source path, the SHA-256 of the source bytes, the converter and its
+  version, a timestamp, and a status of `ingested`, `skipped` or `failed` with
+  a reason. `IngestManifest.problems()` returns exactly the documents the KG
+  does not contain and why.
+
+  This is the counterpart to a real failure mode: DocKG's PDF path caught its
+  parse error and `continue`d, so an unparseable PDF vanished from the corpus
+  with no record anywhere. A corpus that quietly omits three PDFs is
+  indistinguishable from one that was never shown them. `anydoc` performs no
+  OCR, so scanned PDFs are a routine occurrence rather than an edge case, and
+  they now surface as a skip with a reason instead of an absence.
+
+  The manifest is plain JSON at `<staging_root>/.ingest/manifest.json` —
+  diffable in review, readable without this library, written atomically so an
+  interrupted run cannot leave a half-written ledger.
+
+- **A run rebuilds from nothing by default; `update=True` is the incremental
+  path.** The same contract the fleet's builders already settled on —
+  `dockg build` / `dockg build --update`, `pycodekg build` / `pycodekg update` —
+  where the wipe is implicit and the incremental path is the named opt-in.
+
+  Defaulting to a rebuild is what keeps the corpus honest, and for the reason
+  pycode_kg gave when it made the same change: it eliminates the phantom
+  footgun where deleted or renamed sources silently persist. One layer up the
+  effect is identical — under an incremental default, a document removed
+  upstream leaves its staged copy behind forever and keeps being built into the
+  KG. It also means a converter upgrade needs no special flag.
+
+  Dedup is keyed on the SHA-256 of source *bytes* rather than the filename, so
+  the same document arriving twice under different names is ingested once. It
+  needs no flag of its own: a rebuild starts from an empty manifest, so the one
+  check deduplicates within a run and, in update mode, across runs.
+
+  A recorded digest is only a no-op while its staged file still exists — delete
+  a staged document and the next run restores it, under its original name
+  rather than a collision-suffixed one. Two *different* documents that would
+  land on the same staged name get a short digest suffix instead of one
+  overwriting the other, and a staging root nested inside a source tree is
+  never fed its own output.
+
+
 ## [0.16.0] - 2026-08-16
 
 ### Changed

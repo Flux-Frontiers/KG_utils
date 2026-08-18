@@ -6,6 +6,11 @@ Sub-packages / modules:
     kg_utils.store      — GraphStore: SQLite-backed authoritative node/edge store.
     kg_utils.semantic   — Embedder, SentenceTransformerEmbedder, SemanticIndex, SeedHit.
     kg_utils.pipeline   — KGModule: concrete base class with full build/query/pack pipeline.
+    kg_utils.ingest     — IngestPipeline, IngestManifest, AnydocConverter: convert
+                          PDF/Word/PowerPoint/Excel/OpenDocument/RTF/EPUB/CSV
+                          sources into a staged Markdown corpus any builder can
+                          consume, with per-file provenance (needs the 'ingest'
+                          extra; .md/.txt/.rst need nothing).
     kg_utils.snapshots  — Snapshot, SnapshotManager, SnapshotManifest, etc.
     kg_utils.embed      — Embedder protocol, DEFAULT_MODEL, KNOWN_MODELS,
                           kg_model_cache_dir(), resolve_model_path().
@@ -39,6 +44,7 @@ Optional extras
 ---------------
 The core install is stdlib-only; everything heavier is opt-in.
 
+    pip install 'kgmodule-utils[ingest]'           # anydoc — document → Markdown
     pip install 'kgmodule-utils[semantic]'         # sentence-transformers + torch
                                                    #   + sqlite-vec (the default backend)
     pip install 'kgmodule-utils[sqlite-vec]'       # sqlite-vec alone
@@ -54,4 +60,4 @@ The core install is stdlib-only; everything heavier is opt-in.
     pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
-__version__ = "0.16.0"
+__version__ = "0.17.0"
