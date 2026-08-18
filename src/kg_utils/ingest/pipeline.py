@@ -231,12 +231,15 @@ class IngestPipeline:
         try:
             result = converter.convert(source)
         except ConversionError as exc:
+            # Record the version too: "which converter rejected this" is only
+            # actionable if you know which version of it did the rejecting.
             return IngestRecord(
                 source_path=str(source),
                 sha256=digest,
                 size_bytes=size,
                 status="failed",
                 converter=converter.name,
+                converter_version=converter.version,
                 reason=str(exc),
                 ingested_at=utc_now(),
             )

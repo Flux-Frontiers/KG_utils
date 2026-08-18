@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Converters report their version off the instance, so failures record it
+  too.** `Converter` gained a `version` property, read from distribution
+  metadata rather than the imported module — `AnydocConverter().version`
+  resolves without importing `anydoc` at all, and answers `"unknown"` rather
+  than raising when the extra is absent.
+
+  The manifest previously named the converter on a failed record but not its
+  version, so "which version rejected this file" was unanswerable from the
+  ledger — a real hole in a structure whose whole job is provenance. Found
+  while documenting the manifest schema. (0.17.0 on PyPI does not contain
+  this fix; it shipped after that release.)
+
 ## [0.17.0] - 2026-08-18
 
 ### Added
