@@ -156,12 +156,3 @@ ignore = [
   "UP042",     # StrEnum changes str(member) output, which callers may rely on
   "B027",      # _post_build_hook is an intentional optional no-op
 ]
-
-[tool.pylint.main]
-source-roots = ["src"]
-init-hook = "import sys; sys.path.insert(0, 'src')"
-
-[tool.pylint."messages control"]
-disable = [
-    "missing-module-docstring",
-]
