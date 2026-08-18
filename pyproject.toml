@@ -125,6 +125,21 @@ pre-commit = "^4.5.1"
 # Only needed to regenerate `.secrets.baseline` by hand after an audited change.
 detect-secrets = "^1.5.0"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+  "integration: tests that require optional heavy deps (sentence-transformers, numpy, etc.)",
+  "synthesis: tests that require the synthesis optional extras (openai, httpx, pillow)",
+]
+filterwarnings = [
+  # VTK 9.6.2 still assigns array.shape in place, deprecated in NumPy 2.5.
+  # No module qualifier: NumPy raises this from C, so the filter's module
+  # field sees a file path, not vtkmodules.util.numpy_support. The message
+  # is specific enough. Drop once a VTK release stops tripping it.
+  "ignore:Setting the shape on a NumPy array has been deprecated:DeprecationWarning",
+]
+
 [tool.ruff]
 line-length    = 100
 target-version = "py312"
