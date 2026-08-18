@@ -455,11 +455,18 @@ print(f"{stats.ingested} staged, {stats.skipped} skipped, {stats.failed} failed"
 
 Then build over the staged corpus as usual — `dockg build --repo corpora/specs`.
 
-Re-running is idempotent: sources are deduplicated by the SHA-256 of their
-*bytes*, not their filename, so pointing the pipeline at a growing folder only
-converts what is new. Pass `skip_existing=False` to re-convert in place after a
-converter upgrade, or `wipe=True` to rebuild the staging corpus from
-nothing.
+A run rebuilds the staging corpus from nothing by default — the same contract
+as `dockg build` and `pycodekg build`. The corpus therefore reflects exactly the
+sources given: a document removed upstream does not linger as a phantom, and a
+converter upgrade is picked up with no special flag.
+
+Pass `update=True` for the incremental path (`dockg build --update`,
+`pycodekg update`), which keeps what is already staged and converts only what is
+new. The trade is that a source deleted upstream keeps its staged copy.
+
+Either way, sources are deduplicated by the SHA-256 of their *bytes* rather than
+their filename, so the same document arriving twice under different names is
+ingested once.
 
 Every file examined is accounted for, including the ones that did not make it —
 `anydoc` performs no OCR, so scanned PDFs are skipped rather than converted, and

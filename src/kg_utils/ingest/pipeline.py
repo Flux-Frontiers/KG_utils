@@ -9,10 +9,14 @@ Materializing rather than streaming is deliberate.  The staged corpus is
 inspectable, diffable and re-buildable without re-running conversion, and no
 builder internals had to change to gain multi-format ingestion.
 
-Re-running is the normal case, not the exception, so the run contract is built
-around it: ``wipe`` rebuilds from nothing, ``skip_existing`` converts only what
-is new. Flag naming follows the fleet — ``wipe`` is what ``kgrag init`` and
-``pycodekg build`` already call destroying a store and rebuilding it::
+A run rebuilds the staging corpus from nothing by default, and ``update=True``
+selects the incremental path — the same contract as ``dockg build`` /
+``dockg build --update`` and ``pycodekg build`` / ``pycodekg update``.
+
+Defaulting to a full rebuild is what keeps the corpus honest. Under an
+incremental default, a source document deleted or renamed upstream leaves its
+staged copy behind forever and it keeps being built into the KG — the
+phantom-node footgun the fleet's builders removed by making the wipe implicit::
 
     from kg_utils.ingest import IngestPipeline
 
@@ -101,30 +105,33 @@ class IngestPipeline:
     def run(
         self,
         sources: Iterable[str | Path],
-        wipe: bool = False,
-        skip_existing: bool = True,
+        update: bool = False,
         on_progress: ProgressHook | None = None,
     ) -> IngestStats:
         """Ingest *sources* into the staging corpus.
 
-        * ``wipe`` — delete the staging corpus and its manifest first, so
-          the run rebuilds from nothing.
-        * ``skip_existing`` — skip source bytes already recorded as ingested.
-          Set ``False`` to re-convert everything in place, which is what you
-          want after upgrading a converter.
+        By default the staging corpus and its manifest are deleted first and
+        every source is re-converted, so the result reflects exactly the
+        sources given — documents removed upstream do not linger. This also
+        means a converter upgrade is picked up with no special flag.
+
+        ``update=True`` selects the incremental path: existing staged documents
+        are kept and sources already recorded as ingested are skipped by
+        content digest, so a growing folder only converts what is new. The
+        trade is that a source deleted upstream keeps its staged copy.
 
         Every file examined produces a manifest record, including the ones that
         could not be converted: a corpus always explains its own gaps.
 
         :param sources: Files and/or directories to ingest. Directories are
                         walked recursively.
-        :param wipe: Delete the staging corpus before ingesting.
-        :param skip_existing: Skip sources whose digest was already ingested.
+        :param update: Incremental update — keep existing staged documents
+                       instead of rebuilding from nothing.
         :param on_progress: Called with ``(source_path, record)`` after each
                             file is processed — for progress bars and logging.
         :return: Totals and per-file records for this run.
         """
-        if wipe and self.staging_root.exists():
+        if not update and self.staging_root.exists():
             shutil.rmtree(self.staging_root)
         self.staging_root.mkdir(parents=True, exist_ok=True)
 
@@ -135,7 +142,7 @@ class IngestPipeline:
         taken = manifest.staged_paths()
 
         for source in self._iter_sources(sources):
-            record = self._ingest_one(source, manifest, taken, skip_existing)
+            record = self._ingest_one(source, manifest, taken)
             manifest.add(record)
             stats.records.append(record)
             if record.status == "ingested":
@@ -167,14 +174,15 @@ class IngestPipeline:
         source: Path,
         manifest: IngestManifest,
         taken: set[str],
-        skip_existing: bool,
     ) -> IngestRecord:
         """Convert and stage a single source file, returning its record.
 
         :param source: Source file to ingest.
-        :param manifest: Manifest consulted for dedup.
+        :param manifest: Manifest consulted for dedup. After a rebuild it holds
+                         only what this run has staged, so the same check
+                         deduplicates within a run and across runs in update
+                         mode, with no separate flag.
         :param taken: Staged paths already claimed in this staging root.
-        :param skip_existing: Whether to skip already-ingested digests.
         :return: The record describing this file's outcome.
         """
         try:
@@ -190,7 +198,7 @@ class IngestPipeline:
                 ingested_at=utc_now(),
             )
 
-        if skip_existing and manifest.has_ingested(digest):
+        if manifest.has_ingested(digest):
             prior = manifest.get(digest)
             staged = prior.staged_path if prior else ""
             # Only a genuine no-op if the staged file is still on disk; if it
@@ -353,8 +361,7 @@ class IngestPipeline:
 def ingest(
     sources: Iterable[str | Path],
     staging_root: str | Path,
-    wipe: bool = False,
-    skip_existing: bool = True,
+    update: bool = False,
     converters: Sequence[Converter] | None = None,
     on_progress: ProgressHook | None = None,
 ) -> IngestStats:
@@ -362,16 +369,11 @@ def ingest(
 
     :param sources: Files and/or directories to ingest.
     :param staging_root: Directory to write the normalized corpus into.
-    :param wipe: Delete the staging corpus before ingesting.
-    :param skip_existing: Skip sources whose digest was already ingested.
+    :param update: Incremental update — keep existing staged documents instead
+                   of rebuilding from nothing.
     :param converters: Converter chain override.
     :param on_progress: Called with ``(source_path, record)`` per file.
     :return: Totals and per-file records for this run.
     """
     pipeline = IngestPipeline(staging_root=staging_root, converters=converters)
-    return pipeline.run(
-        sources,
-        wipe=wipe,
-        skip_existing=skip_existing,
-        on_progress=on_progress,
-    )
+    return pipeline.run(sources, update=update, on_progress=on_progress)

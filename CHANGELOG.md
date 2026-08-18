@@ -49,17 +49,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diffable in review, readable without this library, written atomically so an
   interrupted run cannot leave a half-written ledger.
 
-- **Re-running is the normal case, so the run contract is built around it.**
-  `IngestPipeline.run()` takes `wipe` and `skip_existing`. `wipe` is named for
-  the fleet, not invented here: it is already what `kgrag init` and `pycodekg
-  build` call destroying a store and rebuilding it, and what
-  `KGModule.build(wipe=True)` means at the Python level.
+- **A run rebuilds from nothing by default; `update=True` is the incremental
+  path.** The same contract the fleet's builders already settled on —
+  `dockg build` / `dockg build --update`, `pycodekg build` / `pycodekg update` —
+  where the wipe is implicit and the incremental path is the named opt-in.
 
-  Dedup is keyed on the SHA-256 of source *bytes*, not the filename, so the
-  same document arriving twice under
-  different names is ingested once; pointing the pipeline at a growing folder
-  only converts what is new. `skip_existing=False` re-converts in place, which
-  is what you want after a converter upgrade.
+  Defaulting to a rebuild is what keeps the corpus honest, and for the reason
+  pycode_kg gave when it made the same change: it eliminates the phantom
+  footgun where deleted or renamed sources silently persist. One layer up the
+  effect is identical — under an incremental default, a document removed
+  upstream leaves its staged copy behind forever and keeps being built into the
+  KG. It also means a converter upgrade needs no special flag.
+
+  Dedup is keyed on the SHA-256 of source *bytes* rather than the filename, so
+  the same document arriving twice under different names is ingested once. It
+  needs no flag of its own: a rebuild starts from an empty manifest, so the one
+  check deduplicates within a run and, in update mode, across runs.
 
   A recorded digest is only a no-op while its staged file still exists — delete
   a staged document and the next run restores it, under its original name

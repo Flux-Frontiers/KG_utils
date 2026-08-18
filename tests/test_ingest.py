@@ -210,26 +210,27 @@ def test_unsupported_files_are_recorded_with_a_reason(corpus: Path, tmp_path: Pa
     assert "unsupported format" in problems[0].reason
 
 
-def test_skip_existing_makes_reruns_idempotent(corpus: Path, tmp_path: Path) -> None:
+def test_update_makes_reruns_incremental(corpus: Path, tmp_path: Path) -> None:
     staging = tmp_path / "staged"
     pipeline = IngestPipeline(staging_root=staging)
 
     first = pipeline.run([corpus])
-    second = pipeline.run([corpus])
+    second = pipeline.run([corpus], update=True)
 
     assert first.ingested == 4
     assert second.ingested == 0
     assert second.skipped == 5  # 4 already-ingested + the unsupported jpeg
 
 
-def test_skip_existing_false_reconverts(corpus: Path, tmp_path: Path) -> None:
-    """The path you take after upgrading a converter."""
+def test_default_reconverts_everything(corpus: Path, tmp_path: Path) -> None:
+    """A converter upgrade needs no special flag — the default rebuilds."""
     pipeline = IngestPipeline(staging_root=tmp_path / "staged")
     pipeline.run([corpus])
 
-    again = pipeline.run([corpus], skip_existing=False)
+    again = pipeline.run([corpus])
 
     assert again.ingested == 4
+    assert again.skipped == 1  # only the unsupported jpeg, no dedup skips
 
 
 def test_dedup_is_by_content_not_filename(tmp_path: Path) -> None:
@@ -262,15 +263,39 @@ def test_name_collision_does_not_overwrite(tmp_path: Path) -> None:
     assert bodies == {"first report", "second report"}
 
 
-def test_wipe_clears_staging(corpus: Path, tmp_path: Path) -> None:
+def test_default_rebuild_clears_staging(corpus: Path, tmp_path: Path) -> None:
     staging = tmp_path / "staged"
     pipeline = IngestPipeline(staging_root=staging)
     pipeline.run([corpus])
     (staging / "stale.md").write_text("left over", encoding="utf-8")
 
-    pipeline.run([corpus], wipe=True)
+    pipeline.run([corpus])
 
     assert not (staging / "stale.md").exists()
+    assert (staging / "guide.md").exists()
+
+
+def test_deleted_source_does_not_linger(corpus: Path, tmp_path: Path) -> None:
+    """The phantom-document footgun a rebuild-by-default exists to prevent."""
+    staging = tmp_path / "staged"
+    pipeline = IngestPipeline(staging_root=staging)
+    pipeline.run([corpus])
+    (corpus / "guide.md").unlink()
+
+    pipeline.run([corpus])
+
+    assert not (staging / "guide.md").exists()
+
+
+def test_update_keeps_a_deleted_source_staged(corpus: Path, tmp_path: Path) -> None:
+    """The trade --update accepts: speed, at the cost of orphans."""
+    staging = tmp_path / "staged"
+    pipeline = IngestPipeline(staging_root=staging)
+    pipeline.run([corpus])
+    (corpus / "guide.md").unlink()
+
+    pipeline.run([corpus], update=True)
+
     assert (staging / "guide.md").exists()
 
 
@@ -281,7 +306,7 @@ def test_restaged_when_staged_file_deleted(corpus: Path, tmp_path: Path) -> None
     pipeline.run([corpus])
     (staging / "guide.md").unlink()
 
-    stats = pipeline.run([corpus])
+    stats = pipeline.run([corpus], update=True)
 
     assert stats.ingested == 1
     assert (staging / "guide.md").exists()
@@ -310,7 +335,7 @@ def test_staging_output_is_never_reingested(tmp_path: Path) -> None:
 
     pipeline = IngestPipeline(staging_root=staging)
     pipeline.run([src])
-    second = pipeline.run([src], skip_existing=False)
+    second = pipeline.run([src])
 
     assert second.ingested == 1
 
