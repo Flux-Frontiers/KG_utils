@@ -26,6 +26,15 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.18.0 (2026-08-22)** — New `kg_utils.temporal`: a shared temporal
+  contract so time can become a federation axis instead of a per-module
+  convention. Modules write the same `occurred_start` / `occurred_end` /
+  `recorded_at` metadata keys, and a federated query can filter and order
+  dated nodes across all of them. Precision is preserved — `"1876"` stays a
+  year and overlaps any query touching 1876 — and *occurred* is kept distinct
+  from *recorded*, so a diary entry written tonight about last Tuesday lands on
+  Tuesday. Also fixes `NodeSpec.metadata`, which the store had always dropped
+  on write; existing databases are migrated on open.
 - **0.17.0 (2026-08-18)** — New `kg_utils.ingest` sub-package behind an
   `ingest` extra: `IngestPipeline` turns a folder of mixed-format documents
   (PDF, Word, PowerPoint, Excel, EPUB, and more) into a staged Markdown corpus
@@ -567,7 +576,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.17.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.18.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -575,7 +584,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.17.0},
+  version   = {0.18.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

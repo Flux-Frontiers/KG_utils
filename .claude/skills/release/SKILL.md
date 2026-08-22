@@ -54,22 +54,31 @@ Then `poetry lock`.
 Every release so far has found at least one of these stale. Check all of them
 explicitly; do not assume a previous release left them correct.
 
-**Four version surfaces must agree.** `fleet_audit.py` cross-checks three of
-them, so a mismatch is caught eventually — but after publication, which is too
-late.
+**Six version surfaces must agree — three of them live in README.md.**
+`fleet_audit.py` cross-checks only pyproject / CITATION / the badge, so the
+citation blocks can drift indefinitely without any tool complaining.
+
+The single command that finds them all:
 
 ```bash
-grep '^version' pyproject.toml
-grep '__version__' src/kg_utils/__init__.py
-grep -o 'version-[0-9.]*' README.md | head -1
-grep '^version:' CITATION.cff
+grep -n '^version' pyproject.toml
+grep -n '__version__' src/kg_utils/__init__.py
+grep -n '^version:\|^date-released:' CITATION.cff
+grep -n '[0-9]\+\.[0-9]\+\.[0-9]\+' README.md        # read every hit
 ```
 
 - [ ] `pyproject.toml`
 - [ ] `src/kg_utils/__init__.py`
-- [ ] `README.md` badge
-- [ ] `CITATION.cff` — **also its `date-released:`**, which is a second stale
-      field hiding behind the first
+- [ ] `CITATION.cff` `version:` — **and `date-released:`**, a second stale field
+      hiding behind the first
+- [ ] `README.md` version badge
+- [ ] `README.md` **APA citation** — `(Version X.Y.Z) [Software]`
+- [ ] `README.md` **BibTeX** — `version   = {X.Y.Z},`
+- [ ] `README.md` **Latest News** — needs a new entry for this release
+
+The v0.12.1 release commit already recorded the APA and BibTeX pair as stale,
+and they were stale again at 0.18.0. Assume they are wrong until you have read
+them.
 
 **Prose must describe what actually shipped.** A new public module is not
 released until it is documented:
@@ -83,6 +92,10 @@ positives**, matching "temporal snapshots" and "temporal metric tracking" on the
 unrelated `snapshots` module. Read every hit; do not count them.
 
 ## Step 5 — Write `release-notes.md`
+
+**This file has been stale at three consecutive releases** — 0.12.1, 0.13.1 and
+0.18.0 all had to fix it in the release commit. It is the single most reliable
+failure in this repo's release process. Regenerate it, never edit it.
 
 The workflow feeds this file to `gh release create --notes-file`. If it is
 stale, the GitHub Release describes **the previous release** — which is what
