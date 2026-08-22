@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`kg_utils.temporal` — the shared temporal contract, so time can become a
+  federation axis instead of a per-module convention.** Modules that know
+  *when* something happened now write the same three metadata keys —
+  `occurred_start`, `occurred_end`, `recorded_at` — and a federated query can
+  filter and order dated nodes across all of them without knowing which module
+  produced any given node.
+
+  Three decisions carry the design, each of which a plausible implementation
+  gets wrong:
+
+  - **Occurred is not recorded.** A diary entry written tonight about last
+    Tuesday occurred on Tuesday and was recorded tonight. Conflating them puts
+    it in the wrong place on the timeline, so the contract keeps both. The
+    distinction is inherited from `personal_agent`, which learned it the hard
+    way.
+  - **Precision is preserved, and it determines extent.** `"1876"` stays a
+    year rather than becoming a silent `1876-01-01`; a node dated that way
+    overlaps *any* query touching 1876, while `"1876-03-04"` overlaps only
+    that day. An absent `occurred_end` therefore means "as wide as the
+    precision implies", not "zero duration" — which is what makes an
+    undated-to-the-day publication behave correctly in a window query.
+  - **Malformed dates are ignored, not raised on.** One bad date in one corpus
+    must not abort a federated query across twenty.
+
+  API: `temporal_metadata()` builds the metadata slice for producers (omitting
+  absent keys, so merging never clobbers); `read_span()` returns a
+  `TemporalSpan` for consumers, with `overlaps()` — supporting open-ended
+  windows on either side — and a total-ordering `sort_key`. `spine_id()` and
+  `spine_chain()` mint the deterministic calendar-node IDs a timeline graph
+  hangs events from (`t:2026` → `t:2026-08` → `t:2026-08-17`), truncated at
+  the precision available so a year-dated node is never asserted to belong to
+  a day nobody recorded. Spine IDs sort lexicographically in chronological
+  order.
+
+  Stdlib only — no new dependency, no new extra, no new base class. 38 tests.
+  This is layer 1 of the TimelineKG fusion; layer 2 is `QueryScope.time_range`
+  in kg-rag, which calls `read_span().overlaps()`.
+
 ### Fixed
 
 - **Converters report their version off the instance, so failures record it

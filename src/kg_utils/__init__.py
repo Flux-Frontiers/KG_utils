@@ -11,6 +11,11 @@ Sub-packages / modules:
                           sources into a staged Markdown corpus any builder can
                           consume, with per-file provenance (needs the 'ingest'
                           extra; .md/.txt/.rst need nothing).
+    kg_utils.temporal   — Shared temporal contract: OCCURRED_START/OCCURRED_END/
+                          RECORDED_AT metadata keys, TemporalSpan, temporal_metadata(),
+                          read_span(), spine_id(), spine_chain(). Lets a federated
+                          query filter and order dated nodes across every module
+                          without knowing which one produced them.
     kg_utils.snapshots  — Snapshot, SnapshotManager, SnapshotManifest, etc.
     kg_utils.embed      — Embedder protocol, DEFAULT_MODEL, KNOWN_MODELS,
                           kg_model_cache_dir(), resolve_model_path().
