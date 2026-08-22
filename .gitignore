@@ -207,8 +207,12 @@ marimo/_lsp/
 __marimo__/
 commit.txt
 
-# Claude Code project memory and settings
-.claude/
+# Claude Code. Project assets under .claude/skills/ are shared -- they are
+# repo knowledge, and an untracked skill dies with whatever machine wrote it.
+# Everything else here stays personal: settings.local.json carries per-user
+# permissions, and .claude/ is also where local session state lands.
+.claude/*
+!.claude/skills/
 
 # macOS
 .DS_Store
