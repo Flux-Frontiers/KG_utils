@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.18.0] - 2026-08-22
 
+### Fixed
+
+- **`NodeSpec.metadata` is now persisted. It never was.** The spec has always
+  carried a `metadata` field documented as "domain-specific extension data",
+  and `GraphStore` has always dropped it on write: the `nodes` table had no
+  column for it, so every value any module attached to a node was discarded
+  silently and read back as absent. Edge metadata was persisted (as
+  `evidence`); node metadata was not, and nothing said so.
+
+  Found while wiring the temporal contract, which is exactly the kind of
+  consumer that made it matter — a module could write `occurred_start` onto a
+  node and a federated query would never see it. Anything else that has tried
+  to attach node metadata since the store was written has been losing it too.
+
+  `nodes` gains a `metadata TEXT` column holding the mapping as JSON, and both
+  node reads return it decoded. A blob that fails to parse, or that decodes to
+  something other than an object, reads as `{}` rather than raising: extension
+  data is not worth making a node unreadable over.
+
+  **Existing databases are migrated on open.** `_SCHEMA_SQL` uses
+  `CREATE TABLE IF NOT EXISTS`, which is a no-op against a database an earlier
+  version created — so a column added to that statement alone would never
+  reach a single existing store, and every KG in the fleet is an existing
+  store. `_migrate()` adds the column with `ALTER TABLE` when absent,
+  idempotently, on each connect. Without it a pre-0.18.0 database would raise
+  "no such column: metadata" on its next query, before any rebuild.
+
 ### Added
 
 - **`kg_utils.temporal` — the shared temporal contract, so time can become a

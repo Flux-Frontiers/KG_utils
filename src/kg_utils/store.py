@@ -5,8 +5,13 @@ No embeddings, no LanceDB, no domain-specific parsing.
 
 Schema
 ------
-nodes (id, kind, name, qualname, module_path, lineno, end_lineno, docstring)
+nodes (id, kind, name, qualname, module_path, lineno, end_lineno, docstring, metadata)
 edges (src, rel, dst, evidence)
+
+``metadata`` holds a node's domain extension data as JSON — including the
+:mod:`kg_utils.temporal` contract keys, which is what lets a federated query
+scope by time. It was added after the other columns, so :func:`_migrate`
+brings existing databases forward; see the note there.
 """
 
 from __future__ import annotations
@@ -35,7 +40,8 @@ CREATE TABLE IF NOT EXISTS nodes (
   module_path  TEXT,
   lineno       INTEGER,
   end_lineno   INTEGER,
-  docstring    TEXT
+  docstring    TEXT,
+  metadata     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS edges (
@@ -129,6 +135,7 @@ class GraphStore:
                 check_same_thread=False,
             )
             self._con.executescript(_SCHEMA_SQL)
+            _migrate(self._con)
         return self._con
 
     def close(self) -> None:
@@ -182,14 +189,16 @@ class GraphStore:
                 n.lineno,
                 n.end_lineno,
                 n.docstring,
+                (json.dumps(n.metadata, ensure_ascii=False) if n.metadata else None),
             )
             for n in nodes
         ]
         self.con.executemany(
             """
             INSERT INTO nodes
-              (id, kind, name, qualname, module_path, lineno, end_lineno, docstring)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              (id, kind, name, qualname, module_path, lineno, end_lineno, docstring,
+               metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
               kind=excluded.kind,
               name=excluded.name,
@@ -197,7 +206,8 @@ class GraphStore:
               module_path=excluded.module_path,
               lineno=excluded.lineno,
               end_lineno=excluded.end_lineno,
-              docstring=excluded.docstring
+              docstring=excluded.docstring,
+              metadata=excluded.metadata
             """,
             rows,
         )
@@ -236,7 +246,8 @@ class GraphStore:
         """
         row = self.con.execute(
             """
-            SELECT id, kind, name, qualname, module_path, lineno, end_lineno, docstring
+            SELECT id, kind, name, qualname, module_path, lineno, end_lineno, docstring,
+                   metadata
             FROM nodes WHERE id = ?
             """,
             (node_id,),
@@ -274,7 +285,8 @@ class GraphStore:
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = self.con.execute(
             f"""
-            SELECT id, kind, name, qualname, module_path, lineno, end_lineno, docstring
+            SELECT id, kind, name, qualname, module_path, lineno, end_lineno, docstring,
+                   metadata
             FROM nodes {where}
             ORDER BY module_path, lineno
             """,
@@ -659,6 +671,25 @@ def _parse_call_site_lineno(evidence: str | None) -> int | None:
         return None
 
 
+def _migrate(con: sqlite3.Connection) -> None:
+    """Bring an existing database up to the current schema, additively.
+
+    ``_SCHEMA_SQL`` uses ``CREATE TABLE IF NOT EXISTS``, which is a no-op
+    against a database created by an earlier version — so a column added to
+    that statement never reaches existing stores. Every KG in the fleet is an
+    existing store, and they are rebuilt on their own schedules, so a column
+    has to be added here as well to be readable before the next rebuild.
+
+    Idempotent: each column is added only if absent.
+
+    :param con: Open connection to migrate in place.
+    """
+    have = {row[1] for row in con.execute("PRAGMA table_info(nodes)")}
+    if "metadata" not in have:
+        con.execute("ALTER TABLE nodes ADD COLUMN metadata TEXT")
+        con.commit()
+
+
 def _row_to_node(row: tuple[Any, ...]) -> dict[str, Any]:
     return {
         "id": row[0],
@@ -669,4 +700,24 @@ def _row_to_node(row: tuple[Any, ...]) -> dict[str, Any]:
         "lineno": row[5],
         "end_lineno": row[6],
         "docstring": row[7],
+        "metadata": _load_metadata(row[8]) if len(row) > 8 else {},
     }
+
+
+def _load_metadata(raw: str | None) -> dict[str, Any]:
+    """Decode a stored metadata blob, tolerating anything unreadable.
+
+    A corrupt or hand-edited blob yields an empty dict rather than raising:
+    metadata is extension data, and losing it must not make the node itself
+    unreadable.
+
+    :param raw: The stored JSON text, or ``None``.
+    :return: The decoded mapping, or ``{}``.
+    """
+    if not raw:
+        return {}
+    try:
+        loaded = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -340,3 +341,152 @@ def test_stats_counts(store: GraphStore) -> None:
 
 def test_store_repr(store: GraphStore) -> None:
     assert "GraphStore" in repr(store)
+
+
+# ---------------------------------------------------------------------------
+# Node metadata persistence + additive migration
+# ---------------------------------------------------------------------------
+
+
+class TestNodeMetadata:
+    """NodeSpec.metadata must survive a write/read round trip.
+
+    It did not until 0.18.0: the spec carried the field, the schema had no
+    column for it, and it was dropped silently on write. Any consumer reading
+    node metadata back — the temporal contract most of all — got nothing.
+    """
+
+    def _node(self, node_id="n:1", **kw):
+        return NodeSpec(
+            node_id=node_id,
+            kind="entry",
+            name="n",
+            qualname="n",
+            source_path="p.md",
+            **kw,
+        )
+
+    def test_metadata_round_trips(self, tmp_path):
+        store = GraphStore(tmp_path / "g.sqlite")
+        store.write([self._node(metadata={"occurred_start": "2026-04-15"})], [])
+        node = store.node("n:1")
+        assert node["metadata"] == {"occurred_start": "2026-04-15"}
+        store.close()
+
+    def test_absent_metadata_reads_as_empty_dict(self, tmp_path):
+        store = GraphStore(tmp_path / "g.sqlite")
+        store.write([self._node()], [])
+        assert store.node("n:1")["metadata"] == {}
+        store.close()
+
+    def test_metadata_survives_list_nodes(self, tmp_path):
+        store = GraphStore(tmp_path / "g.sqlite")
+        store.write([self._node(metadata={"k": "v"})], [])
+        nodes = store.query_nodes()
+        assert nodes[0]["metadata"] == {"k": "v"}
+        store.close()
+
+    def test_upsert_updates_metadata(self, tmp_path):
+        store = GraphStore(tmp_path / "g.sqlite")
+        store.write([self._node(metadata={"occurred_start": "2026-04-15"})], [])
+        store.write([self._node(metadata={"occurred_start": "2026-05-01"})], [])
+        assert store.node("n:1")["metadata"]["occurred_start"] == "2026-05-01"
+        store.close()
+
+    def test_non_ascii_metadata_preserved(self, tmp_path):
+        store = GraphStore(tmp_path / "g.sqlite")
+        store.write([self._node(metadata={"title": "Café Ontwerp — 1876"})], [])
+        assert store.node("n:1")["metadata"]["title"] == "Café Ontwerp — 1876"
+        store.close()
+
+    def test_corrupt_metadata_does_not_break_the_node(self, tmp_path):
+        """Extension data is not worth making a node unreadable over."""
+        db = tmp_path / "g.sqlite"
+        store = GraphStore(db)
+        store.write([self._node()], [])
+        store.con.execute("UPDATE nodes SET metadata = ? WHERE id = ?", ("{not json", "n:1"))
+        store.con.commit()
+        node = store.node("n:1")
+        assert node["metadata"] == {}
+        assert node["name"] == "n"
+        store.close()
+
+    def test_non_object_metadata_reads_as_empty(self, tmp_path):
+        db = tmp_path / "g.sqlite"
+        store = GraphStore(db)
+        store.write([self._node()], [])
+        store.con.execute("UPDATE nodes SET metadata = ? WHERE id = ?", ("[1,2,3]", "n:1"))
+        store.con.commit()
+        assert store.node("n:1")["metadata"] == {}
+        store.close()
+
+
+class TestMetadataMigration:
+    """An existing database predating the column must still open and read.
+
+    CREATE TABLE IF NOT EXISTS is a no-op against an old database, so without
+    an explicit ALTER every KG built before 0.18.0 would raise
+    "no such column: metadata" on its next query — before any rebuild.
+    """
+
+    def _legacy_db(self, path):
+        """Build a database with the pre-0.18.0 nodes schema."""
+        con = sqlite3.connect(str(path))
+        con.executescript(
+            """
+            CREATE TABLE nodes (
+              id TEXT PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL,
+              qualname TEXT, module_path TEXT, lineno INTEGER,
+              end_lineno INTEGER, docstring TEXT
+            );
+            CREATE TABLE edges (
+              src TEXT NOT NULL, rel TEXT NOT NULL, dst TEXT NOT NULL,
+              evidence TEXT, PRIMARY KEY (src, rel, dst)
+            );
+            """
+        )
+        con.execute(
+            "INSERT INTO nodes (id, kind, name, qualname, module_path) VALUES (?,?,?,?,?)",
+            ("old:1", "entry", "old", "old", "p.md"),
+        )
+        con.commit()
+        con.close()
+
+    def test_legacy_db_is_migrated_on_open(self, tmp_path):
+        db = tmp_path / "legacy.sqlite"
+        self._legacy_db(db)
+        store = GraphStore(db)
+        node = store.node("old:1")
+        assert node is not None
+        assert node["name"] == "old"
+        assert node["metadata"] == {}
+        store.close()
+
+    def test_legacy_db_accepts_new_writes_after_migration(self, tmp_path):
+        db = tmp_path / "legacy.sqlite"
+        self._legacy_db(db)
+        store = GraphStore(db)
+        store.write(
+            [
+                NodeSpec(
+                    node_id="new:1",
+                    kind="entry",
+                    name="new",
+                    qualname="new",
+                    source_path="p.md",
+                    metadata={"occurred_start": "2026-04-15"},
+                )
+            ],
+            [],
+        )
+        assert store.node("new:1")["metadata"]["occurred_start"] == "2026-04-15"
+        assert store.node("old:1")["metadata"] == {}
+        store.close()
+
+    def test_migration_is_idempotent(self, tmp_path):
+        db = tmp_path / "legacy.sqlite"
+        self._legacy_db(db)
+        for _ in range(3):
+            store = GraphStore(db)
+            assert store.node("old:1") is not None
+            store.close()
