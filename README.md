@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.17.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.18.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -51,7 +51,8 @@ Older changes are in the [CHANGELOG](CHANGELOG.md).
 The SDK covers the full life of a knowledge graph: core contracts and SQLite
 storage (`specs`, `extractor`, `store`, `pipeline`), semantic indexing over
 pluggable vector backends (`semantic`, `vector_backend`, `embed`, `embedder`),
-document ingestion (`ingest`), temporal snapshots (`snapshots`), text + image
+document ingestion (`ingest`), a shared temporal contract for dated nodes
+(`temporal`), temporal snapshots (`snapshots`), text + image
 synthesis (`synthesis`), centrality analysis (`analysis`), and a visualization
 stack that runs from interactive HTML (`viz`) through 3-D layouts and organic
 trees (`viz3d`) to Looking Glass light-field casting (`viz3d.qt`).
