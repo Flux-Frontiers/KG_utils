@@ -276,6 +276,54 @@ def test_resolve_symbols_idempotent(store: GraphStore) -> None:
     assert c1 == c2  # second call finds same edges already present
 
 
+def test_resolve_symbols_receiver_typed_scopes_to_class(store: GraphStore) -> None:
+    # Two classes define the same method name; only the one matching the
+    # stub's receiver_class metadata should get a RESOLVES_TO edge.
+    store.write(
+        [
+            _node("m:a.py:Log.render", "method", "render", qualname="Log.render"),
+            _node("m:a.py:Plotter.render", "method", "render", qualname="Plotter.render"),
+            _node(
+                "sym:plotter.render",
+                "symbol",
+                "render",
+                qualname="plotter.render",
+                metadata={"receiver_class": "Log"},
+            ),
+        ],
+        [],
+    )
+    store.resolve_symbols()
+    edges = store.edges_within({"sym:plotter.render", "m:a.py:Log.render", "m:a.py:Plotter.render"})
+    resolved = [e for e in edges if e["rel"] == "RESOLVES_TO"]
+    assert len(resolved) == 1
+    assert resolved[0]["dst"] == "m:a.py:Log.render"
+    evidence = json.loads(resolved[0]["evidence"])
+    assert evidence["resolution_mode"] == "receiver_typed"
+
+
+def test_resolve_symbols_receiver_typed_no_match_stays_unresolved(
+    store: GraphStore,
+) -> None:
+    # receiver_class names a class with no matching method in the graph —
+    # must not fall back to a same-named method on an unrelated class.
+    store.write(
+        [
+            _node("m:a.py:Other.render", "method", "render", qualname="Other.render"),
+            _node(
+                "sym:plotter.render",
+                "symbol",
+                "render",
+                qualname="plotter.render",
+                metadata={"receiver_class": "Log"},
+            ),
+        ],
+        [],
+    )
+    count = store.resolve_symbols()
+    assert count == 0
+
+
 # ---------------------------------------------------------------------------
 # callers_of and edges_from
 # ---------------------------------------------------------------------------

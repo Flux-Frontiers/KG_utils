@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`resolve_symbols()` no longer guesses across classes when it doesn't have
+  to.** A `sym:` stub for a dotted call like `plotter.render()` matched by
+  trailing name alone — any first-party definition named `render()` anywhere
+  in the graph, regardless of receiver. Observed producing a fabricated
+  `RESOLVES_TO` edge from a stdlib `re.Match.start()` call to an unrelated
+  `_LogCapture.start` method (pycode_kg, `gutenberg_kg` corpus).
+
+  When a stub's `metadata` carries a `receiver_class` key — written by a
+  caller that traced the receiver back to a type annotation — matching is
+  now scoped to `f"{receiver_class}.{name}"` instead of the bare name. A
+  typed stub that finds no match in its own class does not fall back to the
+  untyped guess; it stays unresolved rather than resolving to the wrong
+  thing. Untyped stubs (no `receiver_class` in metadata) are unaffected.
+
 ## [0.18.0] - 2026-08-22
 
 ### Fixed

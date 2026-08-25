@@ -373,13 +373,19 @@ class GraphStore:
         """Add RESOLVES_TO edges from ``sym:`` stub nodes to their definitions.
 
         Matches stubs to first-party definitions by name (and optionally by
-        fully-qualified dotted name).  Idempotent — duplicate edges are
-        silently ignored.
+        fully-qualified dotted name).  When a stub carries a ``receiver_class``
+        key in its ``metadata`` — e.g. a call site ``plotter.render()`` where
+        the visitor traced ``plotter``'s annotation back to a class — matching
+        is scoped to definitions whose qualname is ``f"{receiver_class}.{name}"``
+        instead of the bare trailing-name match against every definition in the
+        graph. A typed stub that matches nothing does not fall back to the
+        untyped guess; it simply stays unresolved.  Idempotent — duplicate
+        edges are silently ignored.
 
         :return: Number of new RESOLVES_TO edges written.
         """
         sym_rows = self.con.execute(
-            "SELECT id, name, qualname FROM nodes WHERE kind = 'symbol'"
+            "SELECT id, name, qualname, metadata FROM nodes WHERE kind = 'symbol'"
         ).fetchall()
 
         def_rows = self.con.execute(
@@ -392,8 +398,11 @@ class GraphStore:
 
         name_to_defs: dict[str, list[str]] = {}
         dotted_to_defs: dict[str, list[str]] = {}
+        qualname_to_defs: dict[str, list[str]] = {}
         for def_id, def_kind, def_name, def_qualname, def_module_path in def_rows:
             name_to_defs.setdefault(def_name, []).append(def_id)
+            if def_qualname:
+                qualname_to_defs.setdefault(def_qualname, []).append(def_id)
 
             module_dotted_variants = _module_to_dotted_variants(def_module_path)
             if def_kind == "module":
@@ -405,7 +414,7 @@ class GraphStore:
                     dotted_to_defs.setdefault(dotted_key, []).append(def_id)
 
         edges: list[tuple[str, str, str, str]] = []
-        for sym_id, sym_name, sym_qualname in sym_rows:
+        for sym_id, sym_name, sym_qualname, sym_metadata_raw in sym_rows:
             if not sym_name:
                 continue
 
@@ -420,7 +429,17 @@ class GraphStore:
                     mode = "exact_qualname"
                     confidence = "high"
 
+            receiver_class = None
             if not candidates:
+                receiver_class = _load_metadata(sym_metadata_raw).get("receiver_class")
+                if receiver_class:
+                    typed = qualname_to_defs.get(f"{receiver_class}.{sym_name}", [])
+                    if typed:
+                        candidates = typed
+                        mode = "receiver_typed"
+                        confidence = "high"
+
+            if not candidates and not receiver_class:
                 candidates = name_to_defs.get(sym_name, [])
                 if len(candidates) > 1:
                     mode = "name_fallback_ambiguous"
