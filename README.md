@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.18.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.18.1-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -26,6 +26,14 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.18.1 (2026-08-25)** — `resolve_symbols()` no longer guesses across
+  classes when it doesn't have to. A dotted call stub's `RESOLVES_TO` edge
+  used to match by trailing name alone, so any first-party definition sharing
+  a method name could pick up a fabricated edge regardless of receiver. When
+  a caller records a `receiver_class` in the stub's `metadata` (e.g. a
+  visitor that traced a call's receiver back to a type annotation), matching
+  now scopes to that class, and a typed stub with no match in it stays
+  unresolved instead of falling back to the untyped guess.
 - **0.18.0 (2026-08-22)** — New `kg_utils.temporal`: a shared temporal
   contract so time can become a federation axis instead of a per-module
   convention. Modules write the same `occurred_start` / `occurred_end` /
@@ -576,7 +584,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.18.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.18.1) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -584,7 +592,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.18.0},
+  version   = {0.18.1},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},
