@@ -136,6 +136,8 @@ class SnapshotManager:
         tree_hash: str = "",
         hotspots: list[dict[str, Any]] | None = None,
         issues: list[str] | None = None,
+        key: str = "",
+        subject: str = "",
         **extra_metrics: Any,
     ) -> Snapshot:
         """Capture a snapshot from current state.
@@ -147,9 +149,18 @@ class SnapshotManager:
         :param version: Version string; auto-detected from package if None.
         :param branch: Git branch; auto-detected if None.
         :param graph_stats_dict: Output from the KG's ``stats()`` method.
-        :param tree_hash: Git tree hash; auto-detected if not provided.
+        :param tree_hash: Git tree hash, recorded as provenance; auto-detected
+            if not provided. It is no longer the snapshot's key.
         :param hotspots: Top hotspot entries.
         :param issues: Issue description strings.
+        :param key: Snapshot identifier. Pass the release tag for a snapshot of
+            a repo at a release; omit it for a corpus, which has no tag, and
+            get a UTC timestamp instead. Never defaults to the tree hash: that
+            hash is read before ``git add`` stages the snapshot, so it names a
+            tree that is never committed and cannot be resolved afterwards.
+        :param subject: What was measured, e.g. ``repo:doc-kg`` or
+            ``corpus:pepys``. Distinguishes the measured thing from the
+            measuring tool, which is recorded separately.
         :param extra_metrics: Additional domain-specific metric fields.
         :return: New :class:`Snapshot` instance (not yet persisted).
         """
@@ -159,6 +170,8 @@ class SnapshotManager:
             branch = self._get_current_branch()
         if not tree_hash:
             tree_hash = self._get_current_tree_hash()
+        if not key:
+            key = datetime.now(UTC).isoformat()
 
         metrics: dict[str, Any] = dict(graph_stats_dict or {})
         metrics.update(extra_metrics)
@@ -172,9 +185,13 @@ class SnapshotManager:
             hotspots=hotspots or [],
             issues=issues or [],
             tree_hash=tree_hash,
+            snapshot_key=key,
+            subject=subject,
+            tool=self.package_name,
+            tool_version=self._package_version(),
         )
 
-        prev = self.get_previous(tree_hash)
+        prev = self.get_previous(snapshot.key)
         if prev:
             snapshot.vs_previous = self._compute_delta(snapshot, prev)
 
@@ -251,6 +268,9 @@ class SnapshotManager:
             "branch": snapshot.branch,
             "timestamp": snapshot.timestamp,
             "version": snapshot.version,
+            "subject": snapshot.subject,
+            "tool": snapshot.tool,
+            "tool_version": snapshot.tool_version,
             "file": snapshot_file.name,
             "metrics": snapshot.metrics,
             "deltas": {
@@ -279,9 +299,11 @@ class SnapshotManager:
         manifest = SnapshotManifest.from_dict(
             json.loads(self.manifest_path.read_text(encoding="utf-8"))
         )
-        # Normalise legacy key fields -> 'key'
+        # Dual-read, permanent rather than transitional: tree-hash-keyed
+        # entries predate the key change and cannot be re-keyed onto versions,
+        # so both shapes stay addressable indefinitely.
         for entry in manifest.snapshots:
-            if "key" not in entry:
+            if not entry.get("key"):
                 if "tree_hash" in entry:
                     entry["key"] = entry.pop("tree_hash")
                 elif "commit" in entry:
@@ -294,7 +316,8 @@ class SnapshotManager:
         )
 
     def load_snapshot(self, key: str) -> Snapshot | None:
-        """Load a snapshot by key (tree hash) or ``'latest'``.
+        """Load a snapshot by key (release tag, timestamp, or legacy tree hash)
+        or ``'latest'``.
 
         Missing ``vs_previous`` / ``vs_baseline`` deltas are backfilled
         on-the-fly from manifest metadata.
@@ -392,8 +415,8 @@ class SnapshotManager:
     def diff_snapshots(self, key_a: str, key_b: str) -> dict[str, Any]:
         """Compare two snapshots side-by-side.
 
-        :param key_a: First snapshot key (tree hash).
-        :param key_b: Second snapshot key (tree hash).
+        :param key_a: First snapshot key.
+        :param key_b: Second snapshot key.
         :return: Dict with metrics from both and computed deltas.
         """
         snap_a = self.load_snapshot(key_a)
