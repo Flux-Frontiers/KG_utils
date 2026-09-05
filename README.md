@@ -283,7 +283,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class | Description |
 |---|---|
-| `Snapshot` | Temporal snapshot keyed by git tree hash with metrics and deltas |
+| `Snapshot` | Temporal snapshot keyed by a supplied release tag or timestamp, with metrics, deltas, and tree-hash provenance |
 | `SnapshotManager` | Capture, persist, load, list, diff, and prune snapshots |
 | `SnapshotManifest` | Fast-lookup index with format versioning |
 

@@ -152,6 +152,7 @@ class TestSnapshotLifecycle:
             branch="main",
             graph_stats_dict={"total_nodes": nodes, "total_edges": edges},
             tree_hash=key,
+            key=key,
         )
 
     def test_save_then_load_round_trip(self, mgr: SnapshotManager) -> None:
@@ -251,6 +252,7 @@ class TestSnapshotManagerSubclass:
             branch="main",
             graph_stats_dict={"total_nodes": 10, "total_edges": 5, "coverage": 0.50},
             tree_hash="doc-s1",
+            key="doc-s1",
         )
         mgr.save_snapshot(s1, force=True)
 
@@ -259,6 +261,7 @@ class TestSnapshotManagerSubclass:
             branch="main",
             graph_stats_dict={"total_nodes": 20, "total_edges": 10, "coverage": 0.75},
             tree_hash="doc-s2",
+            key="doc-s2",
         )
         mgr.save_snapshot(s2, force=True)
 
@@ -373,6 +376,7 @@ class TestConcreteKGModuleAndExtractor:
             branch="main",
             graph_stats_dict=mod.stats(),
             tree_hash="corpus-v1",
+            key="corpus-v1",
         )
         path = mgr.save_snapshot(snap)
         assert path is not None and path.exists()
@@ -397,6 +401,7 @@ class TestSnapshotManagerGitIntegration:
             version="0.1.0",
             graph_stats_dict={"total_nodes": 5, "total_edges": 2},
             tree_hash="git-test",
+            key="git-test",
         )
         assert snap.branch != "" and snap.branch != "unknown"
 

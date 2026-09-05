@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,7 @@ def test_snapshot_to_from_dict() -> None:
         version="1.0.0",
         metrics={"total_nodes": 10, "total_edges": 5},
         tree_hash="abc123",
+        snapshot_key="abc123",
     )
     d = snap.to_dict()
     assert d["key"] == "abc123"
@@ -30,8 +33,51 @@ def test_snapshot_to_from_dict() -> None:
 
 
 def test_snapshot_key_property() -> None:
+    """A snapshot with no supplied key falls back to its tree hash."""
     snap = Snapshot(branch="main", timestamp="", metrics={}, tree_hash="deadbeef")
     assert snap.key == "deadbeef"
+
+
+def test_supplied_key_wins_over_tree_hash() -> None:
+    snap = Snapshot(
+        branch="main", timestamp="", metrics={}, tree_hash="deadbeef", snapshot_key="v1.2.3"
+    )
+    assert snap.key == "v1.2.3"
+    assert snap.to_dict()["tree_hash"] == "deadbeef"
+
+
+def test_from_dict_reads_legacy_tree_hash_key() -> None:
+    """Entries written before the key change stay addressable by their key."""
+    legacy = {"key": "a" * 40, "branch": "main", "timestamp": "", "metrics": {}}
+    snap = Snapshot.from_dict(legacy)
+    assert snap.key == "a" * 40
+    assert snap.tree_hash == "a" * 40  # recognised as a hash, kept as provenance
+
+
+def test_from_dict_does_not_mistake_a_tag_for_a_tree_hash() -> None:
+    snap = Snapshot.from_dict({"key": "v0.19.0", "branch": "main", "timestamp": "", "metrics": {}})
+    assert snap.key == "v0.19.0"
+    assert snap.tree_hash == ""
+
+
+def test_from_dict_reads_legacy_commit_key() -> None:
+    snap = Snapshot.from_dict(
+        {"commit": "c0ffee", "branch": "main", "timestamp": "", "metrics": {}}
+    )
+    assert snap.key == "c0ffee"
+
+
+def test_to_dict_serializes_dataclass_fields() -> None:
+    """A subclass storing typed metrics needs no to_dict override."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Metrics:
+        total_nodes: int
+        total_edges: int
+
+    snap = Snapshot(branch="main", timestamp="", metrics=Metrics(3, 4))  # type: ignore[arg-type]
+    assert snap.to_dict()["metrics"] == {"total_nodes": 3, "total_edges": 4}
 
 
 # -- SnapshotManifest --------------------------------------------------------
@@ -63,6 +109,7 @@ def test_capture_and_save(mgr: SnapshotManager) -> None:
         branch="test",
         graph_stats_dict={"total_nodes": 5, "total_edges": 3},
         tree_hash="hash1",
+        key="hash1",
     )
     assert snap.key == "hash1"
     assert snap.metrics["total_nodes"] == 5
@@ -86,6 +133,7 @@ def test_capture_relativizes_in_repo_paths(tmp_path: Path) -> None:
         version="0.1.0",
         branch="test",
         tree_hash="hash-rel",
+        key="hash-rel",
         graph_stats_dict={
             "total_nodes": 5,
             "total_edges": 3,
@@ -127,6 +175,7 @@ def test_capture_relativizes_under_relative_snapshots_dir(
         version="0.1.0",
         branch="test",
         tree_hash="hash-relative-dir",
+        key="hash-relative-dir",
         graph_stats_dict={
             "total_nodes": 5,
             "db_path": str(repo / ".dockg" / "graph.sqlite"),
@@ -153,6 +202,7 @@ def test_capture_relativizes_across_a_symlinked_root(tmp_path: Path) -> None:
         version="0.1.0",
         branch="test",
         tree_hash="hash-symlink",
+        key="hash-symlink",
         graph_stats_dict={
             "total_nodes": 5,
             # Recorded through the *real* path while the manager was built
@@ -191,6 +241,7 @@ def test_subclass_may_reassign_repo_root(tmp_path: Path) -> None:
         version="0.1.0",
         branch="test",
         tree_hash="hash-subclass",
+        key="hash-subclass",
         graph_stats_dict={"total_nodes": 2, "db_path": str(elsewhere / "g.sqlite")},
     )
     assert snap.metrics["db_path"] == "g.sqlite"
@@ -209,6 +260,7 @@ def test_relativize_survives_an_unusable_repo_root(tmp_path: Path) -> None:
         version="0.1.0",
         branch="test",
         tree_hash="hash-noroot",
+        key="hash-noroot",
         graph_stats_dict={"total_nodes": 1, "db_path": "/abs/path/g.sqlite"},
     )
     assert snap.metrics["db_path"] == "/abs/path/g.sqlite"
@@ -220,6 +272,7 @@ def test_save_rejects_zero_nodes(mgr: SnapshotManager) -> None:
         branch="test",
         graph_stats_dict={"total_nodes": 0, "total_edges": 0},
         tree_hash="empty",
+        key="empty",
     )
     with pytest.raises(ValueError, match="0 nodes"):
         mgr.save_snapshot(snap)
@@ -231,6 +284,7 @@ def test_load_snapshot(mgr: SnapshotManager) -> None:
         branch="test",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5},
         tree_hash="loadtest",
+        key="loadtest",
     )
     mgr.save_snapshot(snap)
 
@@ -245,6 +299,7 @@ def test_load_latest(mgr: SnapshotManager) -> None:
         branch="test",
         graph_stats_dict={"total_nodes": 7, "total_edges": 2},
         tree_hash="latest1",
+        key="latest1",
     )
     mgr.save_snapshot(snap)
 
@@ -260,6 +315,7 @@ def test_list_snapshots(mgr: SnapshotManager) -> None:
             branch="test",
             graph_stats_dict={"total_nodes": 10 + i, "total_edges": 5},
             tree_hash=h,
+            key=h,
         )
         mgr.save_snapshot(snap, force=True)
 
@@ -273,12 +329,14 @@ def test_diff_snapshots(mgr: SnapshotManager) -> None:
         branch="test",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5, "node_counts": {"file": 10}},
         tree_hash="diff_a",
+        key="diff_a",
     )
     s2 = mgr.capture(
         version="0.1.0",
         branch="test",
         graph_stats_dict={"total_nodes": 15, "total_edges": 8, "node_counts": {"file": 15}},
         tree_hash="diff_b",
+        key="diff_b",
     )
     mgr.save_snapshot(s1, force=True)
     mgr.save_snapshot(s2, force=True)
@@ -296,6 +354,7 @@ def test_prune_dry_run(mgr: SnapshotManager) -> None:
             branch="test",
             graph_stats_dict={"total_nodes": 10, "total_edges": 5},
             tree_hash=h,
+            key=h,
         )
         mgr.save_snapshot(snap, force=True)
 
@@ -403,6 +462,7 @@ def test_get_previous_returns_older_snapshot(mgr: SnapshotManager) -> None:
         branch="main",
         graph_stats_dict={"total_nodes": 5, "total_edges": 2},
         tree_hash="older",
+        key="older",
     )
     mgr.save_snapshot(s1, force=True)
 
@@ -411,6 +471,7 @@ def test_get_previous_returns_older_snapshot(mgr: SnapshotManager) -> None:
         branch="main",
         graph_stats_dict={"total_nodes": 10, "total_edges": 4},
         tree_hash="newer",
+        key="newer",
     )
     mgr.save_snapshot(s2, force=True)
 
@@ -426,6 +487,7 @@ def test_get_baseline_returns_oldest(mgr: SnapshotManager) -> None:
             branch="main",
             graph_stats_dict={"total_nodes": n, "total_edges": 2},
             tree_hash=h,
+            key=h,
         )
         mgr.save_snapshot(snap, force=True)
 
@@ -441,6 +503,7 @@ def test_list_snapshots_limit(mgr: SnapshotManager) -> None:
             branch="main",
             graph_stats_dict={"total_nodes": 10 + i, "total_edges": 2},
             tree_hash=h,
+            key=h,
         )
         mgr.save_snapshot(snap, force=True)
 
@@ -454,6 +517,7 @@ def test_list_snapshots_branch_filter(mgr: SnapshotManager) -> None:
             branch=branch,
             graph_stats_dict={"total_nodes": 10, "total_edges": 2},
             tree_hash=h,
+            key=h,
         )
         mgr.save_snapshot(snap, force=True)
 
@@ -474,6 +538,7 @@ def test_save_snapshot_dedup_refreshes_in_place(mgr: SnapshotManager) -> None:
         branch="main",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5},
         tree_hash="hash-a",
+        key="hash-a",
     )
     mgr.save_snapshot(snap1)
 
@@ -482,6 +547,7 @@ def test_save_snapshot_dedup_refreshes_in_place(mgr: SnapshotManager) -> None:
         branch="main",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5},
         tree_hash="hash-b",
+        key="hash-b",
     )
     mgr.save_snapshot(snap2)  # same metrics → dedup
 
@@ -496,6 +562,7 @@ def test_save_snapshot_force_adds_new_entry(mgr: SnapshotManager) -> None:
         branch="main",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5},
         tree_hash="force-a",
+        key="force-a",
     )
     mgr.save_snapshot(snap1, force=True)
 
@@ -504,6 +571,7 @@ def test_save_snapshot_force_adds_new_entry(mgr: SnapshotManager) -> None:
         branch="main",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5},
         tree_hash="force-b",
+        key="force-b",
     )
     mgr.save_snapshot(snap2, force=True)
 
@@ -517,6 +585,7 @@ def test_prune_removes_duplicates(mgr: SnapshotManager) -> None:
             branch="main",
             graph_stats_dict={"total_nodes": 10, "total_edges": 5},
             tree_hash=h,
+            key=h,
         )
         mgr.save_snapshot(snap, force=True)
 
@@ -532,6 +601,7 @@ def test_prune_removes_orphaned_files(mgr: SnapshotManager) -> None:
         branch="main",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5},
         tree_hash="real-snap",
+        key="real-snap",
     )
     mgr.save_snapshot(snap, force=True)
 
@@ -550,6 +620,7 @@ def test_prune_reports_broken_entries(mgr: SnapshotManager) -> None:
         branch="main",
         graph_stats_dict={"total_nodes": 10, "total_edges": 5},
         tree_hash="broken-snap",
+        key="broken-snap",
     )
     mgr.save_snapshot(snap, force=True)
 
@@ -593,3 +664,92 @@ def test_load_manifest_normalises_legacy_tree_hash(mgr: SnapshotManager) -> None
     manifest = mgr.load_manifest()
     assert manifest.snapshots[0]["key"] == "legacy-key"
     assert "tree_hash" not in manifest.snapshots[0]
+
+
+# -- Key scheme --------------------------------------------------------------
+
+
+def test_capture_defaults_to_a_timestamp_key_not_a_tree_hash(mgr: SnapshotManager) -> None:
+    """The tree hash is provenance, never the key.
+
+    It is read before ``git add`` stages the snapshot, so it names a tree that
+    is never committed and cannot be resolved afterwards.
+    """
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        graph_stats_dict={"total_nodes": 1, "total_edges": 1},
+        tree_hash="b" * 40,
+    )
+    assert snap.key != "b" * 40
+    assert snap.tree_hash == "b" * 40
+    datetime.fromisoformat(snap.key)  # a timestamp, and a parseable one
+
+
+def test_capture_uses_a_supplied_release_key(mgr: SnapshotManager) -> None:
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        graph_stats_dict={"total_nodes": 1, "total_edges": 1},
+        key="v0.19.0",
+        subject="repo:kg-utils",
+    )
+    mgr.save_snapshot(snap)
+
+    assert snap.key == "v0.19.0"
+    assert (mgr.snapshots_dir / "v0.19.0.json").exists()
+    assert mgr.load_snapshot("v0.19.0") is not None
+
+
+def test_capture_records_subject_and_tool_separately(mgr: SnapshotManager) -> None:
+    """The version field names the measuring tool; subject names what was measured."""
+    snap = mgr.capture(
+        version="0.1.0",
+        branch="test",
+        graph_stats_dict={"total_nodes": 1, "total_edges": 1},
+        key="v1",
+        subject="corpus:pepys",
+    )
+    mgr.save_snapshot(snap)
+
+    entry = mgr.list_snapshots()[0]
+    assert entry["subject"] == "corpus:pepys"
+    assert entry["tool"] == mgr.package_name
+    assert snap.tool_version == mgr._package_version()
+
+
+def test_manifest_dual_read_keeps_legacy_entries_addressable(mgr: SnapshotManager) -> None:
+    """A tree-hash-keyed manifest written by an older release still loads."""
+    key = "c" * 40
+    (mgr.snapshots_dir / f"{key}.json").write_text(
+        json.dumps(
+            {
+                "key": key,
+                "branch": "main",
+                "timestamp": "2026-01-01T00:00:00+00:00",
+                "metrics": {"total_nodes": 2, "total_edges": 1},
+            }
+        ),
+        encoding="utf-8",
+    )
+    mgr.manifest_path.write_text(
+        json.dumps(
+            {
+                "format": "1.0",
+                "last_update": "",
+                "snapshots": [
+                    {
+                        "tree_hash": key,
+                        "branch": "main",
+                        "timestamp": "2026-01-01T00:00:00+00:00",
+                        "file": f"{key}.json",
+                        "metrics": {"total_nodes": 2, "total_edges": 1},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert mgr.load_manifest().snapshots[0]["key"] == key
+    assert mgr.load_snapshot(key) is not None
