@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-05
+
 ### Changed
 
 - **Snapshots are no longer keyed by git tree hash.** The hash was read before
