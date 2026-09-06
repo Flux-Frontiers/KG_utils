@@ -320,13 +320,32 @@ class TestSnapshotManagerSubclass:
         assert loaded.vs_baseline["nodes"] == 20
         assert abs(loaded.vs_baseline["coverage_delta"] - 0.40) < 1e-6
 
-    def test_capture_does_not_persist_a_previous_delta_for_a_new_key(self, tmp_path: Path) -> None:
-        """Why the backfill is the normal path, not a legacy one.
+    def test_capture_cannot_resolve_its_own_previous_snapshot(self, tmp_path: Path) -> None:
+        """KNOWN GAP, pinned deliberately -- this is not the behaviour we want.
 
-        get_previous resolves the key against the manifest, and at capture time
-        the snapshot is not saved yet, so vs_previous is written as null for
-        every first-time key. vs_baseline escapes because get_baseline does not
-        depend on the unsaved key.
+        ``capture()`` asks ``get_previous(snapshot.key)`` for a key it has not
+        saved yet. ``get_previous`` resolves the key against the manifest,
+        finds nothing, and returns ``None``, so ``vs_previous`` is written as
+        null for every first-time key. ``vs_baseline`` escapes because
+        ``get_baseline()`` does not depend on the unsaved key. That asymmetry
+        is why the backfill in ``load_snapshot`` is the normal path rather
+        than a legacy one.
+
+        The fault is in the question, not the answer. ``get_previous``
+        returning ``None`` for an unknown key is correct: the key has no
+        position in the manifest, so assuming it sorts last would give a
+        confidently wrong answer for a typo. ``capture()`` knows its snapshot
+        is the newest -- it stamps ``datetime.now`` -- so it should ask for
+        the most recent saved snapshot directly rather than for whatever
+        precedes an unsaved key.
+
+        Not fixed here because it changes what is *written*, and the current
+        behaviour is pinned by equivalent tests in doc_kg, memory_kg and
+        kgrag. It is invisible to consumers: every read path backfills the
+        delta through ``_compute_delta_from_metrics``. Delete this test when
+        ``capture()`` is fixed; do not weaken ``get_previous`` to satisfy it,
+        which is what diary_kg did and what makes its contract diverge from
+        every sibling's.
         """
         mgr = SnapshotManager(tmp_path / "snaps", package_name="doc-kg")
         first = mgr.capture(
@@ -344,7 +363,15 @@ class TestSnapshotManagerSubclass:
             key="c2",
         )
         assert second.vs_previous is None
-        assert second.vs_baseline == {"nodes": 10, "edges": 10}
+        assert second.vs_baseline is not None
+        assert second.vs_baseline["nodes"] == 10
+        assert second.vs_baseline["edges"] == 10
+
+        # The gap is invisible downstream: the read path fills it in.
+        mgr.save_snapshot(second, force=True)
+        loaded = mgr.load_snapshot("c2")
+        assert loaded is not None
+        assert loaded.vs_previous == {"nodes": 10, "edges": 10}
 
 
 # ---------------------------------------------------------------------------
