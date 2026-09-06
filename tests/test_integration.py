@@ -265,13 +265,86 @@ class TestSnapshotManagerSubclass:
         )
         mgr.save_snapshot(s2, force=True)
 
-        # Custom fields appear in list_snapshots (which calls _compute_delta_from_metrics).
-        # load_snapshot backfills only nodes/edges from the manifest.
+        # Every path that produces a delta goes through
+        # _compute_delta_from_metrics, so the subclass's field is in all of
+        # them. This comment used to say load_snapshot backfilled nodes/edges
+        # only, which was true, was a bug, and stood for five months because
+        # the assertion was pointed at the path that worked.
         listed = mgr.list_snapshots()
         latest = next(s for s in listed if s["key"] == "doc-s2")
         delta = latest["deltas"]["vs_previous"]
         assert delta["nodes"] == 10
         assert abs(delta["coverage_delta"] - 0.25) < 1e-6
+
+        loaded = mgr.load_snapshot("doc-s2")
+        assert loaded is not None
+        assert loaded.vs_previous is not None
+        assert loaded.vs_previous["nodes"] == 10
+        assert abs(loaded.vs_previous["coverage_delta"] - 0.25) < 1e-6
+
+        diffed = mgr.diff_snapshots("doc-s1", "doc-s2")["delta"]
+        assert diffed["nodes"] == 10
+        assert abs(diffed["coverage_delta"] - 0.25) < 1e-6
+
+    def test_backfilled_baseline_delta_keeps_custom_fields(self, tmp_path: Path) -> None:
+        """The vs_baseline branch of the backfill uses the same extension point."""
+
+        class _DocMgr(SnapshotManager):
+            def _compute_delta_from_metrics(self, new_m: dict, old_m: dict) -> dict:
+                base = super()._compute_delta_from_metrics(new_m, old_m)
+                base["coverage_delta"] = round(
+                    new_m.get("coverage", 0.0) - old_m.get("coverage", 0.0), 4
+                )
+                return base
+
+        mgr = _DocMgr(tmp_path / "snaps", package_name="doc-kg")
+        for key, nodes, coverage in [("b1", 10, 0.50), ("b2", 20, 0.75), ("b3", 30, 0.90)]:
+            snap = mgr.capture(
+                version="1.0",
+                branch="main",
+                graph_stats_dict={
+                    "total_nodes": nodes,
+                    "total_edges": nodes,
+                    "coverage": coverage,
+                },
+                key=key,
+            )
+            # Strip both deltas so the read path has to rebuild them.
+            snap.vs_previous = None
+            snap.vs_baseline = None
+            mgr.save_snapshot(snap, force=True)
+
+        loaded = mgr.load_snapshot("b3")
+        assert loaded is not None
+        assert loaded.vs_baseline is not None
+        assert loaded.vs_baseline["nodes"] == 20
+        assert abs(loaded.vs_baseline["coverage_delta"] - 0.40) < 1e-6
+
+    def test_capture_does_not_persist_a_previous_delta_for_a_new_key(self, tmp_path: Path) -> None:
+        """Why the backfill is the normal path, not a legacy one.
+
+        get_previous resolves the key against the manifest, and at capture time
+        the snapshot is not saved yet, so vs_previous is written as null for
+        every first-time key. vs_baseline escapes because get_baseline does not
+        depend on the unsaved key.
+        """
+        mgr = SnapshotManager(tmp_path / "snaps", package_name="doc-kg")
+        first = mgr.capture(
+            version="1.0",
+            branch="main",
+            graph_stats_dict={"total_nodes": 10, "total_edges": 10},
+            key="c1",
+        )
+        mgr.save_snapshot(first, force=True)
+
+        second = mgr.capture(
+            version="1.1",
+            branch="main",
+            graph_stats_dict={"total_nodes": 20, "total_edges": 20},
+            key="c2",
+        )
+        assert second.vs_previous is None
+        assert second.vs_baseline == {"nodes": 10, "edges": 10}
 
 
 # ---------------------------------------------------------------------------
