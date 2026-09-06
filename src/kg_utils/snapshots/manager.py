@@ -320,7 +320,17 @@ class SnapshotManager:
         or ``'latest'``.
 
         Missing ``vs_previous`` / ``vs_baseline`` deltas are backfilled
-        on-the-fly from manifest metadata.
+        on-the-fly from manifest metadata, through
+        :meth:`_compute_delta_from_metrics` so that a subclass's domain delta
+        fields are present here as they are in :meth:`list_snapshots` and
+        :meth:`diff_snapshots`.
+
+        The backfill is not a legacy path. ``capture()`` resolves
+        ``vs_previous`` through :meth:`get_previous`, which looks the key up in
+        the manifest -- and at capture time the snapshot is not saved yet, so
+        the lookup fails and ``vs_previous`` is written as ``null`` for every
+        first-time key. ``vs_baseline`` escapes because :meth:`get_baseline`
+        does not depend on the unsaved key.
         """
         if key == "latest":
             manifest = self.load_manifest()
@@ -341,21 +351,17 @@ class SnapshotManager:
             idx = next((i for i, s in enumerate(entries) if s.get("key") == key), None)
 
             if idx is not None:
+                # Both branches go through _compute_delta_from_metrics, the
+                # documented extension point. Computing the delta inline here
+                # instead meant a subclass's domain fields (coverage_delta,
+                # kinetic_params_delta, ...) were absent from a backfilled
+                # delta and present everywhere else.
                 if snap.vs_previous is None and idx + 1 < len(entries):
                     prev_m = entries[idx + 1].get("metrics", {})
-                    snap.vs_previous = {
-                        "nodes": snap.metrics.get("total_nodes", 0) - prev_m.get("total_nodes", 0),
-                        "edges": snap.metrics.get("total_edges", 0) - prev_m.get("total_edges", 0),
-                    }
-                if snap.vs_baseline is None and entries:
+                    snap.vs_previous = self._compute_delta_from_metrics(snap.metrics, prev_m)
+                if snap.vs_baseline is None and entries and entries[-1].get("key") != key:
                     base_m = entries[-1].get("metrics", {})
-                    if entries[-1].get("key") != key:
-                        snap.vs_baseline = {
-                            "nodes": snap.metrics.get("total_nodes", 0)
-                            - base_m.get("total_nodes", 0),
-                            "edges": snap.metrics.get("total_edges", 0)
-                            - base_m.get("total_edges", 0),
-                        }
+                    snap.vs_baseline = self._compute_delta_from_metrics(snap.metrics, base_m)
         return snap
 
     def get_previous(self, key: str) -> Snapshot | None:

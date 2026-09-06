@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A backfilled delta lost every domain-specific field.** `SnapshotManager`
+  produces a metrics delta in four places. Three call
+  `_compute_delta_from_metrics`, the documented extension point every KG module
+  overrides to add its own fields. The fourth, the backfill inside
+  `load_snapshot`, built a two-key `{"nodes", "edges"}` dict inline, so the same
+  snapshot reported different deltas depending on which method you asked, and
+  the one that was wrong sits behind `snapshot show`. Both branches of the
+  backfill now go through the extension point.
+
+  This was not a rare path. `capture()` resolves `vs_previous` through
+  `get_previous`, which looks the key up in the manifest, and at capture time
+  the snapshot is not saved yet, so the lookup fails and `vs_previous` is
+  written as `null` for every first-time key. `vs_baseline` escaped because
+  `get_baseline` does not depend on the unsaved key, which is why a release
+  snapshot could print a correct baseline delta beside a zeroed previous delta
+  for the same pair.
+
+  Consumers get the fix by reading a snapshot back; nothing on disk changes and
+  no migration is needed. `doc_kg` regains `coverage_delta` and `issues_delta`,
+  `pycode_kg` `coverage_delta` and `critical_issues_delta`, `Metabo_kg`
+  `kinetic_params_delta` and `pathway_delta`, `ftree_kg` `files_delta` and
+  `dirs_delta`, `diary_kg` its chunk and entry deltas.
+
 ## [0.19.0] - 2026-09-05
 
 ### Changed
