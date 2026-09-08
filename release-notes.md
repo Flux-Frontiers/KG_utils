@@ -1,46 +1,56 @@
-# Release Notes — v0.19.1
+# Release Notes — v0.20.0
 
-> Released: 2026-09-06
+> Released: 2026-09-08
 
-A snapshot loaded from disk reported a different metrics delta than the same
-snapshot listed or diffed. This release makes all four paths agree. Nothing on
-disk changes, no migration is needed, and consumers pick the fix up by reading
-a snapshot back.
+### Added
 
-## What changed
+Five extension points on `SnapshotManager`, each replacing an override that
+two or more KG modules were carrying. Nothing here changes existing behaviour:
+every default reproduces what the base did in 0.19.1.
 
-**A backfilled delta kept only nodes and edges.** `SnapshotManager` computes a
-metrics delta in four places. `capture()`, `list_snapshots()` and
-`diff_snapshots()` all call `_compute_delta_from_metrics`, the extension point
-every KG module overrides to add its own fields. The backfill inside
-`load_snapshot()` built a two-key dict inline instead, so a module's domain
-fields were absent there and present everywhere else. Both branches of the
-backfill now go through the extension point.
+- **`package_name` as a class attribute.** Seven of the eight KG modules carry
+  an `__init__` whose entire body is `super().__init__(snapshots_dir,
+  package_name="...", db_path=db_path)`. A subclass now sets the attribute and
+  deletes the method. An explicit `package_name=` keyword still wins for a
+  single instance.
 
-The practical effect is that `snapshot show` was the command reporting the
-wrong numbers. DocKG regains `coverage_delta` and `issues_delta`, PyCodeKG
-`coverage_delta` and `critical_issues_delta`, MetaboKG `kinetic_params_delta`
-and `pathway_delta`, FTreeKG `files_delta` and `dirs_delta`, DiaryKG its chunk
-and entry deltas.
+- **`_domain_metrics(stats)`, a capture hook.** Modules that collect their own
+  metrics -- per-module node counts, per-directory counts, topic counts --
+  override `capture()` to do it, which means restating the base signature.
+  Restating it is how an unnamed `key=` fell into `**extra_metrics` and shipped
+  four packages keyed on a tree hash. Collecting metrics in `_domain_metrics()`
+  leaves the signature alone, so that failure cannot recur. It receives the
+  graph stats, so a module can also derive a metric from them, and the values
+  it returns yield to a same-named `extra_metrics` keyword, so it can declare
+  a domain default that an explicit caller overrides.
 
-**Why the backfill runs at all.** `capture()` resolves the previous snapshot
-through `get_previous()`, which looks the key up in the manifest. At capture
-time the snapshot has not been saved, so the lookup fails and `vs_previous` is
-written as null for every first-time key. `vs_baseline` escapes because
-`get_baseline()` does not depend on the unsaved key, which is why a release
-snapshot could print a correct baseline delta beside a zeroed previous delta
-for the same pair. That asymmetry is now covered by a test that states it is a
-known gap rather than a contract.
+- **`timestamp` in the `diff_snapshots` result.** `doc_kg` and `memory_kg`
+  carried byte-identical `diff_snapshots` overrides that existed for nothing
+  but this, at the cost of two extra `load_snapshot` calls each.
 
-## Upgrading
+- **`issues_delta` in the `diff_snapshots` result.** `issues` is a base field
+  and "introduced / resolved" needs no domain knowledge. Ordered by appearance
+  in the source list rather than by set iteration, so the result is stable
+  across runs.
 
-Nothing to do. Every module already floors at `>=0.19.0` and picks this up on
-its next dependency resolve. Snapshot files and manifests are untouched, and no
-public signature changed.
+- **`dict_metric_deltas`, a class attribute.** `pycode_kg`
+  (`module_node_counts`), `ftree_kg` (`dir_node_counts`) and `diary_kg`
+  (`topic_counts`) each hand-rolled the same loop: diff a dict-valued metric,
+  keep only the changed keys. Naming the metric keys on the subclass emits
+  `"<key>_delta"` for each.
 
-If you maintain a `SnapshotManager` subclass, the one thing worth knowing is
-that a delta read back from `load_snapshot()` now carries your domain fields.
-Code that worked around their absence can drop the workaround.
+- **`metrics_ignore`, a class attribute.** `doc_kg`'s `_metrics_changed`
+  override exists only to drop `db_path` before comparing. Empty by default,
+  so `_metrics_changed` is unchanged for every other module.
+
+- **`capture_aliases`, a class attribute.** `capture()` ends in
+  `**extra_metrics`, so it accepts any keyword. A module that renames one of
+  its own capture keywords therefore gets no error from the old name: the value
+  lands in the metrics dict under the dead name and the new one is simply
+  absent. That is the same silence that shipped four packages keyed on a tree
+  hash. Declaring `{old: new}` keeps the old keyword working and raises a
+  `DeprecationWarning` naming the replacement. The target may be a metric name
+  or `graph_stats_dict`; an explicitly passed current keyword always wins.
 
 ---
 
