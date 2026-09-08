@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -753,3 +754,230 @@ def test_manifest_dual_read_keeps_legacy_entries_addressable(mgr: SnapshotManage
 
     assert mgr.load_manifest().snapshots[0]["key"] == key
     assert mgr.load_snapshot(key) is not None
+
+
+# -- Extension points: class attributes and hooks ----------------------------
+#
+# Each of these replaces an override that several KG modules were carrying.
+# The point of the tests is that configuring the base produces what the
+# hand-written override produced, so the override can be deleted.
+
+
+def test_package_name_class_attribute_replaces_init_override(tmp_path: Path) -> None:
+    """A subclass sets one string instead of forwarding through __init__."""
+
+    class Sub(SnapshotManager):
+        package_name = "sub-kg"
+
+    mgr = Sub(tmp_path / "snapshots")
+    assert mgr.package_name == "sub-kg"
+    snap = mgr.capture(graph_stats_dict={"total_nodes": 1}, key="k")
+    assert snap.tool == "sub-kg"
+
+
+def test_package_name_argument_still_wins(tmp_path: Path) -> None:
+    """An explicit keyword overrides the class attribute for that instance."""
+
+    class Sub(SnapshotManager):
+        package_name = "sub-kg"
+
+    assert Sub(tmp_path / "s", package_name="other-kg").package_name == "other-kg"
+    assert SnapshotManager(tmp_path / "t").package_name == "kg-utils"
+
+
+def test_domain_metrics_hook_merges_into_capture(tmp_path: Path) -> None:
+    """_domain_metrics() collects module metrics without touching capture()."""
+
+    class Sub(SnapshotManager):
+        def _domain_metrics(self, stats: dict[str, Any]) -> dict[str, Any]:
+            return {"module_node_counts": {"a.py": 3}}
+
+    snap = Sub(tmp_path / "snapshots").capture(graph_stats_dict={"total_nodes": 1}, key="k")
+    assert snap.metrics["module_node_counts"] == {"a.py": 3}
+    assert snap.metrics["total_nodes"] == 1
+
+
+def test_domain_metrics_does_not_swallow_the_key(tmp_path: Path) -> None:
+    """The signature is untouched, so ``key`` cannot land in metrics.
+
+    This is the regression the hook exists to prevent: a capture() override
+    restating the signature is what let ``key=`` fall into **extra_metrics and
+    ship four packages keyed on a tree hash.
+    """
+
+    class Sub(SnapshotManager):
+        def _domain_metrics(self, stats: dict[str, Any]) -> dict[str, Any]:
+            return {"collected": 1}
+
+    snap = Sub(tmp_path / "snapshots").capture(key="v1.2.3", subject="repo:sub")
+    assert snap.key == "v1.2.3"
+    assert snap.subject == "repo:sub"
+    assert "key" not in snap.metrics
+
+
+def test_domain_metrics_yields_to_an_explicit_keyword(tmp_path: Path) -> None:
+    """A caller-supplied metric wins over the collected one."""
+
+    class Sub(SnapshotManager):
+        def _domain_metrics(self, stats: dict[str, Any]) -> dict[str, Any]:
+            return {"count": 1}
+
+    snap = Sub(tmp_path / "snapshots").capture(key="k", count=99)
+    assert snap.metrics["count"] == 99
+
+
+def _two_snapshots(mgr: SnapshotManager, m_a: dict, m_b: dict, **kw: Any) -> None:
+    for key, metrics in (("d_a", m_a), ("d_b", m_b)):
+        snap = mgr.capture(graph_stats_dict=metrics, key=key, issues=kw.get(key, []))
+        mgr.save_snapshot(snap, force=True)
+
+
+def test_diff_includes_timestamp_on_both_sides(mgr: SnapshotManager) -> None:
+    _two_snapshots(mgr, {"total_nodes": 1}, {"total_nodes": 2})
+    result = mgr.diff_snapshots("d_a", "d_b")
+    assert result["a"]["timestamp"]
+    assert result["b"]["timestamp"]
+
+
+def test_diff_issues_delta_is_generic_and_ordered(mgr: SnapshotManager) -> None:
+    _two_snapshots(
+        mgr,
+        {"total_nodes": 1},
+        {"total_nodes": 2},
+        d_a=["kept", "gone"],
+        d_b=["kept", "new-1", "new-2"],
+    )
+    result = mgr.diff_snapshots("d_a", "d_b")
+    assert result["issues_delta"] == {
+        "introduced": ["new-1", "new-2"],
+        "resolved": ["gone"],
+    }
+
+
+def test_dict_metric_deltas_emits_only_changed_entries(tmp_path: Path) -> None:
+    """Replaces the hand-rolled loop in pycode_kg, ftree_kg and diary_kg."""
+
+    class Sub(SnapshotManager):
+        dict_metric_deltas = ("module_node_counts",)
+
+    mgr = Sub(tmp_path / "snapshots")
+    _two_snapshots(
+        mgr,
+        {"total_nodes": 1, "module_node_counts": {"a.py": 5, "same.py": 2, "gone.py": 4}},
+        {"total_nodes": 2, "module_node_counts": {"a.py": 8, "same.py": 2, "new.py": 1}},
+    )
+    result = mgr.diff_snapshots("d_a", "d_b")
+    assert result["module_node_counts_delta"] == {"a.py": 3, "gone.py": -4, "new.py": 1}
+
+
+def test_dict_metric_deltas_absent_by_default(mgr: SnapshotManager) -> None:
+    _two_snapshots(mgr, {"total_nodes": 1}, {"total_nodes": 2})
+    result = mgr.diff_snapshots("d_a", "d_b")
+    assert not [k for k in result if k.endswith("_delta") and k.startswith("module")]
+
+
+def test_dict_metric_deltas_tolerates_a_missing_metric(tmp_path: Path) -> None:
+    class Sub(SnapshotManager):
+        dict_metric_deltas = ("never_captured",)
+
+    mgr = Sub(tmp_path / "snapshots")
+    _two_snapshots(mgr, {"total_nodes": 1}, {"total_nodes": 2})
+    assert mgr.diff_snapshots("d_a", "d_b")["never_captured_delta"] == {}
+
+
+def test_metrics_ignore_excludes_configured_keys(tmp_path: Path) -> None:
+    """Replaces doc_kg's _metrics_changed override, which dropped db_path."""
+
+    class Sub(SnapshotManager):
+        metrics_ignore = frozenset({"db_path"})
+
+    mgr = Sub(tmp_path / "snapshots")
+    assert not mgr._metrics_changed(
+        {"total_nodes": 1, "db_path": "/a"}, {"total_nodes": 1, "db_path": "/b"}
+    )
+    assert mgr._metrics_changed(
+        {"total_nodes": 2, "db_path": "/a"}, {"total_nodes": 1, "db_path": "/a"}
+    )
+
+
+def test_metrics_ignore_empty_by_default(mgr: SnapshotManager) -> None:
+    assert mgr._metrics_changed({"db_path": "/a"}, {"db_path": "/b"})
+
+
+def test_domain_metrics_can_derive_from_stats(tmp_path: Path) -> None:
+    """The hook sees the graph stats, so a module can derive a metric."""
+
+    class Sub(SnapshotManager):
+        def _domain_metrics(self, stats: dict[str, Any]) -> dict[str, Any]:
+            node_counts = stats.get("node_counts", {})
+            return {"meaningful_nodes": stats.get("total_nodes", 0) - node_counts.get("doc", 0)}
+
+    snap = Sub(tmp_path / "snapshots").capture(
+        graph_stats_dict={"total_nodes": 10, "node_counts": {"doc": 4}}, key="k"
+    )
+    assert snap.metrics["meaningful_nodes"] == 6
+
+
+def test_capture_alias_remaps_a_renamed_metric(tmp_path: Path) -> None:
+    """A renamed capture keyword keeps working, loudly.
+
+    Without this, the old name lands in metrics under the dead name and the
+    new one is absent, with no error -- the same silence that shipped four
+    packages keyed on a tree hash.
+    """
+
+    class Sub(SnapshotManager):
+        capture_aliases = {"coverage": "docstring_coverage"}
+
+    mgr = Sub(tmp_path / "snapshots")
+    with pytest.warns(DeprecationWarning, match="coverage"):
+        snap = mgr.capture(key="k", coverage=0.85)
+    assert snap.metrics["docstring_coverage"] == 0.85
+    assert "coverage" not in snap.metrics
+
+
+def test_capture_alias_does_not_override_the_current_keyword(tmp_path: Path) -> None:
+    """Passing both keeps the current one and still warns about the old."""
+
+    class Sub(SnapshotManager):
+        capture_aliases = {"coverage": "docstring_coverage"}
+
+    mgr = Sub(tmp_path / "snapshots")
+    with pytest.warns(DeprecationWarning):
+        snap = mgr.capture(key="k", coverage=0.1, docstring_coverage=0.9)
+    assert snap.metrics["docstring_coverage"] == 0.9
+
+
+def test_capture_alias_can_target_graph_stats_dict(tmp_path: Path) -> None:
+    """The target may be a base parameter, not only a metric name."""
+
+    class Sub(SnapshotManager):
+        capture_aliases = {"stats_dict": "graph_stats_dict"}
+
+    mgr = Sub(tmp_path / "snapshots")
+    with pytest.warns(DeprecationWarning, match="stats_dict"):
+        snap = mgr.capture(key="k", stats_dict={"total_nodes": 7})
+    assert snap.metrics["total_nodes"] == 7
+    assert "stats_dict" not in snap.metrics
+
+
+def test_capture_alias_yields_to_an_explicit_graph_stats_dict(tmp_path: Path) -> None:
+    class Sub(SnapshotManager):
+        capture_aliases = {"stats_dict": "graph_stats_dict"}
+
+    mgr = Sub(tmp_path / "snapshots")
+    with pytest.warns(DeprecationWarning):
+        snap = mgr.capture(
+            key="k", graph_stats_dict={"total_nodes": 1}, stats_dict={"total_nodes": 9}
+        )
+    assert snap.metrics["total_nodes"] == 1
+
+
+def test_no_aliases_declared_means_no_warning(mgr: SnapshotManager) -> None:
+    """An undeclared keyword is still just a metric, as it always was."""
+    import warnings as _warnings
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter("error")
+        snap = mgr.capture(key="k", some_metric=1)
+    assert snap.metrics["some_metric"] == 1

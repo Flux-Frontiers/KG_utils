@@ -14,11 +14,29 @@ import dataclasses
 import importlib.metadata
 import json
 import subprocess
+import warnings
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from kg_utils.snapshots.models import PruneResult, Snapshot, SnapshotManifest
+
+
+def _issues_delta(issues_a: list[str], issues_b: list[str]) -> dict[str, list[str]]:
+    """Return the issue strings introduced and resolved between two snapshots.
+
+    Order follows the source list rather than set iteration, so the result is
+    stable across runs and diffable.
+
+    :param issues_a: Issues of the earlier snapshot.
+    :param issues_b: Issues of the later snapshot.
+    :return: ``{"introduced": [...], "resolved": [...]}``.
+    """
+    set_a, set_b = set(issues_a), set(issues_b)
+    return {
+        "introduced": list(dict.fromkeys(i for i in issues_b if i not in set_a)),
+        "resolved": list(dict.fromkeys(i for i in issues_a if i not in set_b)),
+    }
 
 
 class SnapshotManager:
@@ -29,24 +47,62 @@ class SnapshotManager:
     :meth:`_collect_extra_metrics` when they need domain-specific delta fields
     or automatic metric collection from SQLite.
 
+    Four class attributes let a subclass configure the base instead of
+    overriding a method to adapt to it. Set them on the subclass; do not
+    override :meth:`__init__`, :meth:`diff_snapshots` or
+    :meth:`_metrics_changed` to achieve the same effect.
+
+    :cvar package_name: Package name for auto-detecting version
+        (e.g. ``"pycode-kg"``, ``"doc-kg"``). Set this on the subclass rather
+        than overriding ``__init__`` purely to change the default.
+    :cvar dict_metric_deltas: Metric keys whose values are dicts of counts.
+        :meth:`diff_snapshots` emits ``"<key>_delta"`` for each, holding only
+        the entries whose count changed.
+    :cvar metrics_ignore: Metric keys :meth:`_metrics_changed` ignores when
+        deciding whether two snapshots differ meaningfully.
+
     :param snapshots_dir: Directory for snapshot JSON files and manifest.
-    :param package_name: Package name for auto-detecting version
-        (e.g. ``"code-kg"``, ``"doc-kg"``). Defaults to ``"kg-utils"``.
+    :param package_name: Package name for auto-detecting version. Overrides
+        the :attr:`package_name` class attribute for this instance; omit it to
+        use the class attribute.
     :param db_path: Optional SQLite database path for collecting per-module or
         per-directory node counts via :meth:`_collect_breakdown_counts`.
     """
+
+    #: Default package name for version detection. Subclasses override this
+    #: attribute instead of overriding ``__init__`` to change one string.
+    package_name: str = "kg-utils"
+
+    #: Metric keys holding a dict of counts, delta'd by :meth:`diff_snapshots`.
+    dict_metric_deltas: tuple[str, ...] = ()
+
+    #: Metric keys :meth:`_metrics_changed` ignores. Typically paths and other
+    #: environment-dependent values that are not part of the measurement.
+    metrics_ignore: frozenset[str] = frozenset()
+
+    #: Deprecated ``capture()`` keywords, mapped to what replaced them. The
+    #: target is either a metric name or ``"graph_stats_dict"``.
+    #:
+    #: Needed because ``capture()`` ends in ``**extra_metrics``, which accepts
+    #: any keyword. A module that renames one of its own capture keywords gets
+    #: no error from the old name: it lands in the metrics dict under the dead
+    #: name and the new one is simply absent. Declaring the rename here keeps
+    #: the old keyword working and warns, instead of failing silently.
+    capture_aliases: dict[str, str] = {}
 
     def __init__(
         self,
         snapshots_dir: Path | str,
         *,
-        package_name: str = "kg-utils",
+        package_name: str | None = None,
         db_path: Path | str | None = None,
     ) -> None:
         self.snapshots_dir = Path(snapshots_dir)
         self.snapshots_dir.mkdir(parents=True, exist_ok=True)
         self.manifest_path = self.snapshots_dir / "manifest.json"
-        self.package_name = package_name
+        # Falls back to the class attribute, so a subclass sets one string
+        # rather than carrying an __init__ that only forwards to super().
+        self.package_name = package_name if package_name is not None else type(self).package_name
         self.db_path = Path(db_path) if db_path else None
         #: Repository root, inferred as the grandparent of ``snapshots_dir``
         #: — snapshot directories are laid out as ``<repo>/.<kind>kg/snapshots``
@@ -164,6 +220,23 @@ class SnapshotManager:
         :param extra_metrics: Additional domain-specific metric fields.
         :return: New :class:`Snapshot` instance (not yet persisted).
         """
+        for deprecated, current in self.capture_aliases.items():
+            if deprecated not in extra_metrics:
+                continue
+            value = extra_metrics.pop(deprecated)
+            warnings.warn(
+                f"{type(self).__name__}.capture({deprecated}=...) is deprecated; "
+                f"pass {current}={value!r} instead. The old keyword is accepted "
+                f"for now, but it is not a metric name and will be dropped.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if current == "graph_stats_dict":
+                if graph_stats_dict is None:
+                    graph_stats_dict = value
+            else:
+                extra_metrics.setdefault(current, value)
+
         if not version:
             version = self._package_version()
         if branch is None:
@@ -174,6 +247,7 @@ class SnapshotManager:
             key = datetime.now(UTC).isoformat()
 
         metrics: dict[str, Any] = dict(graph_stats_dict or {})
+        metrics.update(self._domain_metrics(metrics))
         metrics.update(extra_metrics)
         metrics = self._relativize_paths(metrics)
 
@@ -200,6 +274,29 @@ class SnapshotManager:
             snapshot.vs_baseline = self._compute_delta(snapshot, baseline)
 
         return snapshot
+
+    def _domain_metrics(self, stats: dict[str, Any]) -> dict[str, Any]:
+        """Return metrics the module collects or derives for itself.
+
+        Override this rather than :meth:`capture`. A ``capture()`` override has
+        to restate the base signature, and restating it is how an unnamed
+        ``key=`` ends up swallowed into ``**extra_metrics`` and never reaches
+        the base -- the defect that shipped as a tree-hash snapshot key in four
+        packages. Collecting metrics here leaves the signature alone, so that
+        cannot happen.
+
+        Two things belong here. Metrics the module queries for itself, such as
+        per-module node counts from SQLite; and values derived from *stats*,
+        such as a node total that discounts one node kind. Returning a domain
+        default is also useful: values returned here are overridden by any
+        same-named ``extra_metrics`` keyword, so a default declared here
+        survives only when the caller supplies nothing.
+
+        :param stats: The graph stats passed to :meth:`capture`, already
+            copied. Mutating it has no effect; return values instead.
+        :return: Domain metric fields to merge into the snapshot's metrics.
+        """
+        return {}
 
     def save_snapshot(self, snapshot: Snapshot, *, force: bool = False) -> Path | None:
         """Persist a snapshot to disk and update the manifest.
@@ -449,13 +546,35 @@ class SnapshotManager:
             for k in all_edge_rels
         }
 
-        return {
-            "a": {"key": snap_a.key, "metrics": snap_a.metrics, "issues": snap_a.issues},
-            "b": {"key": snap_b.key, "metrics": snap_b.metrics, "issues": snap_b.issues},
+        result: dict[str, Any] = {
+            "a": {
+                "key": snap_a.key,
+                "timestamp": snap_a.timestamp,
+                "metrics": snap_a.metrics,
+                "issues": snap_a.issues,
+            },
+            "b": {
+                "key": snap_b.key,
+                "timestamp": snap_b.timestamp,
+                "metrics": snap_b.metrics,
+                "issues": snap_b.issues,
+            },
             "delta": self._compute_delta(snap_b, snap_a),
             "node_counts_delta": node_counts_delta,
             "edge_counts_delta": edge_counts_delta,
+            "issues_delta": _issues_delta(snap_a.issues, snap_b.issues),
         }
+
+        for metric in self.dict_metric_deltas:
+            counts_a: dict[str, int] = snap_a.metrics.get(metric, {}) or {}
+            counts_b: dict[str, int] = snap_b.metrics.get(metric, {}) or {}
+            result[f"{metric}_delta"] = {
+                k: counts_b.get(k, 0) - counts_a.get(k, 0)
+                for k in list(counts_a) + [k for k in counts_b if k not in counts_a]
+                if counts_b.get(k, 0) != counts_a.get(k, 0)
+            }
+
+        return result
 
     # ------------------------------------------------------------------
     # Delta computation — override for domain-specific delta fields
@@ -464,9 +583,19 @@ class SnapshotManager:
     def _metrics_changed(self, new_metrics: dict[str, Any], old_metrics: dict[str, Any]) -> bool:
         """Return ``True`` if metrics represent a meaningful change.
 
-        Override in subclasses to customise.
+        Keys named in the :attr:`metrics_ignore` class attribute are excluded
+        from the comparison. Set that attribute rather than overriding this.
+
+        :param new_metrics: Metrics of the snapshot being saved.
+        :param old_metrics: Metrics of the snapshot it would replace.
+        :return: ``True`` if the two differ outside :attr:`metrics_ignore`.
         """
-        return new_metrics != old_metrics
+        if not self.metrics_ignore:
+            return new_metrics != old_metrics
+        ignore = self.metrics_ignore
+        return {k: v for k, v in new_metrics.items() if k not in ignore} != {
+            k: v for k, v in old_metrics.items() if k not in ignore
+        }
 
     def _compute_delta(self, snap_new: Snapshot, snap_old: Snapshot) -> dict[str, Any]:
         """Compute metrics delta (new - old).
