@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.20.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.21.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -25,6 +25,19 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 ---
 
 ## Latest News
+
+- **0.21.0 (2026-09-09)** — Two fixes to state that reaches disk.
+  `SnapshotManager.save_snapshot()`'s dedup branch refreshed only four fields
+  of the manifest entry it reused, so re-saving a snapshot with a corrected
+  `subject` — or any changed `metrics_ignore` key — updated the file and left
+  the manifest carrying the old value, with a zero exit. `snapshot list` reads
+  the manifest and `snapshot show` reads the file, so the two could disagree
+  indefinitely. Both branches now build the entry from one place.
+  `SqliteVecBackend` raises the new `VectorStoreNotFoundError` when a store is
+  read before anything built it, instead of a bare
+  `sqlite3.OperationalError("unable to open database file")` that named
+  neither the file nor what creates it — and no longer leaves an empty
+  database behind when the path was simply wrong.
 
 - **0.20.0 (2026-09-08)** — Six extension points on `SnapshotManager`, each
   replacing an override that two or more KG modules were carrying:
@@ -609,7 +622,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.20.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.21.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -617,7 +630,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.20.0},
+  version   = {0.21.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

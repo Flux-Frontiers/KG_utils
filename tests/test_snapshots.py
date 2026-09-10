@@ -719,6 +719,81 @@ def test_capture_records_subject_and_tool_separately(mgr: SnapshotManager) -> No
     assert snap.tool_version == mgr._package_version()
 
 
+def test_dedup_refresh_keeps_manifest_and_file_in_agreement(mgr: SnapshotManager) -> None:
+    """Re-saving with a corrected subject must update the manifest, not only the file.
+
+    The dedup branch used to copy four fields onto the existing entry, so
+    ``subject``, ``tool``, ``tool_version`` and ``version`` kept whatever the
+    first save wrote. ``snapshot list`` reads the manifest and ``snapshot show``
+    reads the file, so the two disagreed indefinitely with a zero exit.
+    """
+    stats = {"total_nodes": 10, "total_edges": 4}
+    first = mgr.capture(
+        version="1.18.0",
+        branch="main",
+        graph_stats_dict=stats,
+        key="1.18.0",
+        subject="repo:gutenberg-kg",
+    )
+    mgr.save_snapshot(first)
+
+    corrected = mgr.capture(
+        version="1.18.0",
+        branch="main",
+        graph_stats_dict=stats,
+        key="1.18.0",
+        subject="corpus:gutenberg",
+    )
+    path = mgr.save_snapshot(corrected)
+    assert path is not None
+
+    entries = mgr.list_snapshots()
+    assert len(entries) == 1, "dedup must refresh in place, not append"
+    entry = entries[0]
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+
+    assert entry["subject"] == "corpus:gutenberg"
+    for field in ("key", "branch", "timestamp", "version", "subject", "tool", "tool_version"):
+        assert entry[field] == on_disk[field], f"{field} diverged between manifest and file"
+
+
+def test_dedup_refresh_updates_ignored_metrics(tmp_path: Path) -> None:
+    """A metrics_ignore key differs without counting as a change; the entry still refreshes.
+
+    Same divergence as the provenance fields, reached down the one path that
+    is allowed to treat two different metrics dicts as equal.
+    """
+
+    class Sub(SnapshotManager):
+        metrics_ignore = frozenset({"db_path"})
+
+    mgr = Sub(tmp_path / "snapshots")
+    mgr.save_snapshot(
+        mgr.capture(
+            version="1.0.0",
+            branch="main",
+            graph_stats_dict={"total_nodes": 3, "total_edges": 1},
+            key="1.0.0",
+            db_path="/old/graph.sqlite",
+        )
+    )
+    path = mgr.save_snapshot(
+        mgr.capture(
+            version="1.0.0",
+            branch="main",
+            graph_stats_dict={"total_nodes": 3, "total_edges": 1},
+            key="1.0.0",
+            db_path="/new/graph.sqlite",
+        )
+    )
+    assert path is not None
+
+    entries = mgr.list_snapshots()
+    assert len(entries) == 1
+    assert entries[0]["metrics"]["db_path"] == "/new/graph.sqlite"
+    assert entries[0]["metrics"] == json.loads(path.read_text(encoding="utf-8"))["metrics"]
+
+
 def test_manifest_dual_read_keeps_legacy_entries_addressable(mgr: SnapshotManager) -> None:
     """A tree-hash-keyed manifest written by an older release still loads."""
     key = "c" * 40
