@@ -54,6 +54,22 @@ from typing import Any, Protocol, runtime_checkable
 _LOG = logging.getLogger(__name__)
 
 
+class VectorStoreNotFoundError(FileNotFoundError):
+    """Raised when a vector store is read before anything has built it.
+
+    Reading a store that is not there used to surface as a bare
+    ``sqlite3.OperationalError("unable to open database file")`` when the
+    parent directory was missing, and as ``no such table: vec_meta`` further
+    downstream when the directory existed but the file did not. Neither names
+    the file or says what creates it.
+
+    Subclasses :class:`FileNotFoundError` so callers already catching
+    :class:`OSError` are unaffected, and so a caller that would rather degrade
+    -- capture the graph metrics and skip the vector-derived ones -- can catch
+    this specific case instead of guessing at a driver error.
+    """
+
+
 @runtime_checkable
 class VectorBackend(Protocol):
     """Storage seam for a semantic vector index.
@@ -458,7 +474,23 @@ class SqliteVecBackend:
         self._fresh = wipe or not existed
 
     def _c(self) -> Any:
+        """Return the lazy read connection, refusing to invent a missing store.
+
+        ``sqlite3.connect`` creates whatever file it is pointed at, so without
+        this check a mistyped path yields an empty database and a confusing
+        failure later. :meth:`open` is the path that legitimately creates the
+        store and does not come through here.
+
+        :return: The open SQLite connection.
+        :raises VectorStoreNotFoundError: If the store file does not exist.
+        """
         if self._conn is None:
+            if not self.db_path.exists():
+                raise VectorStoreNotFoundError(
+                    f"Vector store not found: {self.db_path}. Nothing has written it -- "
+                    "build the knowledge graph first, or call open() to create an "
+                    "empty store."
+                )
             self._conn = self._connect()
         return self._conn
 

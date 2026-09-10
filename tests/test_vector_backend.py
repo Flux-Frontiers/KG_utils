@@ -26,6 +26,7 @@ design; see the note in the module docstring of `kg_utils.vector_backend`.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -36,6 +37,7 @@ from kg_utils.vector_backend import (
     LanceDBBackend,
     SqliteVecBackend,
     VectorBackend,
+    VectorStoreNotFoundError,
     _pq_subvectors,
 )
 
@@ -327,3 +329,56 @@ def test_semantic_index_over_backend(tmp_path):
     # filtered search reaches the backend's where path
     hits2 = idx.search("alpha", k=4, where="kind = 'function'")
     assert all(h.kind == "function" for h in hits2)
+
+
+# -- missing store -----------------------------------------------------------
+
+
+def test_searching_a_missing_store_names_the_path(tmp_path: Path) -> None:
+    """A store nobody built must say so, not raise a driver error.
+
+    Previously this surfaced as ``sqlite3.OperationalError("unable to open
+    database file")`` when the parent directory was missing -- naming neither
+    the file nor what creates it. ``count()`` and ``existing_ids()`` already
+    degraded to 0 and the empty set; ``search()`` is the path that reaches
+    the connection unguarded.
+    """
+    missing = tmp_path / "never-built" / "vectors.sqlite"
+    backend = SqliteVecBackend(missing, dim=4)
+
+    with pytest.raises(VectorStoreNotFoundError, match=str(missing)):
+        backend.search([0.0, 0.0, 0.0, 1.0], 5)
+
+
+def test_searching_a_missing_store_does_not_invent_one(tmp_path: Path) -> None:
+    """With the parent present, sqlite would have created an empty database.
+
+    That turned a mistyped path into ``no such table: vec_meta`` further down,
+    and left a stray file behind.
+    """
+    missing = tmp_path / "vectors.sqlite"
+    backend = SqliteVecBackend(missing, dim=4)
+
+    with pytest.raises(VectorStoreNotFoundError):
+        backend.search([0.0, 0.0, 0.0, 1.0], 5)
+    assert not missing.exists()
+
+
+def test_missing_store_error_is_catchable_as_oserror(tmp_path: Path) -> None:
+    """Callers already catching OSError keep working; a degrading caller can be specific."""
+    backend = SqliteVecBackend(tmp_path / "absent.sqlite", dim=4)
+
+    with pytest.raises(OSError):
+        backend.search([0.0, 0.0, 0.0, 1.0], 5)
+
+
+def test_open_still_creates_a_store(tmp_path: Path) -> None:
+    """The guard is on the lazy read path only -- open() is what builds."""
+    path = tmp_path / "fresh" / "vectors.sqlite"
+    backend = SqliteVecBackend(path, dim=4)
+    backend.open()
+    try:
+        assert path.exists()
+        assert backend.search([0.0, 0.0, 0.0, 1.0], 5) == []
+    finally:
+        backend.close()

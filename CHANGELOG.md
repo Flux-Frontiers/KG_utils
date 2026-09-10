@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-09
+
+### Added
+
+- **`VectorStoreNotFoundError`** in `kg_utils.vector_backend`. A subclass of
+  `FileNotFoundError`, so callers already catching `OSError` are unaffected,
+  and a caller that would rather degrade -- capture the graph metrics, skip
+  the vector-derived ones -- can catch this case specifically instead of
+  guessing at a driver error.
+
+### Fixed
+
+- **`SnapshotManager.save_snapshot()` left the manifest's provenance stale on
+  its dedup path.** When `version` and `metrics` matched the newest entry, the
+  method rewrote the snapshot file from the new `Snapshot` but copied only
+  `key`, `branch`, `timestamp` and `file` onto the manifest entry. `subject`,
+  `tool`, `tool_version` and `version` kept whatever the previous save wrote.
+  Re-saving with a corrected `--subject` therefore updated the file and not
+  the manifest, silently and with a zero exit -- and the two are read by
+  different consumers, `snapshot list` and fleet audits from the manifest,
+  `snapshot show` from the file, so they could disagree indefinitely with
+  nothing surfacing it.
+
+  Observed in `gutenberg_kg`, whose manifest recorded `1.18.0` as
+  `subject: repo:gutenberg-kg` while `1.18.0.json` said `corpus:gutenberg`.
+
+  Both branches now build the entry through one `_manifest_entry()` method, so
+  the manifest and the file cannot carry different provenance for the same key.
+  That also closes a second divergence on the same path: any key named in
+  `metrics_ignore` is by definition allowed to differ without counting as a
+  change, and its new value was likewise never reaching the manifest.
+
+  Same family as the `load_snapshot` delta fix in 0.19.1 and the bare
+  `Snapshot` rebuild fixed in `doc_kg` 0.24.1 -- provenance dropped on the way
+  to disk rather than at capture.
+
+- **`SqliteVecBackend` reported a missing vector store as a driver error.**
+  Reading a store that nothing had built surfaced as
+  `sqlite3.OperationalError("unable to open database file")` when the parent
+  directory was absent, naming neither the file nor the command that writes
+  it. When the directory existed, it was worse: `sqlite3.connect` created an
+  empty database, so a mistyped path failed further downstream as `no such
+  table: vec_meta` and left a stray file behind. The lazy read path now checks
+  for the store and raises `VectorStoreNotFoundError` naming the path.
+  `open()`, which is what legitimately creates a store, is unchanged;
+  `count()` and `existing_ids()` already degraded to `0` and the empty set.
+
+### Removed
+
+- The two opt-in live-server tests in `tests/test_embedder_tei.py`, gated on
+  `KG_EMBED_ENDPOINT`. No TEI server is run in this fleet, so they never did
+  anything but report a skip. `TEIEmbedder` itself is unchanged and its 35
+  stubbed tests still run.
+
 ## [0.20.0] - 2026-09-08
 
 ### Added

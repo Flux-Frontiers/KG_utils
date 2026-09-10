@@ -1,8 +1,9 @@
 """Tests for kg_utils.embedder.TEIEmbedder — remote Text Embeddings Inference backend.
 
-The unit tests stub the HTTP layer, so the whole file runs with no server and
-no heavy dependencies.  The handful of tests needing a live TEI are marked
-``integration`` and skip unless ``KG_EMBED_ENDPOINT`` is set.
+The tests stub the HTTP layer, so the file runs with no server and no heavy
+dependencies.  Two live-server tests used to sit here behind a
+``KG_EMBED_ENDPOINT`` gate; they were removed because no TEI server is run in
+this fleet, so they never did anything but report a skip.
 """
 
 # pylint: disable=redefined-outer-name,missing-function-docstring,protected-access
@@ -11,8 +12,6 @@ from __future__ import annotations
 
 import io
 import json
-import math
-import os
 from typing import Any
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
@@ -358,37 +357,3 @@ def test_short_response_is_refused(embedder: TEIEmbedder) -> None:
         pytest.raises(RuntimeError, match="2 vectors for 3 inputs"),
     ):
         embedder.embed_texts(["a", "b", "c"])
-
-
-# ---------------------------------------------------------------------------
-# Live server (opt-in)
-# ---------------------------------------------------------------------------
-
-_LIVE = os.environ.get("KG_EMBED_ENDPOINT")
-
-
-@pytest.mark.integration
-@pytest.mark.skipif(not _LIVE, reason="set KG_EMBED_ENDPOINT to a live TEI server")
-def test_live_probe_and_embed() -> None:
-    emb = TEIEmbedder(_LIVE)
-    assert emb.dim > 0
-
-    vecs = emb.embed_texts(["Call me Ishmael.", "The whale surfaced."])
-    assert len(vecs) == 2
-    assert all(len(v) == emb.dim for v in vecs)
-    norm = math.sqrt(sum(x * x for x in vecs[0]))
-    assert abs(norm - 1.0) < 1e-4
-
-
-@pytest.mark.integration
-@pytest.mark.skipif(not _LIVE, reason="set KG_EMBED_ENDPOINT to a live TEI server")
-def test_live_matches_sentence_transformers() -> None:
-    """Parity gate from the Phase 0 evaluation: cosine >= 0.999 against ST."""
-    ste = pytest.importorskip("kg_utils.embedder").SentenceTransformerEmbedder
-    texts = ["Call me Ishmael.", "The try-works were started at nine o'clock."]
-
-    tei_vecs = TEIEmbedder(_LIVE).embed_texts(texts)
-    st_vecs = ste().embed_texts(texts)
-
-    for a, b in zip(tei_vecs, st_vecs):
-        assert sum(x * y for x, y in zip(a, b)) > 0.999

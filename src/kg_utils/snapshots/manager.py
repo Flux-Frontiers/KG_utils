@@ -298,6 +298,33 @@ class SnapshotManager:
         """
         return {}
 
+    def _manifest_entry(self, snapshot: Snapshot, snapshot_file: Path) -> dict[str, Any]:
+        """Return the manifest record describing *snapshot*.
+
+        Both branches of :meth:`save_snapshot` build their entry here so that
+        the manifest and the snapshot file can never carry different
+        provenance for the same key.
+
+        :param snapshot: The snapshot being recorded.
+        :param snapshot_file: The file it was written to.
+        :return: The manifest entry, ready to append or to replace one with.
+        """
+        return {
+            "key": snapshot.key,
+            "branch": snapshot.branch,
+            "timestamp": snapshot.timestamp,
+            "version": snapshot.version,
+            "subject": snapshot.subject,
+            "tool": snapshot.tool,
+            "tool_version": snapshot.tool_version,
+            "file": snapshot_file.name,
+            "metrics": snapshot.metrics,
+            "deltas": {
+                "vs_previous": snapshot.vs_previous,
+                "vs_baseline": snapshot.vs_baseline,
+            },
+        }
+
     def save_snapshot(self, snapshot: Snapshot, *, force: bool = False) -> Path | None:
         """Persist a snapshot to disk and update the manifest.
 
@@ -342,10 +369,15 @@ class SnapshotManager:
                 if old_key != snapshot.key and old_file.exists():
                     old_file.unlink()
 
-                latest_entry["key"] = snapshot.key
-                latest_entry["branch"] = snapshot.branch
-                latest_entry["timestamp"] = snapshot.timestamp
-                latest_entry["file"] = snapshot_file.name
+                # Replace the record wholesale rather than patching a few
+                # fields: a partial refresh left ``subject``, ``tool``,
+                # ``tool_version``, ``version`` and any ``metrics_ignore`` key
+                # holding whatever the *previous* save wrote, so the manifest
+                # and the file on disk could disagree indefinitely -- ``list``
+                # reads one, ``show`` the other, and nothing surfaced it.
+                # Mutating in place keeps the entry's position in the history.
+                latest_entry.clear()
+                latest_entry.update(self._manifest_entry(snapshot, snapshot_file))
 
                 manifest.last_update = datetime.now(UTC).isoformat()
                 self._save_manifest(manifest)
@@ -360,21 +392,7 @@ class SnapshotManager:
             None,
         )
 
-        manifest_entry: dict[str, Any] = {
-            "key": snapshot.key,
-            "branch": snapshot.branch,
-            "timestamp": snapshot.timestamp,
-            "version": snapshot.version,
-            "subject": snapshot.subject,
-            "tool": snapshot.tool,
-            "tool_version": snapshot.tool_version,
-            "file": snapshot_file.name,
-            "metrics": snapshot.metrics,
-            "deltas": {
-                "vs_previous": snapshot.vs_previous,
-                "vs_baseline": snapshot.vs_baseline,
-            },
-        }
+        manifest_entry = self._manifest_entry(snapshot, snapshot_file)
 
         if existing_idx is not None:
             manifest.snapshots[existing_idx] = manifest_entry
