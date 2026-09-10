@@ -26,7 +26,7 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
-- **0.21.0 (2026-09-09)** — Two fixes to state that reaches disk.
+- **0.21.0 (2026-09-10)** — Two fixes to state that reaches disk.
   `SnapshotManager.save_snapshot()`'s dedup branch refreshed only four fields
   of the manifest entry it reused, so re-saving a snapshot with a corrected
   `subject` — or any changed `metrics_ignore` key — updated the file and left

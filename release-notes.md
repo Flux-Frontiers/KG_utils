@@ -1,56 +1,56 @@
-# Release Notes — v0.20.0
+# Release Notes — v0.21.0
 
-> Released: 2026-09-08
+> Released: 2026-09-10
 
-### Added
+Two defects that both let disk state go quietly wrong, plus the typed exception
+that lets a caller tell one of them apart from a driver failure. Nothing here
+changes an API you are already calling; the snapshot fix corrects data that
+`save_snapshot` was writing incorrectly, so the value is in upgrading rather
+than in adopting anything new.
 
-Five extension points on `SnapshotManager`, each replacing an override that
-two or more KG modules were carrying. Nothing here changes existing behaviour:
-every default reproduces what the base did in 0.19.1.
+## What changed
 
-- **`package_name` as a class attribute.** Seven of the eight KG modules carry
-  an `__init__` whose entire body is `super().__init__(snapshots_dir,
-  package_name="...", db_path=db_path)`. A subclass now sets the attribute and
-  deletes the method. An explicit `package_name=` keyword still wins for a
-  single instance.
+**Snapshot provenance no longer drifts between the manifest and the file.**
+`SnapshotManager.save_snapshot()` has a dedup path: when a save matches the
+newest entry's version and metrics, it refreshes that entry in place instead of
+appending. It rewrote the snapshot file completely but copied only four fields
+onto the manifest entry, so `subject`, `tool`, `tool_version` and `version` kept
+whatever the previous save had written. Re-saving with a corrected `--subject`
+updated the file and left the manifest stale, with a zero exit and nothing
+printed. That matters because different commands read different halves:
+`snapshot list` and fleet-wide audits read the manifest, `snapshot show` reads
+the file. They could disagree indefinitely with nothing surfacing it, and in
+`gutenberg_kg` they did. Both paths now build the entry through a single
+`_manifest_entry()` method, which also closes the same gap for any metric named
+in `metrics_ignore`.
 
-- **`_domain_metrics(stats)`, a capture hook.** Modules that collect their own
-  metrics -- per-module node counts, per-directory counts, topic counts --
-  override `capture()` to do it, which means restating the base signature.
-  Restating it is how an unnamed `key=` fell into `**extra_metrics` and shipped
-  four packages keyed on a tree hash. Collecting metrics in `_domain_metrics()`
-  leaves the signature alone, so that failure cannot recur. It receives the
-  graph stats, so a module can also derive a metric from them, and the values
-  it returns yield to a same-named `extra_metrics` keyword, so it can declare
-  a domain default that an explicit caller overrides.
+**A missing vector store now says so.** Reading a store that nothing had built
+surfaced as `sqlite3.OperationalError("unable to open database file")`, naming
+neither the path nor the command that creates it. Where the parent directory
+happened to exist it was worse: `sqlite3.connect` created an empty database, so
+a mistyped path failed later as `no such table: vec_meta` and left a stray file
+behind. The lazy read path now checks first and raises the new
+`VectorStoreNotFoundError` with the path in the message. `open()`, which is what
+legitimately creates a store, is unchanged.
 
-- **`timestamp` in the `diff_snapshots` result.** `doc_kg` and `memory_kg`
-  carried byte-identical `diff_snapshots` overrides that existed for nothing
-  but this, at the cost of two extra `load_snapshot` calls each.
+**`VectorStoreNotFoundError` is a `FileNotFoundError`.** Callers already
+catching `OSError` keep working untouched. The reason to subclass rather than
+raise a bare `FileNotFoundError` is that a consumer which would rather degrade
+than abort — capture the graph metrics, skip the vector-derived ones — can now
+catch this one condition instead of pattern-matching driver text. `swift_kg` was
+doing exactly that string match, and it is the reason this type exists.
 
-- **`issues_delta` in the `diff_snapshots` result.** `issues` is a base field
-  and "introduced / resolved" needs no domain knowledge. Ordered by appearance
-  in the source list rather than by set iteration, so the result is stable
-  across runs.
+## Upgrading
 
-- **`dict_metric_deltas`, a class attribute.** `pycode_kg`
-  (`module_node_counts`), `ftree_kg` (`dir_node_counts`) and `diary_kg`
-  (`topic_counts`) each hand-rolled the same loop: diff a dict-valued metric,
-  keep only the changed keys. Naming the metric keys on the subclass emits
-  `"<key>_delta"` for each.
+Nothing to migrate. Existing snapshots are readable as they were, and no
+signature changed.
 
-- **`metrics_ignore`, a class attribute.** `doc_kg`'s `_metrics_changed`
-  override exists only to drop `db_path` before comparing. Empty by default,
-  so `_metrics_changed` is unchanged for every other module.
-
-- **`capture_aliases`, a class attribute.** `capture()` ends in
-  `**extra_metrics`, so it accepts any keyword. A module that renames one of
-  its own capture keywords therefore gets no error from the old name: the value
-  lands in the metrics dict under the dead name and the new one is simply
-  absent. That is the same silence that shipped four packages keyed on a tree
-  hash. Declaring `{old: new}` keeps the old keyword working and raises a
-  `DeprecationWarning` naming the replacement. The target may be a metric name
-  or `graph_stats_dict`; an explicitly passed current keyword always wins.
+Two things are worth doing after upgrading. If you have ever re-saved a snapshot
+with a corrected `--subject`, check that `snapshot list` and `snapshot show`
+agree for that key — the fix stops new drift but does not repair an entry
+already written. And if your module classifies a missing vector store by
+matching on error text, switch to `except VectorStoreNotFoundError`; keep the
+substring check only if you must also support a store written before 0.21.0.
 
 ---
 
