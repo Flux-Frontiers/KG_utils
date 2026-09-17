@@ -49,7 +49,6 @@ from PyQt5.QtWidgets import QDialog, QLabel, QProgressBar, QPushButton, QVBoxLay
 
 __all__ = [
     "DEFAULT_CAST_SCALE",
-    "DEFAULT_CAST_VIEW_CONE",
     "DEFAULT_QUILT_PRESET",
     "CastResult",
     "ImagePopup",
@@ -68,15 +67,6 @@ DEFAULT_QUILT_PRESET: str = "16-landscape"
 #: resulting PNG, and its decode time scales with the image's area.  Half-size
 #: is roughly a quarter of the pixels for a difference the panel does not show.
 DEFAULT_CAST_SCALE: float = 0.5
-
-#: Degrees the cast sweeps, overriding the preset's own view cone.  A preset
-#: carries the cone its panel can display -- 50 for the 16" landscape -- but
-#: quiltwright's CLI and render scripts cap the sweep at 35, because the wider
-#: the sweep the further a feature shifts between neighbouring views, and past
-#: roughly 5 px of shift the display stops fusing them and hard edges ghost.
-#: Without this, a cast of the same scene ghosts where a quilt rendered by the
-#: consuming CLI holds.
-DEFAULT_CAST_VIEW_CONE: float = 35.0
 
 #: Workers that outlived their window.  A ``QThread`` destroyed while running
 #: takes the process with it, so a session that cannot stop one in time parks
@@ -461,7 +451,7 @@ def cast_scene_to_looking_glass(
     out_stem: str | Path,
     spec: Any | None = None,
     *,
-    view_cone: float | None = DEFAULT_CAST_VIEW_CONE,
+    view_cone: float | None = None,
     progress: Callable[[int, int, str], None] | None = None,
 ) -> CastResult:
     """Render a scene off-screen as a quilt and push it to the Looking Glass.
@@ -483,10 +473,10 @@ def cast_scene_to_looking_glass(
     :param out_stem: Output path stem; the quilt suffix is appended.
     :param spec: Quilt spec to render at.  Defaults to
         :data:`DEFAULT_QUILT_PRESET` scaled by :data:`DEFAULT_CAST_SCALE`.
-    :param view_cone: Degrees the camera sweeps, overriding the spec's own
-        cone.  Defaults to :data:`DEFAULT_CAST_VIEW_CONE`; pass ``None`` to
-        sweep whatever the spec carries, which is the panel's full cone and
-        wider than what reliably fuses.
+    :param view_cone: Degrees the camera sweeps, honored as given even if
+        wider than the cap.  ``None`` takes the spec's own cone capped at
+        ``quiltwright.quilt.STANDARD_VIEW_CONE``, which is what the quiltwright
+        CLI and the render scripts sweep.
     :param progress: Called as ``(step, total, message)`` before each stage,
         for a status bar.  A Qt caller should pump its event loop here.
     :return: A :class:`CastResult`; nothing here raises, because a dark panel
@@ -494,6 +484,7 @@ def cast_scene_to_looking_glass(
     """
     import pyvista as pv
     from quiltwright import QUILT_PRESETS, render_quilt, save_and_cast_quilt
+    from quiltwright.quilt import resolve_view_cone
 
     if spec is None:
         spec = QUILT_PRESETS[DEFAULT_QUILT_PRESET].scaled(DEFAULT_CAST_SCALE)
@@ -509,8 +500,13 @@ def cast_scene_to_looking_glass(
         build_scene(offscreen)
         offscreen.camera_position = camera_position
 
-        _step(2, f"rendering {spec.n_views} views at {spec.tile_width}x{spec.tile_height}...")
-        quilt = render_quilt(offscreen, spec, view_cone=view_cone)
+        spec, capped_from = resolve_view_cone(spec, view_cone)
+        narrowed = f" (cone {capped_from:g} -> {spec.view_cone:g})" if capped_from else ""
+        _step(
+            2,
+            f"rendering {spec.n_views} views at {spec.tile_width}x{spec.tile_height}{narrowed}...",
+        )
+        quilt = render_quilt(offscreen, spec)
 
         _step(3, f"writing {spec.quilt_width}x{spec.quilt_height} quilt...")
         _step(4, "handing to Bridge...")

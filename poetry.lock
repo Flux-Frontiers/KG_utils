@@ -3795,15 +3795,15 @@ markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\") and (
 
 [[package]]
 name = "quiltwright"
-version = "0.7.0"
-description = "Holographic output for Looking Glass displays: off-axis multi-view quilts from PyVista or POV-Ray scenes"
+version = "0.14.1"
+description = "Holographic output for Looking Glass displays: off-axis multi-view quilts from PyVista, POV-Ray or Blender Cycles scenes"
 optional = true
 python-versions = "<3.14,>=3.12"
 groups = ["main"]
 markers = "extra == \"viz3d-qt\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
-    {file = "quiltwright-0.7.0-py3-none-any.whl", hash = "sha256:10c9e11d609ca1ab988648da776c0f4964b37d32dda4b4964cf4366d9c6674cb"},
-    {file = "quiltwright-0.7.0.tar.gz", hash = "sha256:532110b204cb822df686d05a37baa8502d8dddadf80a84b22ce0c689d49f23f0"},
+    {file = "quiltwright-0.14.1-py3-none-any.whl", hash = "sha256:f8f0576ac7ee66298f1d3f1109c51d3b167cff7bc1bd599e6987daaa44d710ee"},
+    {file = "quiltwright-0.14.1.tar.gz", hash = "sha256:e53a633eb22e72aec2de7b866d8b97294755764398698f68fed928f6cb87be78"},
 ]
 
 [package.dependencies]
@@ -3812,6 +3812,8 @@ numpy = ">=1.26"
 pillow = ">=10.0"
 
 [package.extras]
+heic = ["pillow-heif (>=0.16)"]
+molecules = ["pypdb2pov (>=0.1.1)"]
 video = ["imageio-ffmpeg (>=0.4)"]
 viz = ["pyvista (>=0.44)"]
 
@@ -4985,4 +4987,4 @@ viz3d-render = ["numpy", "pyvista"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "52e9a27f5cbb1ca13455183f13d3414fdd2ad678d915cc936fffbd2b7f36823b"
+content-hash = "5dc7f779f39261cbe3e034d6e4a09e545a29b83f66f9dd251038a3ace8cc4251"

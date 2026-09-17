@@ -21,7 +21,6 @@ from PyQt5.QtWidgets import QApplication, QLabel, QProgressBar, QWidget  # noqa:
 
 from kg_utils.viz3d.qt import (  # noqa: E402
     _ORPHANED_WORKERS,
-    DEFAULT_CAST_VIEW_CONE,
     ImagePopup,
     PovRenderSession,
     PovRenderWorker,
@@ -263,10 +262,11 @@ class TestCastSceneToLookingGlass:
         assert result.path is None
         assert seen and seen[0][0] == 1
 
-    def test_the_sweep_is_capped_below_the_preset_cone(self, qapp, monkeypatch):
+    def test_the_sweep_is_capped_at_quiltwrights_standard_cone(self, qapp, monkeypatch):
         """A preset carries its panel's full cone; a wider sweep ghosts."""
         _needs_cast_support()
         import quiltwright
+        from quiltwright.quilt import STANDARD_VIEW_CONE
 
         seen: dict[str, object] = {}
 
@@ -278,22 +278,38 @@ class TestCastSceneToLookingGlass:
         panel_spec = _tiny_spec(view_cone=50.0)  # as 16-landscape carries
         monkeypatch.setattr(quiltwright, "render_quilt", fake_render_quilt)
         cast_scene_to_looking_glass(lambda _p: None, None, "unused", panel_spec)
-        assert seen["spec"] is panel_spec  # the spec is untouched
-        assert seen["view_cone"] == DEFAULT_CAST_VIEW_CONE < panel_spec.view_cone
+        assert seen["spec"].view_cone == STANDARD_VIEW_CONE < panel_spec.view_cone
+        assert "view_cone" not in seen  # the resolved spec carries it
 
-    def test_the_caller_may_sweep_the_specs_own_cone(self, qapp, monkeypatch):
+    def test_a_cone_narrower_than_the_cap_is_left_alone(self, qapp, monkeypatch):
+        """quiltwright's rule caps a wide cone; it never widens a narrow one."""
         _needs_cast_support()
         import quiltwright
 
         seen: dict[str, object] = {}
 
         def fake_render_quilt(_plotter, spec, **kwargs):
-            seen.update(kwargs)
+            seen["spec"] = spec
+            raise RuntimeError("stop after the cone is chosen")
+
+        narrow = _tiny_spec(view_cone=20.0)
+        monkeypatch.setattr(quiltwright, "render_quilt", fake_render_quilt)
+        cast_scene_to_looking_glass(lambda _p: None, None, "unused", narrow)
+        assert seen["spec"].view_cone == 20.0
+
+    def test_an_explicit_cone_is_honored_even_past_the_cap(self, qapp, monkeypatch):
+        _needs_cast_support()
+        import quiltwright
+
+        seen: dict[str, object] = {}
+
+        def fake_render_quilt(_plotter, spec, **kwargs):
+            seen["spec"] = spec
             raise RuntimeError("stop after the cone is chosen")
 
         monkeypatch.setattr(quiltwright, "render_quilt", fake_render_quilt)
-        cast_scene_to_looking_glass(lambda _p: None, None, "unused", _tiny_spec(), view_cone=None)
-        assert seen["view_cone"] is None
+        cast_scene_to_looking_glass(lambda _p: None, None, "unused", _tiny_spec(), view_cone=50.0)
+        assert seen["spec"].view_cone == 50.0
 
     def test_progress_is_reported_before_each_stage(self, qapp):
         _needs_cast_support()
