@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.21.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.22.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -25,6 +25,18 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 ---
 
 ## Latest News
+
+- **0.22.0 (2026-09-17)** -- `cast_scene_to_looking_glass()` caps the camera
+  sweep at 35 degrees instead of sweeping the preset's full cone. It rendered
+  with no `view_cone`, so a cast swept whatever the preset carries -- 50
+  degrees for `16-landscape`, the cone the panel can display rather than the
+  cone that reliably fuses -- while the same repo's CLI, rendering the same
+  scene through quiltwright, swept 35. The difference was visible only on the
+  glass. The cap is not redeclared here: the cast path calls quiltwright's
+  `resolve_view_cone()`, which caps rather than overrides, so a spec already
+  under 35 keeps its own cone. A new `view_cone` argument is honored as given,
+  including past the cap, and a narrowed cone is named in the progress
+  message. The `viz3d-qt` extra now needs `quiltwright>=0.14.1`.
 
 - **0.21.0 (2026-09-10)** — Two fixes to state that reaches disk.
   `SnapshotManager.save_snapshot()`'s dedup branch refreshed only four fields
@@ -436,7 +448,7 @@ about the host window.
 | `PovRenderSession` | Owns the render lifecycle: temp views directory, file-count progress, cleanup, and a `shutdown()` that detaches from a live worker so closing the window mid-render cannot abort the process |
 | `PovRenderWorker` | `QThread` that runs POV-Ray off the GUI thread |
 | `ImagePopup` | Dialog that previews the rendered image |
-| `cast_scene_to_looking_glass()` | Build the PyVista scene, render, write the quilt, and cast it to the display; returns a `CastResult` |
+| `cast_scene_to_looking_glass()` | Build the PyVista scene, render, write the quilt, and cast it to the display; sweeps the spec's cone capped at 35 degrees unless `view_cone` says otherwise, and returns a `CastResult` |
 | `CastResult` | Outcome of one cast: `path`, `error`, `elapsed`, and the `message` a status bar shows |
 | `DEFAULT_QUILT_PRESET` / `DEFAULT_CAST_SCALE` | The preset and scale a cast uses when no `spec` is given (`"16-landscape"` at half size) |
 
@@ -622,7 +634,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.21.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.22.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -630,7 +642,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.21.0},
+  version   = {0.22.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

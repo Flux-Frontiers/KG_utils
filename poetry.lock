@@ -4987,4 +4987,4 @@ viz3d-render = ["numpy", "pyvista"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "5dc7f779f39261cbe3e034d6e4a09e545a29b83f66f9dd251038a3ace8cc4251"
+content-hash = "2a7934b928e2f6c35bac6e8f7f016dc3463d728301b81c421ae18fc553000882"

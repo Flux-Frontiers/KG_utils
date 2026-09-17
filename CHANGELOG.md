@@ -7,11 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [0.22.0] - 2026-09-17
+
+### Added
+
+- **`cast_scene_to_looking_glass(..., view_cone=...)`** -- the degrees the
+  camera sweeps, honored as given even past the 35-degree cap. `None`, the
+  default, takes the spec's own cone capped, which is the behaviour described
+  under Fixed below.
+
 ### Changed
 
-- **The `viz3d-qt` extra now needs `quiltwright>=0.14.0`** (was `>=0.7.0`), for
-  `quiltwright.quilt.resolve_view_cone`. Only the cast path is affected; a
-  consumer that does not install `viz3d-qt` sees nothing.
+- **The `viz3d-qt` extra now needs `quiltwright>=0.14.1`** (was `>=0.7.0`), for
+  `quiltwright.quilt.resolve_view_cone`. That function landed in 0.14.0; the
+  floor sits at 0.14.1, the version the cast path is tested against. Only the
+  cast path is affected; a consumer that does not install `viz3d-qt` sees
+  nothing.
 
 ### Fixed
 

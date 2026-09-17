@@ -9,7 +9,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.21.0"
+version = "0.22.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -65,9 +65,10 @@ viz3d-qt = [
     "numpy>=1.24.0",
     "pyvista>=0.44.0",
     "PyQt5>=5.15.0",
-    # 0.14.0 for quiltwright.quilt.resolve_view_cone: the view-cone cap as one
-    # shared function rather than a copy of 35.0 per caller.
-    "quiltwright>=0.14.0",
+    # For quiltwright.quilt.resolve_view_cone: the view-cone cap as one shared
+    # function rather than a copy of 35.0 per caller.  That landed in 0.14.0;
+    # the floor sits at 0.14.1, the version the cast path is tested against.
+    "quiltwright>=0.14.1",
 ]
 # Exact pin: pre-1.0, breaking minors possible. Prebuilt wheels everywhere;
 # also bundled in `semantic` since "auto" defaults to sqlite-vec.
