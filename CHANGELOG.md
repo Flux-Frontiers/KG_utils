@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The `viz3d-qt` extra now needs `quiltwright>=0.14.0`** (was `>=0.7.0`), for
+  `quiltwright.quilt.resolve_view_cone`. Only the cast path is affected; a
+  consumer that does not install `viz3d-qt` sees nothing.
+
+### Fixed
+
+- **`cast_scene_to_looking_glass()` caps the sweep at 35 degrees instead of
+  sweeping the preset's full cone.** It passed the spec to `render_quilt()`
+  with no `view_cone`, so a cast swept whatever the preset carries -- 50
+  degrees for `16-landscape`, the cone the panel can display rather than the
+  cone that reliably fuses. quiltwright's own CLI and render scripts cap the
+  sweep at 35 for that reason: the wider the sweep, the further a feature
+  shifts between neighbouring views, and past roughly 5 px of shift hard edges
+  ghost. Every viewer's Cast button therefore produced a wider sweep than a
+  quilt rendered by the same repo's CLI, of the same scene, with no way to see
+  the difference except on the glass.
+
+  The cap is not redeclared here. quiltwright 0.14.0 pulled it into
+  `resolve_view_cone()` and `STANDARD_VIEW_CONE` precisely so it would stop
+  being a copy per caller, and the cast path now calls that function -- which
+  is a cap, not an override: a spec whose cone is already under 35 keeps it,
+  where a plain default would have widened it. The new `view_cone` parameter
+  is honored as given, including past the cap; `None`, the default, takes the
+  spec's own cone capped. When the cone is narrowed the progress message says
+  so, so a silent widening is not replaced by a silent narrowing.
+
+
 ## [0.21.0] - 2026-09-10
 
 ### Added
@@ -1250,32 +1279,6 @@ every default reproduces what the base did in 0.19.1.
   arg) be pinned to a device — without it, N parallel workers each auto-select MPS and stack N
   GPU allocations into an OOM. This is what makes CPU multiprocessing embedding safe on Apple
   Silicon.
-
-### Changed
-
-- **`embedder.py`** — replaced `from X import Y` lazy imports with `importlib.import_module()`
-  for `sentence_transformers`, `transformers.logging`, `torch`, and `numpy`.  `importlib` returns
-  `Any`, so `ty` no longer flags these optional heavy dependencies as unresolved imports.
-
-- **`synthesis/_image.py`** — same `importlib.import_module()` pattern for the `mflux` loader;
-  removes the old `# type: ignore` override which is no longer needed.
-
-### Fixed
-
-- **CI `type-check` and `test` jobs** — both jobs now install `--extras "semantic" --extras
-  "synthesis"` so that `sentence-transformers`, `transformers`, `torch`, `lancedb`, `httpx`,
-  `openai`, and `pillow` are present in the CI virtualenv, matching local pre-commit behaviour.
-
-- **`tests/test_synthesis_image.py`** — corrected four test assertions that still referenced
-  the old `dall-e-3` default:
-  - expected model updated from `dall-e-3` → `gpt-image-1`
-  - landscape size updated from `1792x1024` → `1536x1024`
-  - portrait size updated from `1024x1792` → `1024x1536`
-  - `test_generate_openai_requests_b64_json` renamed to `test_generate_openai_does_not_set_response_format`
-    and now asserts that `response_format` is absent from the OpenAI call kwargs (gpt-image-1
-    does not accept this parameter)
-
-## [0.4.3] - 2026-06-08
 
 ### Changed
 

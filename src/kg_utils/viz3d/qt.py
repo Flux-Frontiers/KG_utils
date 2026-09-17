@@ -451,6 +451,7 @@ def cast_scene_to_looking_glass(
     out_stem: str | Path,
     spec: Any | None = None,
     *,
+    view_cone: float | None = None,
     progress: Callable[[int, int, str], None] | None = None,
 ) -> CastResult:
     """Render a scene off-screen as a quilt and push it to the Looking Glass.
@@ -472,6 +473,10 @@ def cast_scene_to_looking_glass(
     :param out_stem: Output path stem; the quilt suffix is appended.
     :param spec: Quilt spec to render at.  Defaults to
         :data:`DEFAULT_QUILT_PRESET` scaled by :data:`DEFAULT_CAST_SCALE`.
+    :param view_cone: Degrees the camera sweeps, honored as given even if
+        wider than the cap.  ``None`` takes the spec's own cone capped at
+        ``quiltwright.quilt.STANDARD_VIEW_CONE``, which is what the quiltwright
+        CLI and the render scripts sweep.
     :param progress: Called as ``(step, total, message)`` before each stage,
         for a status bar.  A Qt caller should pump its event loop here.
     :return: A :class:`CastResult`; nothing here raises, because a dark panel
@@ -479,6 +484,7 @@ def cast_scene_to_looking_glass(
     """
     import pyvista as pv
     from quiltwright import QUILT_PRESETS, render_quilt, save_and_cast_quilt
+    from quiltwright.quilt import resolve_view_cone
 
     if spec is None:
         spec = QUILT_PRESETS[DEFAULT_QUILT_PRESET].scaled(DEFAULT_CAST_SCALE)
@@ -494,7 +500,12 @@ def cast_scene_to_looking_glass(
         build_scene(offscreen)
         offscreen.camera_position = camera_position
 
-        _step(2, f"rendering {spec.n_views} views at {spec.tile_width}x{spec.tile_height}...")
+        spec, capped_from = resolve_view_cone(spec, view_cone)
+        narrowed = f" (cone {capped_from:g} -> {spec.view_cone:g})" if capped_from else ""
+        _step(
+            2,
+            f"rendering {spec.n_views} views at {spec.tile_width}x{spec.tile_height}{narrowed}...",
+        )
         quilt = render_quilt(offscreen, spec)
 
         _step(3, f"writing {spec.quilt_width}x{spec.quilt_height} quilt...")

@@ -65,7 +65,9 @@ viz3d-qt = [
     "numpy>=1.24.0",
     "pyvista>=0.44.0",
     "PyQt5>=5.15.0",
-    "quiltwright>=0.7.0",
+    # 0.14.0 for quiltwright.quilt.resolve_view_cone: the view-cone cap as one
+    # shared function rather than a copy of 35.0 per caller.
+    "quiltwright>=0.14.0",
 ]
 # Exact pin: pre-1.0, breaking minors possible. Prebuilt wheels everywhere;
 # also bundled in `semantic` since "auto" defaults to sqlite-vec.
