@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import QApplication, QLabel, QProgressBar, QWidget  # noqa:
 
 from kg_utils.viz3d.qt import (  # noqa: E402
     _ORPHANED_WORKERS,
+    DEFAULT_CAST_VIEW_CONE,
     ImagePopup,
     PovRenderSession,
     PovRenderWorker,
@@ -262,6 +263,38 @@ class TestCastSceneToLookingGlass:
         assert result.path is None
         assert seen and seen[0][0] == 1
 
+    def test_the_sweep_is_capped_below_the_preset_cone(self, qapp, monkeypatch):
+        """A preset carries its panel's full cone; a wider sweep ghosts."""
+        _needs_cast_support()
+        import quiltwright
+
+        seen: dict[str, object] = {}
+
+        def fake_render_quilt(_plotter, spec, **kwargs):
+            seen["spec"] = spec
+            seen.update(kwargs)
+            raise RuntimeError("stop after the cone is chosen")
+
+        panel_spec = _tiny_spec(view_cone=50.0)  # as 16-landscape carries
+        monkeypatch.setattr(quiltwright, "render_quilt", fake_render_quilt)
+        cast_scene_to_looking_glass(lambda _p: None, None, "unused", panel_spec)
+        assert seen["spec"] is panel_spec  # the spec is untouched
+        assert seen["view_cone"] == DEFAULT_CAST_VIEW_CONE < panel_spec.view_cone
+
+    def test_the_caller_may_sweep_the_specs_own_cone(self, qapp, monkeypatch):
+        _needs_cast_support()
+        import quiltwright
+
+        seen: dict[str, object] = {}
+
+        def fake_render_quilt(_plotter, spec, **kwargs):
+            seen.update(kwargs)
+            raise RuntimeError("stop after the cone is chosen")
+
+        monkeypatch.setattr(quiltwright, "render_quilt", fake_render_quilt)
+        cast_scene_to_looking_glass(lambda _p: None, None, "unused", _tiny_spec(), view_cone=None)
+        assert seen["view_cone"] is None
+
     def test_progress_is_reported_before_each_stage(self, qapp):
         _needs_cast_support()
         seen: list[tuple[int, int, str]] = []
@@ -275,8 +308,9 @@ class TestCastSceneToLookingGlass:
         assert seen and seen[0][0] == 1 and seen[0][1] == 4
 
 
-def _tiny_spec():
-    """:return: A minimal 2x2 quilt spec."""
+def _tiny_spec(view_cone: float | None = None):
+    """:return: A minimal 2x2 quilt spec, at *view_cone* degrees if given."""
     from quiltwright import QuiltSpec
 
-    return QuiltSpec(columns=2, rows=2, quilt_width=128, quilt_height=128, aspect=1.0)
+    kwargs = {} if view_cone is None else {"view_cone": view_cone}
+    return QuiltSpec(columns=2, rows=2, quilt_width=128, quilt_height=128, aspect=1.0, **kwargs)

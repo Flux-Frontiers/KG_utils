@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`cast_scene_to_looking_glass()` sweeps 35 degrees, not the preset's full
+  cone.** It passed the spec to `render_quilt()` with no `view_cone`, so a cast
+  swept whatever the preset carries -- 50 degrees for `16-landscape`, the cone
+  the panel can display rather than the cone that reliably fuses. quiltwright's
+  own CLI and render scripts cap the sweep at 35 for that reason: the wider the
+  sweep, the further a feature shifts between neighbouring views, and past
+  roughly 5 px of shift hard edges ghost. Every viewer's Cast button therefore
+  produced a wider sweep than a quilt rendered by the same repo's CLI, of the
+  same scene, with no way to see the difference except on the glass. The new
+  `view_cone` parameter defaults to `DEFAULT_CAST_VIEW_CONE` (35.0); pass
+  `None` to sweep the spec's own cone.
+
+
 ## [0.21.0] - 2026-09-10
 
 ### Added
