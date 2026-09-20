@@ -68,7 +68,7 @@ viz3d-qt = [
     # For quiltwright.quilt.resolve_view_cone: the view-cone cap as one shared
     # function rather than a copy of 35.0 per caller.  That landed in 0.14.0;
     # the floor sits at 0.14.1, the version the cast path is tested against.
-    "quiltwright>=0.14.1",
+    "quiltwright>=0.15.0",
 ]
 # Exact pin: pre-1.0, breaking minors possible. Prebuilt wheels everywhere;
 # also bundled in `semantic` since "auto" defaults to sqlite-vec.
@@ -120,7 +120,7 @@ pytest-cov = "^5.0.0"
 firecrawl-anydoc = ">=0.1.9"
 # Capped below 0.16 deliberately: 0.16 expands the default rules and reformats
 # Python in Markdown blocks. Adopt on purpose; lift the cap in its own change.
-ruff       = ">=0.4.0,<0.16"
+ruff       = ">=0.15,<0.16"
 ty         = ">=0.0.41"
 # Makes the checked-in hook config runnable from `poetry install --with dev`.
 # Versions match KGRAG's dev group.
