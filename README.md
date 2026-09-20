@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.22.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.23.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -26,6 +26,15 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.23.0 (2026-09-20)** -- `KGModule.query()` and `pack()` now check their
+  arguments before touching the index: an empty query, `k` outside 1-100,
+  `hop` outside 0-5 or `max_nodes` outside 1-500 raises `ValueError` naming
+  the parameter. The bounds are class attributes (`max_k`, `max_hop`,
+  `max_max_nodes`, `max_query_len`), so a module that needs different ones
+  sets those rather than overriding `query()`. They were lifted from
+  `genealogy_kg`, where three repos had copied the same check by hand.
+  `KGModule.__enter__` and `GraphStore.__enter__` also return `Self`, so
+  `with MyKG(...) as kg:` narrows `kg` to `MyKG` under `ty`.
 - **0.22.0 (2026-09-17)** -- `cast_scene_to_looking_glass()` caps the camera
   sweep at 35 degrees instead of sweeping the preset's full cone. It rendered
   with no `view_cone`, so a cast swept whatever the preset carries -- 50
@@ -598,8 +607,8 @@ installs: the test job omits `lancedb` (the vector-backend tests no longer need
 it), but the type-check job requires it so ty can resolve the legacy backend's
 imports — and pre-commit runs ty, so install it locally.
 
-Run the fast test suite (no model downloads) — **650 passed, 1 skipped** (the
-skip is a test that only runs when PyVista is *absent*):
+Run the fast test suite (no model downloads) — **750 passed, 1 skipped** (the
+skip is a test that needs `doc_kg`, which the SDK cannot depend on):
 
 ```bash
 poetry run pytest -m "not integration"
@@ -634,7 +643,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.22.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.23.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -642,7 +651,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.22.0},
+  version   = {0.23.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

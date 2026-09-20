@@ -1,43 +1,44 @@
-# Release Notes — v0.22.0
+# Release Notes -- v0.23.0
 
-> Released: 2026-09-17
+> Released: 2026-09-20
 
-### Added
+`KGModule.query()` and `pack()` now validate their arguments before touching
+the index, and `__enter__` returns `Self`. Both were things three KG modules
+had each worked around by hand; the base class does them now so the copies
+can go.
 
-- **`cast_scene_to_looking_glass(..., view_cone=...)`** -- the degrees the
-  camera sweeps, honored as given even past the 35-degree cap. `None`, the
-  default, takes the spec's own cone capped, which is the behaviour described
-  under Fixed below.
+## What changed
 
-### Changed
+**Query bounds live in the base class.** Every KG module's `query()` and
+`pack()` take input from a CLI, an MCP tool call or a UI, and until now each
+module checked that input itself or not at all. `kg_utils.validation` carries
+the check once: an empty query, `k` outside 1 to 100, `hop` outside 0 to 5 or
+`max_nodes` outside 1 to 500 raises `ValueError` naming the parameter, before
+the index or the graph is touched. `hop=0` (pure semantic) and
+`pack(max_nodes=None)` (no cap) remain valid. The bounds were lifted from
+`genealogy_kg`, checked against every fleet caller before being adopted, and
+match what every fleet MCP server already documents. A module that needs
+different ones sets the class attributes `max_k`, `max_hop`, `max_max_nodes`
+or `max_query_len` on its subclass, and never overrides `query()` to do it.
 
-- **The `viz3d-qt` extra now needs `quiltwright>=0.14.1`** (was `>=0.7.0`), for
-  `quiltwright.quilt.resolve_view_cone`. That function landed in 0.14.0; the
-  floor sits at 0.14.1, the version the cast path is tested against. Only the
-  cast path is affected; a consumer that does not install `viz3d-qt` sees
-  nothing.
+**`with MyKG(...) as kg:` is typed as `MyKG`.** `KGModule.__enter__` and
+`GraphStore.__enter__` returned the base class, so under `ty` every subclass
+attribute failed type-checking inside a `with` block. They return `Self` now.
+`genealogy_kg`, `swift_kg` and `connectome_kg` each carried an identical
+`__enter__` override to work around this and can delete it once they floor at
+0.23.0.
 
-### Fixed
+**Fleet floors.** `quiltwright` moves to `>=0.15.0` and `ruff` to `>=0.15`, a
+currency bump with no behaviour behind it.
 
-- **`cast_scene_to_looking_glass()` caps the sweep at 35 degrees instead of
-  sweeping the preset's full cone.** It passed the spec to `render_quilt()`
-  with no `view_cone`, so a cast swept whatever the preset carries -- 50
-  degrees for `16-landscape`, the cone the panel can display rather than the
-  cone that reliably fuses. quiltwright's own CLI and render scripts cap the
-  sweep at 35 for that reason: the wider the sweep, the further a feature
-  shifts between neighbouring views, and past roughly 5 px of shift hard edges
-  ghost. Every viewer's Cast button therefore produced a wider sweep than a
-  quilt rendered by the same repo's CLI, of the same scene, with no way to see
-  the difference except on the glass.
+## Upgrading
 
-  The cap is not redeclared here. quiltwright 0.14.0 pulled it into
-  `resolve_view_cone()` and `STANDARD_VIEW_CONE` precisely so it would stop
-  being a copy per caller, and the cast path now calls that function -- which
-  is a cap, not an override: a spec whose cone is already under 35 keeps it,
-  where a plain default would have widened it. The new `view_cone` parameter
-  is honored as given, including past the cap; `None`, the default, takes the
-  spec's own cone capped. When the cone is narrowed the progress message says
-  so, so a silent widening is not replaced by a silent narrowing.
+No rebuild and no migration. A caller that was passing an out-of-range `k`,
+`hop` or `max_nodes`, or an empty query, will now get a `ValueError` instead
+of a silent result; no fleet caller does. Modules that copied the validation
+or the `__enter__` override can delete their copies after raising their
+`kgmodule-utils` floor. Verified against built-wheel runs of `pycode_kg`,
+`doc_kg`, `kgrag` and `genealogy_kg` before release, all green.
 
 ---
 
