@@ -20,7 +20,7 @@ import json
 import sqlite3
 from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from kg_utils.specs import EdgeSpec, NodeSpec
 
@@ -144,7 +144,7 @@ class GraphStore:
             self._con.close()
             self._con = None
 
-    def __enter__(self) -> GraphStore:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:

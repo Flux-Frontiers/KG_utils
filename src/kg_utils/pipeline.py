@@ -42,7 +42,7 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Self, cast
 
 from kg_utils.extractor import KGExtractor
 from kg_utils.semantic import (
@@ -55,6 +55,14 @@ from kg_utils.semantic import (
 )
 from kg_utils.specs import BuildStats, EdgeSpec, NodeSpec, QueryResult, SnippetPack
 from kg_utils.store import DEFAULT_RELS, GraphStore
+from kg_utils.validation import (
+    MAX_HOP,
+    MAX_K,
+    MAX_MAX_NODES,
+    MAX_QUERY_LEN,
+    bounded_int,
+    require_query,
+)
 from kg_utils.vector_backend import VectorBackend, make_backend, resolve_backend_name
 
 # ---------------------------------------------------------------------------
@@ -323,6 +331,16 @@ class KGModule(ABC):
     #: Override in subclass to change the default artefact directory name.
     _default_dir: str = ".kgcache"
 
+    #: Bounds :meth:`query` and :meth:`pack` enforce on their arguments before
+    #: touching the index or the graph. Set these on a subclass to change
+    #: them; do not override ``query()`` to do it. Defaults come from
+    #: :mod:`kg_utils.validation` and match what every fleet MCP server
+    #: already documented before the check moved here.
+    max_k: int = MAX_K
+    max_hop: int = MAX_HOP
+    max_max_nodes: int = MAX_MAX_NODES
+    max_query_len: int = MAX_QUERY_LEN
+
     def __init__(
         self,
         repo_root: str | Path,
@@ -533,6 +551,28 @@ class KGModule(ABC):
     # Query
     # ------------------------------------------------------------------
 
+    def _validate_query_args(self, q: str, *, k: int, hop: int, max_nodes: int | None) -> str:
+        """Check the externally supplied arguments of :meth:`query` and :meth:`pack`.
+
+        Both take input from a CLI, an MCP tool call or a UI, so the check is
+        here in the base class rather than repeated at each surface. The
+        bounds are the ``max_*`` class attributes.
+
+        :param q: Natural-language query.
+        :param k: Top-K semantic hits.
+        :param hop: Graph expansion hops; ``0`` is valid.
+        :param max_nodes: Returned node cap, or ``None`` for no cap.
+        :return: ``q`` stripped of surrounding whitespace.
+        :raises ValueError: On an empty or over-long ``q``, or an out-of-range
+            ``k``, ``hop`` or ``max_nodes``, naming the offending parameter.
+        """
+        q = require_query(q, self.max_query_len)
+        bounded_int("k", k, 1, self.max_k)
+        bounded_int("hop", hop, 0, self.max_hop)
+        if max_nodes is not None:
+            bounded_int("max_nodes", max_nodes, 1, self.max_max_nodes)
+        return q
+
     def query(
         self,
         q: str,
@@ -563,6 +603,7 @@ class KGModule(ABC):
         :param rerank_lexical_weight: Lexical weight for ``'hybrid'`` mode.
         :return: :class:`~kg_utils.types.QueryResult`.
         """
+        q = self._validate_query_args(q, k=k, hop=hop, max_nodes=max_nodes)
         q_norm = normalize_query_text(q)
         hits = self.index.search(q_norm, k=k)
         if min_score > 0.0:
@@ -688,6 +729,7 @@ class KGModule(ABC):
         :param missing_lineno_policy: ``'cap_or_skip'`` (default) or ``'legacy'``.
         :return: :class:`~kg_utils.types.SnippetPack`.
         """
+        q = self._validate_query_args(q, k=k, hop=hop, max_nodes=max_nodes)
         q_norm = normalize_query_text(q)
         hits = self.index.search(q_norm, k=k)
         if min_score > 0.0:
@@ -906,7 +948,7 @@ class KGModule(ABC):
         if self._store is not None:
             self._store.close()
 
-    def __enter__(self) -> KGModule:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
