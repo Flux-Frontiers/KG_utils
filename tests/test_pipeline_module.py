@@ -381,3 +381,63 @@ class TestVectorBackendSelection:
         reader = _TextKG(corpus, vector_backend="sqlite-vec", **paths)
         result = reader.query("vector embeddings")
         assert result.seeds > 0
+
+
+class TestKGModuleValidation:
+    """query() and pack() reject bad arguments before touching the index."""
+
+    def test_empty_query_raises(self, kg: _TextKG) -> None:
+        with pytest.raises(ValueError, match=r"q must not be empty"):
+            kg.query("   ")
+
+    def test_k_below_one_raises(self, kg: _TextKG) -> None:
+        with pytest.raises(ValueError, match=r"k must be between 1 and 100, got 0"):
+            kg.query("vector embeddings", k=0)
+
+    def test_k_above_limit_raises(self, kg: _TextKG) -> None:
+        with pytest.raises(ValueError, match=r"k must be between 1 and 100, got 101"):
+            kg.query("vector embeddings", k=101)
+
+    def test_hop_zero_is_pure_semantic_and_valid(self, kg: _TextKG) -> None:
+        assert kg.query("vector embeddings", hop=0).nodes
+
+    def test_hop_above_limit_raises(self, kg: _TextKG) -> None:
+        with pytest.raises(ValueError, match=r"hop must be between 0 and 5, got 6"):
+            kg.query("vector embeddings", hop=6)
+
+    def test_max_nodes_above_limit_raises(self, kg: _TextKG) -> None:
+        with pytest.raises(ValueError, match=r"max_nodes must be between 1 and 500, got 501"):
+            kg.query("vector embeddings", max_nodes=501)
+
+    def test_pack_is_checked_too(self, kg: _TextKG) -> None:
+        with pytest.raises(ValueError, match=r"hop must be between 0 and 5"):
+            kg.pack("vector embeddings", hop=6)
+
+    def test_pack_accepts_no_node_cap(self, kg: _TextKG) -> None:
+        """pack(max_nodes=None) means no limit and must not be rejected."""
+        assert isinstance(kg.pack("vector embeddings", max_nodes=None), SnippetPack)
+
+    def test_query_is_stripped_before_use(self, kg: _TextKG) -> None:
+        padded = kg.query("  vector embeddings  ")
+        plain = kg.query("vector embeddings")
+        assert padded.query == plain.query
+
+    def test_subclass_configures_the_bound_without_overriding_query(self, corpus: Path) -> None:
+        """The fleet idiom: set the class attribute, never override query()."""
+
+        class _Wide(_TextKG):
+            max_hop = 10
+
+        with _Wide(corpus) as wide:
+            assert wide.query("vector embeddings", hop=6).nodes is not None
+
+
+def test_context_manager_narrows_to_the_subclass(corpus: Path) -> None:
+    """__enter__ returns Self, so `with Sub(...) as kg` is typed as Sub.
+
+    At runtime this was always true; the change is that ``ty`` now agrees,
+    which is what let three repos delete an identical override.
+    """
+    with _TextKG(corpus) as kg:
+        assert type(kg) is _TextKG
+        assert kg.query("vector embeddings").nodes

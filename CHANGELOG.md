@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`kg_utils.validation`: shared bounds for `query()` and `pack()`
+  arguments**, and `KGModule` now enforces them. `bounded_int()`,
+  `require_query()` and the constants `MAX_K` (100), `MAX_HOP` (5),
+  `MAX_MAX_NODES` (500) and `MAX_QUERY_LEN` (2000) are lifted from
+  `genealogy_kg.validation`, where they were the reference implementation and
+  had been copied into `swift_kg` and `connectome_kg` besides. Three copies
+  of one check is an SDK feature request. `KGModule.query()` and `pack()`
+  call `_validate_query_args()` first, so an empty query, `k=0`, `hop=6` or
+  `max_nodes=501` raises `ValueError` naming the parameter instead of
+  reaching the index; `hop=0` (pure semantic) and `pack(max_nodes=None)` (no
+  cap) stay valid. The bounds are the class attributes `max_k`, `max_hop`,
+  `max_max_nodes` and `max_query_len`: a module that needs different ones
+  sets those and never overrides `query()` to do it, the same idiom as
+  snapshots. Checked against the fleet before choosing them: no production
+  caller passes `hop` above 5 or `k` above 100, and every fleet MCP server
+  already documents these exact limits. `MAX_QUERY_LEN` is generous on
+  purpose, since `kg-rag` passes a user's prompt to `query()` unshortened;
+  `genealogy_kg`'s MCP surface keeps its own 500.
+
 ### Changed
+
+- **`KGModule.__enter__()` and `GraphStore.__enter__()` return `Self`**, not
+  the base class. `with MyKG(...) as kg:` now narrows `kg` to `MyKG` under
+  `ty`, so subclass attributes type-check inside the block. `genealogy_kg`,
+  `swift_kg` and `connectome_kg` each carried an identical
+  `def __enter__(self) -> Sub: return self` override to work around this;
+  they can delete it once they floor at 0.23.0.
 
 - **`quiltwright` floor raised to `>=0.15.0`** (was `>=0.14.1`) and the `ruff`
   floor from `>=0.4.0` to `>=0.15`, inside the existing `<0.16` cap
