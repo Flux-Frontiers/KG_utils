@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.23.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.24.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -26,6 +26,15 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.24.0 (2026-09-22)** -- Wiping the graph now drops the vector index
+  it invalidates. `KGModule.build_graph(wipe=True)` used to leave the
+  previous build's vectors in place, so a graph-only rebuild followed by
+  `query()` could return notes the new graph no longer held; it now calls the
+  new `KGModule.drop_index()`, and a query without an index says so. The 2-D
+  renderer gains `build_graph_html(..., edge_labels=False)`, which keeps
+  relations on hover instead of printing them across a dense graph, and
+  `leaf_glyphs()` takes one size per leaf, so leaf size can carry data as
+  `tint` carries colour. Both came out of building vault_kg.
 - **0.23.0 (2026-09-20)** -- `KGModule.query()` and `pack()` now check their
   arguments before touching the index: an empty query, `k` outside 1-100,
   `hop` outside 0-5 or `max_nodes` outside 1-500 raises `ValueError` naming
@@ -219,7 +228,7 @@ pip install 'kgmodule-utils[viz3d-qt]'
 
 ```toml
 [tool.poetry.dependencies]
-kgmodule-utils = { version = ">=0.4.0", extras = ["semantic", "synthesis"] }
+kgmodule-utils = { version = ">=0.24.0", extras = ["semantic", "synthesis"] }
 ```
 
 ---
@@ -643,7 +652,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.23.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.24.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -651,7 +660,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.23.0},
+  version   = {0.24.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

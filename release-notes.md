@@ -1,44 +1,37 @@
-# Release Notes -- v0.23.0
+# Release Notes -- v0.24.0
 
-> Released: 2026-09-20
+> Released: 2026-09-22
 
-`KGModule.query()` and `pack()` now validate their arguments before touching
-the index, and `__enter__` returns `Self`. Both were things three KG modules
-had each worked around by hand; the base class does them now so the copies
-can go.
+### Fixed
 
-## What changed
+- **A wiped graph no longer leaves a stale vector index behind** (`kgrag_priv`
+  sweep item 54). `KGModule.build_graph(wipe=True)` rewrote the graph and
+  left the previous build's vectors in place, so a graph-only rebuild
+  followed by `query()` seeded from nodes the new graph might no longer hold.
+  It now drops the index first; `build()` rebuilds it straight after, and a
+  graph-only build leaves no index, so `query()` raises
+  `VectorStoreNotFoundError` rather than answering from the old one.
+  `vault_kg` deleted the stale index in its own CLI and `connectome_kg`
+  warned about it; both workarounds can go once they raise their floor.
 
-**Query bounds live in the base class.** Every KG module's `query()` and
-`pack()` take input from a CLI, an MCP tool call or a UI, and until now each
-module checked that input itself or not at all. `kg_utils.validation` carries
-the check once: an empty query, `k` outside 1 to 100, `hop` outside 0 to 5 or
-`max_nodes` outside 1 to 500 raises `ValueError` naming the parameter, before
-the index or the graph is touched. `hop=0` (pure semantic) and
-`pack(max_nodes=None)` (no cap) remain valid. The bounds were lifted from
-`genealogy_kg`, checked against every fleet caller before being adopted, and
-match what every fleet MCP server already documents. A module that needs
-different ones sets the class attributes `max_k`, `max_hop`, `max_max_nodes`
-or `max_query_len` on its subclass, and never overrides `query()` to do it.
+### Added
 
-**`with MyKG(...) as kg:` is typed as `MyKG`.** `KGModule.__enter__` and
-`GraphStore.__enter__` returned the base class, so under `ty` every subclass
-attribute failed type-checking inside a `with` block. They return `Self` now.
-`genealogy_kg`, `swift_kg` and `connectome_kg` each carried an identical
-`__enter__` override to work around this and can delete it once they floor at
-0.23.0.
-
-**Fleet floors.** `quiltwright` moves to `>=0.15.0` and `ruff` to `>=0.15`, a
-currency bump with no behaviour behind it.
-
-## Upgrading
-
-No rebuild and no migration. A caller that was passing an out-of-range `k`,
-`hop` or `max_nodes`, or an empty query, will now get a `ValueError` instead
-of a silent result; no fleet caller does. Modules that copied the validation
-or the `__enter__` override can delete their copies after raising their
-`kgmodule-utils` floor. Verified against built-wheel runs of `pycode_kg`,
-`doc_kg`, `kgrag` and `genealogy_kg` before release, all green.
+- **`KGModule.drop_index()`** deletes the vector index and returns the paths
+  removed: the sqlite-vec store with its `-wal`/`-shm`/`-journal` sidecars,
+  and any legacy LanceDB directory beside it, which the `"auto"` backend
+  would otherwise fall back to. The index object is closed but kept, so a
+  caller-supplied index survives. `SemanticIndex.close()` closes the
+  backend's connection when it has one.
+- **`build_graph_html(..., edge_labels=False)`** leaves each edge's
+  relation on hover only instead of printing it on the canvas, which keeps a
+  dense neighbourhood readable; the edge colour still carries the relation.
+  The default is unchanged (`kgrag_priv` sweep item 55).
+- **Per-leaf sizes in `leaf_glyphs()`**: `size` takes an `(M,)` array as
+  well as a scalar, so leaf size can carry data (backlinks, citations) the
+  way `tint` carries colour, still in one glyph call. `leaf_frames()` accepts
+  the same array for the clearance a clung leaf keeps from the wood. Sizes
+  must be positive and one per leaf. A scalar draws exactly what it did
+  before (sweep item 55).
 
 ---
 
