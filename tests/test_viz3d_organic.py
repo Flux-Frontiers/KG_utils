@@ -259,6 +259,46 @@ print("OK")
         assert tree_mesh(sk).n_points > 0
         assert leaf_glyphs(_document_cloud(), sk).n_points > 0
 
+    def test_leaf_glyphs_take_a_size_per_leaf(self) -> None:
+        """Sweep item 55: leaf size can carry data, the way tint carries colour."""
+        pytest.importorskip("pyvista")
+
+        from kg_utils.viz3d import leaf_glyphs
+
+        cloud = _document_cloud(40)
+        sk = grow_tree(cloud, np.zeros(3), key="book")
+        uniform = leaf_glyphs(cloud, sk, size=0.2, seed=1)
+        same = leaf_glyphs(cloud, sk, size=np.full(len(cloud), 0.2), seed=1)
+        # An array of one value draws the same leaves as that scalar.
+        assert same.n_points == uniform.n_points
+        assert np.allclose(np.sort(same.points, axis=0), np.sort(uniform.points, axis=0))
+
+        sizes = np.full(len(cloud), 0.1)
+        sizes[0] = 0.5
+        mixed = leaf_glyphs(cloud, sk, size=sizes, seed=1)
+        per = mixed.n_points // len(cloud)
+
+        def radius(i: int) -> float:
+            # Farthest vertex from the glyph's own centre: independent of how
+            # the leaf is oriented, unlike an axis-aligned extent.
+            leaf = mixed.points[i * per : (i + 1) * per]
+            return float(np.linalg.norm(leaf - leaf.mean(axis=0), axis=1).max())
+
+        assert np.isclose(radius(0) / radius(1), 5.0, rtol=1e-3)  # 0.5 vs 0.1
+        assert np.isclose(radius(1), radius(2), rtol=1e-3)
+
+    def test_leaf_glyphs_reject_bad_sizes(self) -> None:
+        pytest.importorskip("pyvista")
+
+        from kg_utils.viz3d import leaf_glyphs
+
+        cloud = _document_cloud(20)
+        sk = grow_tree(cloud, np.zeros(3), key="book")
+        with pytest.raises(ValueError, match="one value per leaf"):
+            leaf_glyphs(cloud, sk, size=np.ones(5))
+        with pytest.raises(ValueError, match="positive"):
+            leaf_glyphs(cloud, sk, size=np.zeros(len(cloud)))
+
 
 # ---------------------------------------------------------------------------
 # Ported from gutenberg_kg's tests/test_layout_organic.py, which covered this

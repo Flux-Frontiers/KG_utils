@@ -199,6 +199,7 @@ def build_graph_html(
     physics: bool = True,
     highlight_ids: set[str] | None = None,
     label_field: str = "name",
+    edge_labels: bool = True,
 ) -> str:
     """Render *nodes* and *edges* as a self-contained interactive HTML page.
 
@@ -217,6 +218,9 @@ def build_graph_html(
     :param highlight_ids: Node IDs to mark with a gold border — query seeds,
         search hits, whatever the caller wants to point at.
     :param label_field: Node key used for the on-canvas label.
+    :param edge_labels: Print each edge's relation on the canvas. ``False``
+        leaves the relation on hover only, which keeps a dense neighbourhood
+        readable; the edge colour still carries the relation.
     :return: A self-contained HTML document.
     """
     from pyvis.network import Network  # noqa: PLC0415 — keeps the viz extra optional
@@ -307,10 +311,10 @@ def build_graph_html(
         net.add_edge(
             edge["src"],
             edge["dst"],
-            label=rel,
             color=theme.relation_color(rel),
             width=1.5,
             title=rel,
+            **({"label": rel} if edge_labels else {}),
         )
 
     with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w") as handle:

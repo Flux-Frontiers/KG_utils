@@ -253,6 +253,30 @@ def test_highlight_ids_are_marked() -> None:
     assert "#FFD700" in html
 
 
+def _edges(html: str) -> list[dict]:
+    import json
+    import re
+
+    payload = re.search(r"edges\s*=\s*new vis\.DataSet\((\[.*?\])\);", html, re.S)
+    assert payload
+    return json.loads(payload.group(1))
+
+
+def test_edges_are_labelled_by_default() -> None:
+    edges = _edges(build_graph_html(CODE_NODES, CODE_EDGES, theme=CODE_THEME))
+    assert edges and all(e.get("label") == e["title"] for e in edges)
+
+
+def test_edge_labels_can_be_turned_off() -> None:
+    """Sweep item 55: a dense neighbourhood is unreadable with every relation printed."""
+    edges = _edges(build_graph_html(CODE_NODES, CODE_EDGES, theme=CODE_THEME, edge_labels=False))
+    assert edges
+    assert all("label" not in e for e in edges)
+    # The relation is still on hover, and still in the colour.
+    assert {e["title"] for e in edges} == {str(e["rel"]) for e in CODE_EDGES}
+    assert all(e["color"] == CODE_THEME.relation_color(e["title"]) for e in edges)
+
+
 # ---------------------------------------------------------------------------
 # select_nodes
 # ---------------------------------------------------------------------------
