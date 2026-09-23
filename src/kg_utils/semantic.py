@@ -288,6 +288,16 @@ class SemanticIndex:
             )
         return self._backend
 
+    def close(self) -> None:
+        """Close the backend's connection, if it has one open.
+
+        Backends that hold no connection (LanceDB) have nothing to close; the
+        check is by attribute so third-party backends need not implement it.
+        """
+        close = getattr(self._backend, "close", None)
+        if close is not None:
+            close()
+
     def __repr__(self) -> str:
         return (
             f"SemanticIndex(vectors_path={self.vectors_path!r}, "

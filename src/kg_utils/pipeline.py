@@ -40,6 +40,7 @@ Typical domain usage::
 from __future__ import annotations
 
 import re
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Self, cast
@@ -494,7 +495,8 @@ class KGModule(ABC):
         Calls :meth:`make_extractor`, drains the iterator, writes to SQLite,
         then calls :meth:`_post_build_hook` for any domain-specific post-processing.
 
-        :param wipe: Clear existing graph before writing.
+        :param wipe: Clear existing graph before writing. Also drops the vector
+            index (:meth:`drop_index`), which no longer matches the new graph.
         :return: :class:`~kg_utils.types.BuildStats` (``indexed_rows`` will be ``None``).
         """
         extractor = self.make_extractor()
@@ -506,6 +508,12 @@ class KGModule(ABC):
             else:
                 edge_specs.append(item)
 
+        if wipe:
+            # A wiped graph invalidates every vector: an index left from the
+            # previous build would seed queries from nodes this graph may no
+            # longer hold. build() rebuilds it straight after; a graph-only
+            # build leaves no index, and query() says so. Sweep item 54.
+            self.drop_index()
         self.store.write(node_specs, edge_specs, wipe=wipe)
         self._post_build_hook(self.store)
 
@@ -518,6 +526,40 @@ class KGModule(ABC):
             node_counts=s["node_counts"],
             edge_counts=s["edge_counts"],
         )
+
+    def drop_index(self) -> list[Path]:
+        """Delete the vector index, closing it first.
+
+        Removes the sqlite-vec store with its ``-wal``/``-shm``/``-journal``
+        sidecars, and any legacy LanceDB directory beside it. The legacy
+        directory goes too because the ``"auto"`` backend falls back to it
+        when no sqlite-vec store exists, so leaving it would bring an even
+        older index back into use. The graph is untouched.
+
+        :func:`build_graph` calls this whenever it wipes the graph; call it
+        directly to discard an index without rebuilding the graph.
+
+        :return: The paths removed; empty when there was no index.
+        """
+        # Close, but keep, the index object: the next build_index() reopens and
+        # recreates the store through it, and a caller may have supplied its
+        # own index (a test double, a customised backend) that must survive.
+        if self._index is not None:
+            self._index.close()
+        removed: list[Path] = []
+        vectors = self.vectors_path
+        for path in (
+            vectors,
+            *(vectors.parent / f"{vectors.name}-{s}" for s in ("wal", "shm", "journal")),
+        ):
+            if path.is_file():
+                path.unlink()
+                removed.append(path)
+        legacy = self._legacy_store_dir
+        if legacy.is_dir():
+            shutil.rmtree(legacy)
+            removed.append(legacy)
+        return removed
 
     def build_index(self, *, wipe: bool = False) -> BuildStats:
         """SQLite → LanceDB only (graph must already exist).

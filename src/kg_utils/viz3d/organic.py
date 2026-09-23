@@ -611,7 +611,7 @@ def leaf_frames(
     positions: np.ndarray,
     skeleton: Skeleton,
     *,
-    size: float = 0.35,
+    size: float | np.ndarray = 0.35,
     cling: float = 0.7,
     seed: int = 0,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -628,7 +628,8 @@ def leaf_frames(
 
     :param positions: ``(M, 3)`` leaf positions (the chunk attractors).
     :param skeleton: Grown skeleton, used for local branch direction.
-    :param size: Leaf glyph radius, which sets the clearance a clung leaf
+    :param size: Leaf glyph radius, scalar or ``(M,)`` per leaf, which sets the
+        clearance a clung leaf
         keeps from the wood.
     :param cling: How far each leaf is pulled toward its nearest skeleton
         node, from ``0`` to ``1``.  See :func:`leaf_glyphs`.
@@ -670,7 +671,7 @@ def leaf_glyphs(
     positions: np.ndarray,
     skeleton: Skeleton,
     *,
-    size: float = 0.35,
+    size: float | np.ndarray = 0.35,
     tint: np.ndarray | None = None,
     cling: float = 0.7,
     seed: int = 0,
@@ -691,7 +692,9 @@ def leaf_glyphs(
 
     :param positions: ``(M, 3)`` leaf positions (the chunk attractors).
     :param skeleton: Grown skeleton, used for local branch direction.
-    :param size: Leaf glyph radius in scene units.
+    :param size: Leaf glyph radius in scene units: one value for every leaf,
+        or an ``(M,)`` array giving each leaf its own, so leaf size can carry
+        data (backlinks, citations, weight) the way ``tint`` carries colour.
     :param tint: Optional ``(M,)`` scalar per leaf, carried onto the glyphs as
         a ``"tint"`` array so the caller can colour foliage by a lookup table
         (seasonal colour, query illumination) in the same single draw call.
@@ -703,7 +706,18 @@ def leaf_glyphs(
     :return: Glyphed ``PolyData``, one actor's worth.
     """
     pv = _pyvista()
-    pts, vecs = leaf_frames(positions, skeleton, size=size, cling=cling, seed=seed)
+    sizes = np.asarray(size, dtype=float)
+    n_leaves = len(np.asarray(positions).reshape(-1, 3))
+    if sizes.ndim > 1 or (sizes.ndim == 1 and len(sizes) != n_leaves):
+        raise ValueError(
+            f"size must be a scalar or one value per leaf ({n_leaves}), got {sizes.shape}"
+        )
+    if sizes.size and not np.all(sizes > 0):
+        raise ValueError("leaf sizes must be positive")
+    per_leaf = sizes.ndim == 1
+    pts, vecs = leaf_frames(
+        positions, skeleton, size=sizes if per_leaf else float(sizes), cling=cling, seed=seed
+    )
     if pts.size == 0:
         return pv.PolyData()
 
@@ -712,10 +726,16 @@ def leaf_glyphs(
         cloud["tint"] = np.asarray(tint, dtype=float)
     cloud["direction"] = vecs
 
-    # A flattened ellipsoid: cheap, and it silhouettes like foliage.
-    proto = pv.Sphere(radius=size, theta_resolution=8, phi_resolution=6)
+    # A flattened ellipsoid: cheap, and it silhouettes like foliage. With
+    # per-leaf sizes the prototype is the largest leaf and each glyph is
+    # scaled down from it, still in one glyph call.
+    radius = float(sizes.max()) if per_leaf else float(sizes)
+    proto = pv.Sphere(radius=radius, theta_resolution=8, phi_resolution=6)
     proto.scale(LEAF_ASPECT, inplace=True)
-    return cloud.glyph(geom=proto, orient="direction", scale=False)
+    if not per_leaf:
+        return cloud.glyph(geom=proto, orient="direction", scale=False)
+    cloud["leaf_scale"] = sizes / radius
+    return cloud.glyph(geom=proto, orient="direction", scale="leaf_scale", factor=1.0)
 
 
 def grow_tree(

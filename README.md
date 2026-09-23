@@ -327,7 +327,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class / function | Description |
 |---|---|
-| `SemanticIndex` | Vector index over a pluggable backend (sqlite-vec default; LanceDB deprecated): `build()`, `search()` |
+| `SemanticIndex` | Vector index over a pluggable backend (sqlite-vec default; LanceDB deprecated): `build()`, `search()`, `close()` |
 | `SentenceTransformerEmbedder` | Local embedding via sentence-transformers |
 | `resolve_model_path()` | Resolve model name / alias to local cache path |
 | `suppress_ingestion_logging()` | Silence verbose HF / tqdm output during ingestion |
@@ -336,7 +336,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class | Description |
 |---|---|
-| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()` for free |
+| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand |
 
 ### `kg_utils.snapshots`
 
@@ -369,7 +369,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class / function | Description |
 |---|---|
-| `build_graph_html()` | Render nodes + edges to a self-contained interactive HTML page (vis-network inlined) |
+| `build_graph_html()` | Render nodes + edges to a self-contained interactive HTML page (vis-network inlined); `edge_labels=False` keeps relations on hover only |
 | `select_nodes()` | Cap a display graph while keeping it connected — seed on central nodes, expand to neighbours |
 | `GraphTheme` | Names a domain's node kinds and edge relations (`KindStyle`, `with_alpha()`) |
 | `TooltipSpec` | Names the node fields worth showing in a tooltip (`TooltipRow`) |
@@ -409,7 +409,7 @@ a limb by what it carries, a prolific year grows visibly heavier wood.
 | `colonize()` | Space colonization (Runions, Lane & Prusinkiewicz 2007) → `Skeleton` |
 | `pipe_radii()` | Per-node branch radius by da Vinci's rule (`PIPE_EXPONENT`) |
 | `root_to_tip_paths()` / `smooth_paths()` | Skeleton paths, and their Catmull-Rom smoothing |
-| `tree_mesh()` / `leaf_glyphs()` | Swept-tube wood and foliage as `PolyData` |
+| `tree_mesh()` / `leaf_glyphs()` | Swept-tube wood and foliage as `PolyData`; leaf `size` may be one value or one per leaf |
 | `crown_spacing()` / `seed_from_key()` | Natural length scale of a cloud; stable seed from any string |
 
 The geometry above is NumPy-only and needs just `viz3d`. The three that return
