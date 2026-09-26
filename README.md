@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.25.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.25.1-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -26,6 +26,11 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.25.1 (2026-09-26)** -- Two species presets fixed. The blackthorn's
+  limbs coiled into helices and the fir grew a branch back down to its lowest
+  whorl, both because too short an influence radius let growth random-walk.
+  A new test bounds how far any species' limbs may wander, and checks the
+  0.25.0 values fail it.
 - **0.25.0 (2026-09-26)** -- Organic trees grow as species. New
   `kg_utils.viz3d.species`: a `Habit` sets the crown's envelope (dome, cone,
   umbrella, spindle, ...) and how the wood grows toward it -- tropism, reach,
@@ -240,7 +245,7 @@ pip install 'kgmodule-utils[viz3d-qt]'
 
 ```toml
 [tool.poetry.dependencies]
-kgmodule-utils = { version = ">=0.25.0", extras = ["semantic", "synthesis"] }
+kgmodule-utils = { version = ">=0.25.1", extras = ["semantic", "synthesis"] }
 ```
 
 ---
@@ -685,7 +690,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.25.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.25.1) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -693,7 +698,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.25.0},
+  version   = {0.25.1},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},
