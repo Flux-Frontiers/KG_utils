@@ -48,6 +48,7 @@ ROOT = Path(__file__).resolve().parent.parent
 #: of these from ``kg_utils.viz3d``; every one was missing from 0.12.0.
 REQUIRED_API: dict[str, tuple[str, ...]] = {
     "kg_utils.viz3d": (
+        "SPECIES",
         "AlliumLayout",
         "FunnelLayout",
         "Layout3D",
@@ -59,6 +60,11 @@ REQUIRED_API: dict[str, tuple[str, ...]] = {
         "fibonacci_annulus",
         "fibonacci_sphere",
         "golden_spiral_2d",
+        "Habit",
+        "bark_mesh",
+        "bark_sweep",
+        "crown_sections",
+        "droop_skeleton",
         "grow_tree",
         "leaf_glyphs",
         "pipe_radii",
@@ -67,7 +73,8 @@ REQUIRED_API: dict[str, tuple[str, ...]] = {
         "smooth_paths",
         "tree_mesh",
     ),
-    "kg_utils.viz3d.organic": ("colonize", "grow_tree", "seed_from_key"),
+    "kg_utils.viz3d.organic": ("colonize", "droop_skeleton", "grow_tree", "seed_from_key"),
+    "kg_utils.viz3d.species": ("SPECIES", "Habit", "crown_sections", "vary_habit"),
 }
 
 

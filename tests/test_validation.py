@@ -30,6 +30,21 @@ class TestBoundedInt:
         with pytest.raises(ValueError, match=r"hop must be between 0 and 5, got 6"):
             bounded_int("hop", 6, 0, MAX_HOP)
 
+    # Arguments arrive as JSON from a model or a form, so loose types are the
+    # normal case at this boundary, not the edge case (sweep item 52).
+    @pytest.mark.parametrize(
+        "value", ["8", True, False, 3.7, None, [8], float("nan"), float("inf")]
+    )
+    def test_non_integers_are_rejected_by_name(self, value: object) -> None:
+        with pytest.raises(ValueError, match=r"k must be an integer"):
+            bounded_int("k", value, 1, MAX_K)  # type: ignore[arg-type]
+
+    def test_integral_values_of_other_types_pass_as_int(self) -> None:
+        np = pytest.importorskip("numpy")
+        for value in (3.0, np.int64(3), np.int32(3)):
+            result = bounded_int("k", value, 1, MAX_K)  # type: ignore[arg-type]
+            assert result == 3 and type(result) is int
+
     def test_zero_hop_is_valid(self) -> None:
         """hop=0 is pure semantic and must not be rejected."""
         assert bounded_int("hop", 0, 0, MAX_HOP) == 0
@@ -55,6 +70,11 @@ class TestRequireQuery:
             ValueError, match=rf"at most {MAX_QUERY_LEN} characters, got {MAX_QUERY_LEN + 1}"
         ):
             require_query("x" * (MAX_QUERY_LEN + 1))
+
+    @pytest.mark.parametrize("value", [None, 42, b"socrates", ["socrates"]])
+    def test_non_strings_are_rejected(self, value: object) -> None:
+        with pytest.raises(ValueError, match=r"q must be a string"):
+            require_query(value)  # type: ignore[arg-type]
 
     def test_custom_limit_is_honoured(self) -> None:
         with pytest.raises(ValueError, match=r"at most 5 characters"):

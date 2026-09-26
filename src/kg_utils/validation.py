@@ -35,18 +35,35 @@ MAX_QUERY_LEN = 2000
 
 
 def bounded_int(name: str, value: int, minimum: int, maximum: int) -> int:
-    """Validate that an integer falls within an inclusive range.
+    """Validate that a value is an integer within an inclusive range.
+
+    Strict about type, because these arguments arrive as JSON from a model or
+    a form, where loose input is the normal case: a string (``"8"``), a bool
+    (``True`` would read as ``1``) or a truncating float (``3.7``) is rejected
+    with a clear message instead of failing deeper in or passing silently.  An
+    integral value of another numeric type (``3.0``, a NumPy integer) is
+    accepted and returned as a plain ``int``.  After ``connectome_kg``'s copy,
+    the strictest of the three the fleet carried.
 
     :param name: Parameter name, used in the error message.
     :param value: The value to validate.
     :param minimum: Inclusive lower bound.
     :param maximum: Inclusive upper bound.
-    :return: ``value``, unchanged.
-    :raises ValueError: If ``value`` is outside ``[minimum, maximum]``.
+    :return: ``value`` as an ``int``.
+    :raises ValueError: If ``value`` is not an integer, or is outside
+        ``[minimum, maximum]``.
     """
-    if not (minimum <= value <= maximum):
-        raise ValueError(f"{name} must be between {minimum} and {maximum}, got {value}")
-    return value
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be an integer, got {value!r}")
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be an integer, got {value!r}") from exc
+    if ivalue != value:
+        raise ValueError(f"{name} must be an integer, got {value!r}")
+    if not (minimum <= ivalue <= maximum):
+        raise ValueError(f"{name} must be between {minimum} and {maximum}, got {ivalue}")
+    return ivalue
 
 
 def require_query(q: str, max_len: int = MAX_QUERY_LEN) -> str:
@@ -55,8 +72,11 @@ def require_query(q: str, max_len: int = MAX_QUERY_LEN) -> str:
     :param q: The raw query.
     :param max_len: Inclusive upper bound on the stripped length.
     :return: ``q`` stripped of leading and trailing whitespace.
-    :raises ValueError: If empty, whitespace-only, or longer than ``max_len``.
+    :raises ValueError: If not a string, empty, whitespace-only, or longer
+        than ``max_len``.
     """
+    if not isinstance(q, str):
+        raise ValueError(f"q must be a string, got {type(q).__name__}")
     stripped = q.strip()
     if not stripped:
         raise ValueError("q must not be empty")

@@ -46,6 +46,8 @@ from kg_utils.viz3d.layout import fibonacci_sphere
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import pyvista as pv
 
+    from kg_utils.viz3d.species import Habit
+
 __author__ = "Eric G. Suchanek, PhD"
 
 #: Pipe-model exponent (da Vinci's rule).  n = 2 is the classical statement
@@ -152,6 +154,9 @@ class Skeleton:
     #: report both rather than let a cap pass silently.
     attractors_used: int = 0
     attractors_total: int = 0
+    #: The crown the skeleton grew toward, *after* any droop: each chunk moves
+    #: with the twig it hangs on.  Set by :func:`grow_tree`; hang leaves here.
+    crown: np.ndarray | None = None
 
     @property
     def n_nodes(self) -> int:
@@ -179,6 +184,10 @@ def colonize(
     max_attractors: int | None = MAX_ATTRACTORS,
     max_iter: int = 800,
     seed: int = 0,
+    step_scale: float = 1.0,
+    influence_steps: float = 12.0,
+    plumb_trunk: bool = False,
+    leader: float = 0.0,
 ) -> Skeleton:
     """
     Grow a branching skeleton from *root* toward *attractors*.
@@ -215,6 +224,15 @@ def colonize(
         render at *every* chunk position — only the skeleton is subsampled.
     :param max_iter: Hard iteration cap.
     :param seed: RNG seed; see :func:`seed_from_key`.
+    :param step_scale: Multiplier on the *default* step (ignored when *step*
+        is given): a species' longer or shorter internodes.
+    :param influence_steps: Default *influence* in internodes.
+    :param plumb_trunk: Raise the trunk straight up to the crown's base
+        instead of leaning it toward the nearest attractor, which leans every
+        tree whose lowest chunk sits off-axis.
+    :param leader: With a plumb trunk, keep it climbing this fraction of the
+        crown's height before growth takes over — one central stem, as a fir
+        or poplar has.  Any value above zero implies *plumb_trunk*.
     :return: The grown :class:`Skeleton` (radii not yet assigned).
     """
     all_pts = np.atleast_2d(np.asarray(attractors, dtype=float))
@@ -229,8 +247,9 @@ def colonize(
         pts = all_pts
 
     extent = float(np.linalg.norm(pts.max(axis=0) - pts.min(axis=0)))
-    step = step if step is not None else max(extent / 40.0, 0.5 * crown_spacing(pts, rng=rng))
-    influence = influence if influence is not None else 12.0 * step
+    if step is None:
+        step = step_scale * max(extent / 40.0, 0.5 * crown_spacing(pts, rng=rng))
+    influence = influence if influence is not None else influence_steps * step
     kill = kill if kill is not None else 2.0 * step
 
     tropism_v = np.asarray(tropism, dtype=float)
@@ -252,8 +271,18 @@ def colonize(
             current = len(nodes) - 1
 
     # The root starts outside every influence sphere, so nothing would ever
-    # grow: lead a trunk up to the nearest attractor first.
-    bridge(0, pts[int(np.argmin(np.linalg.norm(pts - root, axis=1)))], influence)
+    # grow: lead a trunk up first.  By default toward the nearest attractor; a
+    # plumb trunk rises straight to the crown's base (and, with a leader, on
+    # up through the crown) so the tree stands upright whatever its data.
+    if plumb_trunk or leader > 0:
+        z_lo, z_hi = float(pts[:, 2].min()), float(pts[:, 2].max())
+        bridge(0, np.array([root[0], root[1], z_lo]), step)
+        if leader > 0:
+            bridge(
+                len(nodes) - 1, np.array([root[0], root[1], z_lo + leader * (z_hi - z_lo)]), step
+            )
+    else:
+        bridge(0, pts[int(np.argmin(np.linalg.norm(pts - root, axis=1)))], influence)
 
     for _ in range(max_iter):
         live_idx = np.flatnonzero(alive)
@@ -543,6 +572,209 @@ def tree_mesh(
     return tubes[0] if len(tubes) == 1 else pv.merge(tubes)
 
 
+#: World length one bark texture tile covers around a trunk, in scene units.
+BARK_TILE: float = 0.9
+
+
+@dataclass(frozen=True)
+class BarkSweep:
+    """
+    A skeleton swept into textured wood, as plain arrays.
+
+    One continuous tube per *chain* -- a run that follows the thickest child
+    from a fork -- rather than one tube per root-to-tip path, so no stretch of
+    wood is drawn twice and the bark runs unbroken up the trunk.
+
+    :param points: ``(V, 3)`` vertex positions.
+    :param normals: ``(V, 3)`` unit outward normals.
+    :param uv: ``(V, 2)`` texture coordinates: ``u`` around the tube in whole
+        tiles (the seam vertex is duplicated, so it wraps cleanly), ``v`` along
+        it in tile heights, with the image's aspect kept.
+    :param faces: ``(F, 3)`` triangles, counter-clockwise seen from outside.
+    """
+
+    points: np.ndarray
+    normals: np.ndarray
+    uv: np.ndarray
+    faces: np.ndarray
+
+    @property
+    def n_points(self) -> int:
+        """Number of vertices."""
+        return int(self.points.shape[0])
+
+
+def _chains(skeleton: Skeleton, radii: np.ndarray) -> list[list[int]]:
+    """
+    Split a skeleton into chains that follow the thickest child.
+
+    The first chain is the trunk; every other child of a node on a chain
+    starts a new chain at that fork, so each chain's first node is the fork it
+    leaves from.
+
+    :param skeleton: Grown skeleton.
+    :param radii: Per-node radius.
+    :return: Chains of node indices, trunk first.
+    """
+    kids = skeleton.children()
+
+    def main_child(i: int) -> int:
+        cs = kids.get(i, [])
+        return max(cs, key=lambda c: radii[c]) if cs else -1
+
+    def follow(chain: list[int]) -> list[int]:
+        c = main_child(chain[-1])
+        while c >= 0:
+            chain.append(c)
+            c = main_child(c)
+        return chain
+
+    chains = [follow([0])]
+    k = 0
+    while k < len(chains):
+        chain = chains[k]
+        # A side chain's first node is the fork, whose other children its
+        # parent chain already queued.
+        for j in range(0 if k == 0 else 1, len(chain)):
+            main = chain[j + 1] if j + 1 < len(chain) else -1
+            for c in kids.get(chain[j], []):
+                if c != main:
+                    chains.append(follow([chain[j], c]))
+        k += 1
+    return chains
+
+
+def bark_sweep(
+    skeleton: Skeleton,
+    *,
+    aspect: float = 1.0,
+    tile: float = BARK_TILE,
+    subdivisions: int = 4,
+    max_sides: int = 12,
+    min_radius: float = 0.0,
+) -> BarkSweep:
+    """
+    Sweep the skeleton into continuous tapered tubes with bark UVs.
+
+    After ez-tree's branch sweep (github.com/dgreenheck/ez-tree, MIT), as the
+    Knowledge Press web forest does it: rings of vertices per section, a
+    duplicated seam vertex for UV continuity, quads between rings.  Each chain
+    follows the thickest child and is smoothed through the same Catmull-Rom
+    as :func:`limb_paths`; ring frames are parallel-transported so the bark
+    does not twist.  A side chain's first ring sits at the fork with the
+    child's own radius, so it tucks inside its parent.
+
+    ``u`` repeats a whole number of times around each tube (about one tile
+    per *tile* of circumference), and ``v`` advances so a tile keeps the
+    image's *aspect*.  NumPy only; :func:`bark_mesh` wraps it for PyVista.
+
+    :param skeleton: Skeleton with radii (:func:`pipe_radii`).
+    :param aspect: Bark image height / width.
+    :param tile: Circumference one texture tile covers, in scene units.
+    :param subdivisions: Spline samples per skeleton segment; ``1`` keeps the
+        skeleton's own nodes.
+    :param max_sides: Ring resolution at the trunk; thinner chains use fewer
+        sides, down to 4.
+    :param min_radius: Draw no tube thinner than this, so the finest twigs
+        still read on screen; the pipe radii are unchanged.
+    :return: The :class:`BarkSweep`.
+    """
+    if skeleton.radii is None:
+        pipe_radii(skeleton)
+    radii = skeleton.radii
+    assert radii is not None  # set above; keeps the type checker honest
+    trunk_r = max(float(radii[0]), 1e-9)
+    pos: list[np.ndarray] = []
+    nrm: list[np.ndarray] = []
+    uvs: list[np.ndarray] = []
+    faces: list[np.ndarray] = []
+    base = 0
+    chains = _chains(skeleton, radii)
+    for ci, chain in enumerate(chains):
+        if len(chain) < 2:
+            continue
+        ring_r = radii[chain].astype(float)
+        if ci > 0:
+            ring_r[0] = radii[chain[1]]
+        pts = _catmull_rom(skeleton.points[chain], max(1, subdivisions))
+        t_src = np.linspace(0.0, 1.0, len(chain))
+        t_dst = np.linspace(0.0, 1.0, pts.shape[0])
+        true_r = np.interp(t_dst, t_src, ring_r)
+        # Resolution and tiling follow the true pipe radius; only the drawn
+        # tube is held at min_radius.
+        r = np.maximum(true_r, min_radius)
+        r0 = max(float(true_r[0]), 1e-9)
+        sides = int(np.clip(round(max_sides * np.sqrt(r0 / trunk_r)), 4, max_sides))
+        around = max(1, round(2.0 * np.pi * r0 / tile))
+        v_scale = 1.0 / (aspect * (2.0 * np.pi * r0 / around))
+
+        tangents = np.gradient(pts, axis=0)
+        tangents /= np.maximum(np.linalg.norm(tangents, axis=1, keepdims=True), 1e-12)
+        t0 = tangents[0]
+        normal = (
+            np.array([t0[2], 0.0, -t0[0]]) if abs(t0[1]) < 0.9 else np.array([0.0, -t0[2], t0[1]])
+        )
+        ang = 2.0 * np.pi * np.arange(sides + 1) / sides
+        cos, sin = np.cos(ang)[:, None], np.sin(ang)[:, None]
+        v = 0.0
+        for k in range(pts.shape[0]):
+            t = tangents[k]
+            if k:
+                v += float(np.linalg.norm(pts[k] - pts[k - 1])) * v_scale
+            # Parallel transport: drop the tangent component of the last normal.
+            normal = normal - float(normal @ t) * t
+            normal /= max(float(np.linalg.norm(normal)), 1e-12)
+            binormal = np.cross(t, normal)
+            ring_dirs = cos * normal + sin * binormal
+            pos.append(pts[k] + ring_dirs * r[k])
+            nrm.append(ring_dirs)
+            uvs.append(
+                np.column_stack([np.arange(sides + 1) / sides * around, np.full(sides + 1, v)])
+            )
+        n_ring = sides + 1
+        k_idx = np.arange(pts.shape[0] - 1)[:, None]
+        j_idx = np.arange(sides)[None, :]
+        a = base + k_idx * n_ring + j_idx
+        b, c = a + 1, a + n_ring
+        d = c + 1
+        faces.append(np.stack([a, b, c], axis=-1).reshape(-1, 3))
+        faces.append(np.stack([b, d, c], axis=-1).reshape(-1, 3))
+        base += pts.shape[0] * n_ring
+    if not pos:
+        empty = np.zeros((0, 3))
+        return BarkSweep(empty, empty, np.zeros((0, 2)), np.zeros((0, 3), dtype=int))
+    return BarkSweep(
+        points=np.vstack(pos),
+        normals=np.vstack(nrm),
+        uv=np.vstack(uvs),
+        faces=np.vstack(faces).astype(int),
+    )
+
+
+def bark_mesh(skeleton: Skeleton, **sweep_kwargs) -> pv.PolyData:
+    """
+    :func:`bark_sweep` as one PyVista mesh, ready for a bark texture.
+
+    The texture coordinates are set as the mesh's active ones and the normals
+    as point data, so ``plotter.add_mesh(bark_mesh(sk), texture=pv.read_texture(...))``
+    draws textured wood.  Unlike :func:`tree_mesh`, whose ``tube()`` filter
+    writes no texture coordinates, this can carry bark.
+
+    :param skeleton: Skeleton with radii.
+    :param sweep_kwargs: Forwarded to :func:`bark_sweep`.
+    :return: The mesh (empty if nothing grew).
+    """
+    pv = _pyvista()
+    sweep = bark_sweep(skeleton, **sweep_kwargs)
+    if not sweep.n_points:
+        return pv.PolyData()
+    cells = np.hstack([np.full((len(sweep.faces), 1), 3), sweep.faces]).ravel()
+    mesh = pv.PolyData(sweep.points, cells)
+    mesh.point_data["Normals"] = sweep.normals
+    mesh.active_texture_coordinates = sweep.uv
+    return mesh
+
+
 def _unit(vector: np.ndarray) -> np.ndarray:
     """
     Unit vector, falling back to ``+z`` for a degenerate input.
@@ -738,6 +970,116 @@ def leaf_glyphs(
     return cloud.glyph(geom=proto, orient="direction", scale="leaf_scale", factor=1.0)
 
 
+#: Largest bend toward the ground per internode, in radians, at droop 1 on
+#: the finest twig.
+DROOP_PER_NODE: float = 0.3
+
+#: Wood at least this fraction of the trunk's radius stays stiff under droop.
+DROOP_STIFF: float = 0.45
+
+
+def _rotate_toward_down(v: np.ndarray, angle: float) -> tuple[np.ndarray, np.ndarray | None]:
+    """
+    Rotate unit *v* toward ``-z`` by at most *angle*.
+
+    :param v: Unit direction.
+    :param angle: Largest rotation, radians.
+    :return: ``(rotated v, rotation matrix)``, the matrix ``None`` when no
+        rotation was applied.
+    """
+    to_down = float(np.arccos(np.clip(-v[2], -1.0, 1.0)))
+    a = min(angle, to_down)
+    axis = np.array([-v[1], v[0], 0.0])  # v x (0, 0, -1)
+    norm = float(np.linalg.norm(axis))
+    if a < 1e-6 or norm < 1e-9:
+        return v, None
+    k = axis / norm
+    kx = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
+    rot = np.eye(3) + np.sin(a) * kx + (1.0 - np.cos(a)) * (kx @ kx)
+    return rot @ v, rot
+
+
+def _nearest_index(nodes: np.ndarray, pts: np.ndarray, block: int = 512) -> np.ndarray:
+    """
+    Index of the nearest node to every point, in blocks so memory stays flat.
+
+    :param nodes: ``(N, 3)`` node positions.
+    :param pts: ``(M, 3)`` query points.
+    :param block: Points per block.
+    :return: ``(M,)`` node indices.
+    """
+    out = np.empty(len(pts), dtype=int)
+    n2 = (nodes**2).sum(axis=1)
+    for start in range(0, len(pts), block):
+        chunk = pts[start : start + block]
+        d2 = n2[None, :] - 2.0 * chunk @ nodes.T
+        out[start : start + block] = d2.argmin(axis=1)
+    return out
+
+
+def droop_skeleton(
+    skeleton: Skeleton,
+    droop: float,
+    *,
+    points: tuple[np.ndarray, ...] = (),
+    floor: float = 0.3,
+) -> list[np.ndarray]:
+    """
+    Bend thin wood toward the ground, as gravity does to a weeping tree.
+
+    Walking out from the root, each segment turns toward ``-z`` by an angle
+    that grows as its wood thins (``droop * DROOP_PER_NODE`` on the finest
+    twig, nothing for wood over :data:`DROOP_STIFF` of the trunk's radius),
+    and every segment inherits its parent's turn — so limbs arch and twigs
+    hang, and segment lengths never change.  After Stava et al. 2014's
+    bending under load.
+
+    Each of *points* (crown attractors, chunk positions) moves with the node
+    it hangs nearest, so every chunk stays on its own twig.
+
+    :param skeleton: Skeleton with radii (:func:`pipe_radii`); its points are
+        bent in place.
+    :param droop: Strength; ``0`` returns at once.
+    :param points: ``(M, 3)`` arrays to carry along with the wood.
+    :param floor: Drooping wood stops this far above the root.
+    :return: The displaced copies of *points*, in order.
+    """
+    if droop <= 0 or skeleton.n_nodes < 2:
+        return [np.asarray(p, dtype=float).copy() for p in points]
+    if skeleton.radii is None:
+        pipe_radii(skeleton)
+    radii = skeleton.radii
+    assert radii is not None  # set above; keeps the type checker honest
+    before = skeleton.points.copy()
+    after = skeleton.points
+    stiff = DROOP_STIFF * float(radii[0])
+    ground = float(before[0, 2]) + floor
+    rot: list[np.ndarray] = [np.eye(3)] * skeleton.n_nodes
+    for i in range(1, skeleton.n_nodes):
+        p = int(skeleton.parents[i])
+        seg = before[i] - before[p]
+        length = float(np.linalg.norm(seg))
+        if length < 1e-12:
+            after[i] = after[p]
+            rot[i] = rot[p]
+            continue
+        d = rot[p] @ (seg / length)
+        thin = max(0.0, 1.0 - float(radii[i]) / stiff)
+        d, bend = _rotate_toward_down(d, droop * DROOP_PER_NODE * thin * thin)
+        rot[i] = rot[p] if bend is None else bend @ rot[p]
+        after[i] = after[p] + d * length
+        after[i, 2] = max(ground, after[i, 2])
+    moved = []
+    for pts in points:
+        pts = np.asarray(pts, dtype=float)
+        if not len(pts):
+            moved.append(pts.copy())
+            continue
+        k = _nearest_index(before, pts)
+        moved.append(pts + (after[k] - before[k]))
+    return moved
+
+
 def grow_tree(
     chunk_positions: np.ndarray,
     root: np.ndarray,
@@ -745,28 +1087,53 @@ def grow_tree(
     key: str = "",
     tip_radius: float = 0.05,
     tropism: tuple[float, float, float] = (0.0, 0.0, 0.18),
+    habit: Habit | None = None,
     **colonize_kwargs,
 ) -> Skeleton:
     """
     Convenience: colonize then apply pipe radii, seeded from a stable key.
+
+    With a *habit* (:mod:`kg_utils.viz3d.species`) the tree grows as that
+    species: its tropism replaces *tropism*, its step, influence, jitter,
+    plumb trunk and leader go to :func:`colonize`, its pipe exponent to
+    :func:`pipe_radii`, and its droop bends the result
+    (:func:`droop_skeleton`).  Place the crown with the same habit
+    (:func:`~kg_utils.viz3d.species.crown_sections`), and hang leaves on
+    ``skeleton.crown``, which droop may have moved.
 
     :param chunk_positions: ``(M, 3)`` crown attractors.
     :param root: ``(3,)`` trunk base.
     :param key: Stable identifier; seeds the RNG so the tree is reproducible.
     :param tip_radius: Radius of leaf-bearing tips, passed to
         :func:`pipe_radii`.
-    :param tropism: Growth bias, per genre silhouette.
-    :param colonize_kwargs: Forwarded to :func:`colonize`.
-    :return: Skeleton with radii assigned.
+    :param tropism: Growth bias, per genre silhouette; ignored with *habit*.
+    :param habit: Species habit; ``None`` grows exactly as before habits.
+    :param colonize_kwargs: Forwarded to :func:`colonize`; they win over the
+        habit's values.
+    :return: Skeleton with radii assigned and ``crown`` set.
     """
+    crown = np.atleast_2d(np.asarray(chunk_positions, dtype=float))
+    exponent = PIPE_EXPONENT
+    if habit is not None:
+        tropism = (0.0, 0.0, habit.tropism)
+        exponent = habit.pipe_exponent
+        # Explicit keyword arguments win over the habit.
+        colonize_kwargs.setdefault("step_scale", habit.step)
+        colonize_kwargs.setdefault("influence_steps", habit.influence)
+        colonize_kwargs.setdefault("jitter", habit.jitter)
+        colonize_kwargs.setdefault("plumb_trunk", habit.plumb_trunk)
+        colonize_kwargs.setdefault("leader", habit.leader)
     skeleton = colonize(
-        chunk_positions,
+        crown,
         root,
         tropism=tropism,
         seed=seed_from_key(key),
         **colonize_kwargs,
     )
-    pipe_radii(skeleton, tip_radius=tip_radius)
+    pipe_radii(skeleton, tip_radius=tip_radius, exponent=exponent)
+    skeleton.crown = crown
+    if habit is not None and habit.droop > 0 and crown.size:
+        (skeleton.crown,) = droop_skeleton(skeleton, habit.droop, points=(crown,))
     return skeleton
 
 
@@ -814,7 +1181,8 @@ def frame_tree(
 
     :param points: ``(N, 3)`` subject points, typically the crown attractors.
     :param fov: Vertical field of view in degrees.  Given one, the camera is
-        placed at the distance that fits the subject's bounding sphere in it —
+        placed at the distance that fits the points' bounding sphere about
+        the frame's centre (the farthest point, not the box corner) in it —
         the answer ``plotter.reset_camera()`` computes, which a renderer
         without one has to compute for itself.  ``None`` falls back to
         *standoff*, which is what a PyVista caller wants: it sets a direction
@@ -853,7 +1221,12 @@ def frame_tree(
         # A fit is a camera-to-centre distance, so it is measured from the
         # focal point — measuring it from the near face would stand the
         # camera a half-depth too far back and undersize the subject.
-        radius = float(np.linalg.norm(hi - lo)) / 2.0 or 1.0
+        # Fit the points' own bounding sphere about the centre, not the
+        # box's: a rounded crown (a dome, an ellipsoid) never reaches the
+        # box's corners, so the box diagonal stood the camera back and left
+        # the tree small in the frame.
+        subject = np.vstack([pts, np.zeros((1, 3))]) if include_root else pts
+        radius = float(np.linalg.norm(subject - centre, axis=1).max()) or 1.0
         fitted = radius / max(np.tan(np.radians(float(fov) / 2.0)), 1e-6)
         eye_y = centre[1] - fitted * (1.0 + max(float(margin), 0.0))
 

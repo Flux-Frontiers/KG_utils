@@ -38,6 +38,9 @@ Sub-packages / modules:
                           skeletons from crown attractors. Layout maths needs only
                           'viz3d'; smooth_paths, tree_mesh and leaf_glyphs build
                           PyVista meshes and need 'viz3d-render'.
+    kg_utils.viz3d.species — Habit, SPECIES, crown_sections, vary_habit: growth
+                          habits that make organic trees look like species (crown
+                          envelope, leader, tropism, droop), nine tuned presets.
     kg_utils.viz3d.qt   — PovRenderSession, PovRenderWorker, ImagePopup,
                           cast_scene_to_looking_glass, CastResult: the Qt machinery a
                           viewer needs to ray-trace and cast without freezing (needs
