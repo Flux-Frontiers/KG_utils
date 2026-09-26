@@ -978,7 +978,8 @@ def frame_tree(
 
     :param points: ``(N, 3)`` subject points, typically the crown attractors.
     :param fov: Vertical field of view in degrees.  Given one, the camera is
-        placed at the distance that fits the subject's bounding sphere in it —
+        placed at the distance that fits the points' bounding sphere about
+        the frame's centre (the farthest point, not the box corner) in it —
         the answer ``plotter.reset_camera()`` computes, which a renderer
         without one has to compute for itself.  ``None`` falls back to
         *standoff*, which is what a PyVista caller wants: it sets a direction
@@ -1017,7 +1018,12 @@ def frame_tree(
         # A fit is a camera-to-centre distance, so it is measured from the
         # focal point — measuring it from the near face would stand the
         # camera a half-depth too far back and undersize the subject.
-        radius = float(np.linalg.norm(hi - lo)) / 2.0 or 1.0
+        # Fit the points' own bounding sphere about the centre, not the
+        # box's: a rounded crown (a dome, an ellipsoid) never reaches the
+        # box's corners, so the box diagonal stood the camera back and left
+        # the tree small in the frame.
+        subject = np.vstack([pts, np.zeros((1, 3))]) if include_root else pts
+        radius = float(np.linalg.norm(subject - centre, axis=1).max()) or 1.0
         fitted = radius / max(np.tan(np.radians(float(fov) / 2.0)), 1e-6)
         eye_y = centre[1] - fitted * (1.0 + max(float(margin), 0.0))
 

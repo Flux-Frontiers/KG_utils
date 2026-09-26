@@ -34,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `leader`. Defaults are unchanged; `plumb_trunk` raises the trunk straight
   to the crown's base instead of leaning it toward the nearest chunk.
 
+### Changed
+
+- **`frame_tree(fov=...)` fits the points' own bounding sphere** — the
+  farthest point from the frame's centre, root included — instead of the
+  bounding box's half-diagonal. A rounded crown (a dome, an ellipsoid) never
+  reaches its box's corners, so the old fit stood the camera back and left
+  the tree small in a POV-Ray render; every point still fits. The
+  ``fov=None`` standoff rule is unchanged.
+
 ## [0.24.0] - 2026-09-22
 
 ### Fixed

@@ -469,7 +469,10 @@ def test_frame_tree_fits_the_subject_to_a_given_fov():
     canopy = rng.normal(0.0, 1.5, (120, 3)) + np.array([0.0, 0.0, 30.0])
     lo = np.minimum(canopy.min(axis=0), 0.0)
     hi = np.maximum(canopy.max(axis=0), 0.0)
-    radius = float(np.linalg.norm(hi - lo)) / 2.0
+    # The fit is the points' own bounding sphere about the frame's centre,
+    # root included: the farthest point, not the box corner.
+    subject = np.vstack([canopy, np.zeros(3)])
+    radius = float(np.linalg.norm(subject - (lo + hi) / 2.0, axis=1).max())
 
     for fov in (14.0, 26.0, 60.0):
         frame = frame_tree(canopy, fov=fov, margin=0.0)
@@ -523,3 +526,23 @@ def test_a_narrower_lens_stands_further_back():
     narrow = frame_tree(canopy, fov=14.0).position[1]
     wide = frame_tree(canopy, fov=60.0).position[1]
     assert narrow < wide
+
+
+def test_frame_tree_fits_a_rounded_crown_tightly():
+    """
+    With a lens, the camera fits the points' own bounding sphere, not the box's.
+
+    A dome crown never reaches its bounding box's corners, so fitting the box
+    diagonal left it small in the frame; the farthest point still fits, and
+    nearly fills the lens.
+    """
+    rng = np.random.default_rng(3)
+    v = rng.normal(size=(400, 3))
+    ball = v / np.linalg.norm(v, axis=1, keepdims=True) * 5.0 + np.array([0.0, 0.0, 12.0])
+    frame = frame_tree(ball, fov=30.0, margin=0.0)
+    eye, centre = np.array(frame.position), np.array(frame.focal_point)
+    subject = np.vstack([ball, np.zeros(3)])
+    subtended = 2.0 * np.degrees(
+        np.arctan(np.linalg.norm(subject - centre, axis=1).max() / np.linalg.norm(centre - eye))
+    )
+    assert subtended == pytest.approx(30.0)
