@@ -36,6 +36,7 @@ Author: Eric G. Suchanek, PhD
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -897,6 +898,67 @@ def leaf_frames(
     vecs = vecs + rng.normal(0.0, 0.3, vecs.shape)
     norms = np.linalg.norm(vecs, axis=1, keepdims=True)
     return pts, vecs / np.maximum(norms, 1e-9)
+
+
+#: Farthest a leaf's stalk sits from the wood it hangs on, in scene units: the
+#: Knowledge Press web forest's 0.1 m at its 1.7 / 4 world scale.
+LEAF_REACH: float = 0.1 * 4.0 / 1.7
+
+
+def hang_leaves(
+    positions: np.ndarray,
+    skeleton: Skeleton,
+    *,
+    reach: float = LEAF_REACH,
+    lift: float = 0.55,
+    up: Sequence[float] = (0.0, 0.0, 1.0),
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Hang each leaf on its nearest twig, as the Knowledge Press web forest does.
+
+    A leaf's stalk sits on the line from its nearest skeleton node toward its
+    chunk, at most *reach* out, so it visibly hangs on the wood.  Its blade
+    points out along that line, lifted toward *up*, and its face turns as
+    close to *up* as the blade allows.  After ``growTree.ts`` and
+    ``emitLeaves`` in knowledge_press's ``web/src/game/``.
+
+    Unlike :func:`leaf_frames` it has no randomness and does not turn leaves
+    along the branch, which sets many of them edge-on to the viewer.
+
+    :param positions: ``(M, 3)`` leaf positions (the chunk attractors).
+    :param skeleton: Grown skeleton; every node is a candidate twig.
+    :param reach: Farthest a stalk sits from its node, in scene units.
+    :param lift: How much of *up* is added to the unit outward direction
+        before normalising the blade; the web's 0.55.
+    :param up: World up.
+    :return: ``(bases, blades, faces)``, each ``(M, 3)``: stalk points, unit
+        stalk-to-tip directions, and unit face normals perpendicular to the
+        blades.  A leaf's third axis is ``np.cross(blades, faces)``.  All
+        three are empty when *positions* is empty.
+    """
+    pts = np.atleast_2d(np.asarray(positions, dtype=float))
+    if pts.size == 0:
+        return np.zeros((0, 3)), np.zeros((0, 3)), np.zeros((0, 3))
+    up_v = _unit(np.asarray(up, dtype=float))
+
+    anchor = skeleton.points[_nearest_index(skeleton.points, pts)]
+    offset = pts - anchor
+    dist = np.linalg.norm(offset, axis=1, keepdims=True)
+    # A chunk sitting on its node has no outward line; hang it straight up.
+    out = np.where(dist > 1e-6, offset / np.maximum(dist, 1e-12), up_v)
+    bases = anchor + out * np.minimum(dist, reach)
+
+    blades = out + lift * up_v
+    blades /= np.maximum(np.linalg.norm(blades, axis=1, keepdims=True), 1e-12)
+
+    # The face normal is up with its blade component removed.  A blade that
+    # points straight up leaves nothing, so take any direction across it.
+    faces = up_v - (blades @ up_v)[:, None] * blades
+    length = np.linalg.norm(faces, axis=1, keepdims=True)
+    axis = np.array([1.0, 0.0, 0.0]) if abs(up_v[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    across = _unit(axis - float(axis @ up_v) * up_v)
+    faces = np.where(length > 1e-4, faces / np.maximum(length, 1e-12), across)
+    return bases, blades, faces
 
 
 def leaf_glyphs(

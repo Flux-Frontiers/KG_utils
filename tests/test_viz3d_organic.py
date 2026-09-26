@@ -427,3 +427,59 @@ class TestSmoothing:
         assert sk.radii is None
         assert smooth_paths(sk)
         assert sk.radii is not None
+
+
+# ---------------------------------------------------------------------------
+# hang_leaves: the web forest's leaf placement
+# ---------------------------------------------------------------------------
+
+
+def _stick() -> Skeleton:
+    """A vertical trunk of three nodes, up to z = 2."""
+    return Skeleton(
+        points=np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, 2.0]]),
+        parents=np.array([-1, 0, 1]),
+    )
+
+
+def test_hang_leaves_puts_each_stalk_within_reach_of_its_nearest_node():
+    from kg_utils.viz3d import LEAF_REACH, hang_leaves
+
+    chunks = np.array([[3.0, 0.0, 2.0], [0.0, 0.05, 1.0], [0.0, -2.0, 0.9]])
+    bases, _, _ = hang_leaves(chunks, _stick())
+    # Far chunks are drawn in to LEAF_REACH along the line to their node;
+    # one already within reach keeps its place.
+    assert np.allclose(bases[0], [LEAF_REACH, 0.0, 2.0])
+    assert np.allclose(bases[1], chunks[1])
+    assert np.isclose(np.linalg.norm(bases[2] - [0.0, 0.0, 1.0]), LEAF_REACH)
+
+
+def test_hang_leaves_matches_the_web_blade_and_face():
+    """The web's numbers: blade = out + 0.55 up, normalised; face = up minus
+    its blade component.  A chunk straight out along +x from its node."""
+    from kg_utils.viz3d import hang_leaves
+
+    _, blades, faces = hang_leaves(np.array([[3.0, 0.0, 2.0]]), _stick())
+    blade = np.array([1.0, 0.0, 0.55]) / np.hypot(1.0, 0.55)
+    assert np.allclose(blades[0], blade)
+    face = np.array([0.0, 0.0, 1.0]) - blade[2] * blade
+    assert np.allclose(faces[0], face / np.linalg.norm(face))
+    assert abs(float(blades[0] @ faces[0])) < 1e-9
+    assert faces[0, 2] > 0  # the face turns to the sky
+
+
+def test_hang_leaves_handles_a_chunk_on_its_node_and_a_blade_straight_up():
+    from kg_utils.viz3d import hang_leaves
+
+    bases, blades, faces = hang_leaves(np.array([[0.0, 0.0, 2.0]]), _stick())
+    assert np.allclose(bases[0], [0.0, 0.0, 2.0])
+    assert np.allclose(blades[0], [0.0, 0.0, 1.0])
+    assert np.isclose(np.linalg.norm(faces[0]), 1.0)
+    assert abs(float(blades[0] @ faces[0])) < 1e-9
+
+
+def test_hang_leaves_of_nothing_is_empty():
+    from kg_utils.viz3d import hang_leaves
+
+    bases, blades, faces = hang_leaves(np.zeros((0, 3)), _stick())
+    assert bases.shape == blades.shape == faces.shape == (0, 3)
