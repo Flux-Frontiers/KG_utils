@@ -165,7 +165,9 @@ SPECIES: dict[str, Habit] = {
         spread=0.7,
         lift=-0.3,
         tropism=0.30,
-        influence=7,
+        # 7 was too short for the trunk to claim the wide bottom whorl, so a
+        # branch from higher up grew back down to it (0.25.1).
+        influence=12,
         step=0.8,
         jitter=0.08,
         pipe_exponent=2.6,
@@ -186,6 +188,9 @@ SPECIES: dict[str, Habit] = {
         pipe_exponent=2.1,
     ),
     # Blackthorn: a low, dense, twiggy thicket-tree spreading from low down.
+    # Twiggy from its short internodes, not from a short reach: at influence 6
+    # and jitter 0.3 each tip saw too few chunks to steer by and random-walked
+    # into helical limbs twice as long as the straight path (0.25.1).
     "blackthorn": Habit(
         plumb_trunk=True,
         envelope="vase",
@@ -194,9 +199,9 @@ SPECIES: dict[str, Habit] = {
         spread=1.25,
         lift=0.8,
         tropism=0.10,
-        influence=6,
+        influence=10,
         step=0.7,
-        jitter=0.30,
+        jitter=0.18,
         pipe_exponent=2.5,
     ),
     # Stone pine: a tall bare stem under a flat-topped parasol.
