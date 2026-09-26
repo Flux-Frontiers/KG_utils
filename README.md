@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.24.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.25.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -26,6 +26,17 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.25.0 (2026-09-26)** -- Organic trees grow as species. New
+  `kg_utils.viz3d.species`: a `Habit` sets the crown's envelope (dome, cone,
+  umbrella, spindle, ...) and how the wood grows toward it -- tropism, reach,
+  taper, a central leader, gravity droop -- and `SPECIES` holds nine tuned
+  presets, oak to willow; `grow_tree(..., habit=)` grows as one. The data
+  still sets the height, the sections and one crown point per chunk.
+  `bark_sweep()`/`bark_mesh()` sweep continuous bark with texture
+  coordinates, so trees can carry bark images. `bounded_int()` and
+  `require_query()` now reject loosely typed input (`"8"`, `True`, `3.7`, a
+  non-string query) -- a behaviour change -- and `frame_tree(fov=...)` fits a
+  rounded crown tightly. Run against all 15 consumers before tagging.
 - **0.24.0 (2026-09-22)** -- Wiping the graph now drops the vector index
   it invalidates. `KGModule.build_graph(wipe=True)` used to leave the
   previous build's vectors in place, so a graph-only rebuild followed by
@@ -140,7 +151,8 @@ document ingestion (`ingest`), a shared temporal contract for dated nodes
 (`temporal`), temporal snapshots (`snapshots`), text + image
 synthesis (`synthesis`), centrality analysis (`analysis`), and a visualization
 stack that runs from interactive HTML (`viz`) through 3-D layouts and organic
-trees (`viz3d`) to Looking Glass light-field casting (`viz3d.qt`).
+trees grown as species (`viz3d`, `viz3d.species`) to Looking Glass light-field
+casting (`viz3d.qt`).
 
 The module-by-module feature list lives in [docs/features.md](docs/features.md).
 
@@ -228,7 +240,7 @@ pip install 'kgmodule-utils[viz3d-qt]'
 
 ```toml
 [tool.poetry.dependencies]
-kgmodule-utils = { version = ">=0.24.0", extras = ["semantic", "synthesis"] }
+kgmodule-utils = { version = ">=0.25.0", extras = ["semantic", "synthesis"] }
 ```
 
 ---
@@ -673,7 +685,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.24.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.25.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -681,7 +693,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.24.0},
+  version   = {0.25.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},
