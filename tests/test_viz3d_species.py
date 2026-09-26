@@ -9,6 +9,8 @@ and *how* the wood reaches it.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -25,6 +27,7 @@ from kg_utils.viz3d import (
     envelope_width,
     grow_tree,
     pipe_radii,
+    root_to_tip_paths,
     section_cluster,
     species_table,
     vary_habit,
@@ -208,3 +211,52 @@ def test_species_table_is_plain_numbers() -> None:
     assert all(
         isinstance(v, (int, float, str, bool)) for row in table.values() for v in row.values()
     )
+
+
+class TestLimbsDoNotWander:
+    """
+    A limb should reach its chunks, not random-walk to them.
+
+    Measured as the median, over a tree's root-to-tip paths, of path length
+    over straight distance. 0.25.0 shipped two species that failed it: the
+    blackthorn (influence 6, jitter 0.3) grew helical limbs twice as long as
+    the straight path, and the fir (influence 7) grew a branch back down to a
+    bottom whorl its trunk could not reach. The books are the ones that
+    exposed them; a 60-chunk book has too few limbs for a median to mean much.
+    """
+
+    BOOKS = ((14, 22, 16.0, "c"), (14, 22, 16.0, "d"), (20, 25, 18.0, "d"), (30, 30, 22.0, "a"))
+    LIMIT = 2.0
+
+    @staticmethod
+    def _wander(habit: Habit, n_sections: int, per: int, height: float, key: str) -> float:
+        habit = vary_habit(habit, key)
+        tips = crown_sections(n_sections, height, 5.0 + np.sqrt(n_sections) * 0.5, habit)
+        crown = np.vstack(
+            [
+                section_cluster(
+                    per, t, np.array([0.0, 0.0, t[2]]), 1.5 + np.sqrt(per) * 0.12, habit
+                )
+                for t in tips
+            ]
+        )
+        sk = grow_tree(crown, np.zeros(3), key=key, habit=habit)
+        ratios = []
+        for path in root_to_tip_paths(sk):
+            pts = sk.points[path]
+            length = np.linalg.norm(np.diff(pts, axis=0), axis=1).sum()
+            ratios.append(length / max(float(np.linalg.norm(pts[-1] - pts[0])), 1e-9))
+        return float(np.median(ratios))
+
+    @pytest.mark.parametrize("name", sorted(SPECIES))
+    def test_every_species_reaches_its_chunks_directly(self, name: str) -> None:
+        worst = max(self._wander(SPECIES[name], *book) for book in self.BOOKS)
+        assert worst < self.LIMIT, f"{name}: limbs wander {worst:.2f}x the straight path"
+
+    @pytest.mark.parametrize(
+        ("name", "released"),
+        [("blackthorn", {"influence": 6, "jitter": 0.30}), ("fir", {"influence": 7})],
+    )
+    def test_the_released_0_25_0_values_fail_it(self, name: str, released: dict) -> None:
+        old = replace(SPECIES[name], **released)
+        assert max(self._wander(old, *book) for book in self.BOOKS) > self.LIMIT
