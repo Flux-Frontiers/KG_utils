@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tree species for organic trees: `kg_utils.viz3d.species`.** Space
+  colonization follows its attractors, so trees with the same crown envelope
+  and growth parameters all came out the same shape. A `Habit` is what a
+  species adds on top of the data: a crown envelope (`dome`, `ellipsoid`,
+  `ovoid`, `cone`, `vase`, `umbrella`, `spindle`, and the old `column`),
+  width, clear bole, whorls and cluster spread/lift, placed by
+  `crown_sections()` and `section_cluster()`; and how the wood grows toward
+  it — tropism, influence radius, internode step, jitter, pipe exponent, a
+  plumb trunk with an optional central leader, and a gravity droop.
+  `SPECIES` holds nine tuned presets (oak, chestnut, fir, plane, blackthorn,
+  pine, birch, willow, poplar), `vary_habit()` nudges one per tree by a
+  seeded few percent, and `species_table()` gives the plain numbers for a
+  mirror such as the Knowledge Press web forest. The data still sets the
+  height, the sections and one crown point per chunk.
+- **`grow_tree(..., habit=)`** grows a tree as a species, bends it with the
+  habit's droop and records the crown the leaves should hang on as
+  `Skeleton.crown` (droop carries each chunk with its twig). `habit=None`,
+  the default, grows exactly as before.
+- **`droop_skeleton()`** bends thin wood toward the ground, each segment
+  inheriting its parent's turn and keeping its length, and moves any given
+  points with the node they hang on.
+- **`colonize()` options** `step_scale`, `influence_steps`, `plumb_trunk` and
+  `leader`. Defaults are unchanged; `plumb_trunk` raises the trunk straight
+  to the crown's base instead of leaning it toward the nearest chunk.
+
 ## [0.24.0] - 2026-09-22
 
 ### Fixed

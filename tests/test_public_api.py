@@ -101,7 +101,18 @@ def test_viz3d_reexports_the_whole_engine() -> None:
     """
     viz3d = importlib.import_module("kg_utils.viz3d")
 
-    for symbol in ("Skeleton", "colonize", "crown_spacing", "grow_tree", "seed_from_key"):
+    for symbol in (
+        "Habit",
+        "SPECIES",
+        "Skeleton",
+        "colonize",
+        "crown_sections",
+        "crown_spacing",
+        "droop_skeleton",
+        "grow_tree",
+        "seed_from_key",
+        "vary_habit",
+    ):
         assert symbol in viz3d.__all__, f"kg_utils.viz3d.__all__ is missing {symbol}"
         assert hasattr(viz3d, symbol), f"kg_utils.viz3d does not export {symbol}"
 
