@@ -572,6 +572,209 @@ def tree_mesh(
     return tubes[0] if len(tubes) == 1 else pv.merge(tubes)
 
 
+#: World length one bark texture tile covers around a trunk, in scene units.
+BARK_TILE: float = 0.9
+
+
+@dataclass(frozen=True)
+class BarkSweep:
+    """
+    A skeleton swept into textured wood, as plain arrays.
+
+    One continuous tube per *chain* -- a run that follows the thickest child
+    from a fork -- rather than one tube per root-to-tip path, so no stretch of
+    wood is drawn twice and the bark runs unbroken up the trunk.
+
+    :param points: ``(V, 3)`` vertex positions.
+    :param normals: ``(V, 3)`` unit outward normals.
+    :param uv: ``(V, 2)`` texture coordinates: ``u`` around the tube in whole
+        tiles (the seam vertex is duplicated, so it wraps cleanly), ``v`` along
+        it in tile heights, with the image's aspect kept.
+    :param faces: ``(F, 3)`` triangles, counter-clockwise seen from outside.
+    """
+
+    points: np.ndarray
+    normals: np.ndarray
+    uv: np.ndarray
+    faces: np.ndarray
+
+    @property
+    def n_points(self) -> int:
+        """Number of vertices."""
+        return int(self.points.shape[0])
+
+
+def _chains(skeleton: Skeleton, radii: np.ndarray) -> list[list[int]]:
+    """
+    Split a skeleton into chains that follow the thickest child.
+
+    The first chain is the trunk; every other child of a node on a chain
+    starts a new chain at that fork, so each chain's first node is the fork it
+    leaves from.
+
+    :param skeleton: Grown skeleton.
+    :param radii: Per-node radius.
+    :return: Chains of node indices, trunk first.
+    """
+    kids = skeleton.children()
+
+    def main_child(i: int) -> int:
+        cs = kids.get(i, [])
+        return max(cs, key=lambda c: radii[c]) if cs else -1
+
+    def follow(chain: list[int]) -> list[int]:
+        c = main_child(chain[-1])
+        while c >= 0:
+            chain.append(c)
+            c = main_child(c)
+        return chain
+
+    chains = [follow([0])]
+    k = 0
+    while k < len(chains):
+        chain = chains[k]
+        # A side chain's first node is the fork, whose other children its
+        # parent chain already queued.
+        for j in range(0 if k == 0 else 1, len(chain)):
+            main = chain[j + 1] if j + 1 < len(chain) else -1
+            for c in kids.get(chain[j], []):
+                if c != main:
+                    chains.append(follow([chain[j], c]))
+        k += 1
+    return chains
+
+
+def bark_sweep(
+    skeleton: Skeleton,
+    *,
+    aspect: float = 1.0,
+    tile: float = BARK_TILE,
+    subdivisions: int = 4,
+    max_sides: int = 12,
+    min_radius: float = 0.0,
+) -> BarkSweep:
+    """
+    Sweep the skeleton into continuous tapered tubes with bark UVs.
+
+    After ez-tree's branch sweep (github.com/dgreenheck/ez-tree, MIT), as the
+    Knowledge Press web forest does it: rings of vertices per section, a
+    duplicated seam vertex for UV continuity, quads between rings.  Each chain
+    follows the thickest child and is smoothed through the same Catmull-Rom
+    as :func:`limb_paths`; ring frames are parallel-transported so the bark
+    does not twist.  A side chain's first ring sits at the fork with the
+    child's own radius, so it tucks inside its parent.
+
+    ``u`` repeats a whole number of times around each tube (about one tile
+    per *tile* of circumference), and ``v`` advances so a tile keeps the
+    image's *aspect*.  NumPy only; :func:`bark_mesh` wraps it for PyVista.
+
+    :param skeleton: Skeleton with radii (:func:`pipe_radii`).
+    :param aspect: Bark image height / width.
+    :param tile: Circumference one texture tile covers, in scene units.
+    :param subdivisions: Spline samples per skeleton segment; ``1`` keeps the
+        skeleton's own nodes.
+    :param max_sides: Ring resolution at the trunk; thinner chains use fewer
+        sides, down to 4.
+    :param min_radius: Draw no tube thinner than this, so the finest twigs
+        still read on screen; the pipe radii are unchanged.
+    :return: The :class:`BarkSweep`.
+    """
+    if skeleton.radii is None:
+        pipe_radii(skeleton)
+    radii = skeleton.radii
+    assert radii is not None  # set above; keeps the type checker honest
+    trunk_r = max(float(radii[0]), 1e-9)
+    pos: list[np.ndarray] = []
+    nrm: list[np.ndarray] = []
+    uvs: list[np.ndarray] = []
+    faces: list[np.ndarray] = []
+    base = 0
+    chains = _chains(skeleton, radii)
+    for ci, chain in enumerate(chains):
+        if len(chain) < 2:
+            continue
+        ring_r = radii[chain].astype(float)
+        if ci > 0:
+            ring_r[0] = radii[chain[1]]
+        pts = _catmull_rom(skeleton.points[chain], max(1, subdivisions))
+        t_src = np.linspace(0.0, 1.0, len(chain))
+        t_dst = np.linspace(0.0, 1.0, pts.shape[0])
+        true_r = np.interp(t_dst, t_src, ring_r)
+        # Resolution and tiling follow the true pipe radius; only the drawn
+        # tube is held at min_radius.
+        r = np.maximum(true_r, min_radius)
+        r0 = max(float(true_r[0]), 1e-9)
+        sides = int(np.clip(round(max_sides * np.sqrt(r0 / trunk_r)), 4, max_sides))
+        around = max(1, round(2.0 * np.pi * r0 / tile))
+        v_scale = 1.0 / (aspect * (2.0 * np.pi * r0 / around))
+
+        tangents = np.gradient(pts, axis=0)
+        tangents /= np.maximum(np.linalg.norm(tangents, axis=1, keepdims=True), 1e-12)
+        t0 = tangents[0]
+        normal = (
+            np.array([t0[2], 0.0, -t0[0]]) if abs(t0[1]) < 0.9 else np.array([0.0, -t0[2], t0[1]])
+        )
+        ang = 2.0 * np.pi * np.arange(sides + 1) / sides
+        cos, sin = np.cos(ang)[:, None], np.sin(ang)[:, None]
+        v = 0.0
+        for k in range(pts.shape[0]):
+            t = tangents[k]
+            if k:
+                v += float(np.linalg.norm(pts[k] - pts[k - 1])) * v_scale
+            # Parallel transport: drop the tangent component of the last normal.
+            normal = normal - float(normal @ t) * t
+            normal /= max(float(np.linalg.norm(normal)), 1e-12)
+            binormal = np.cross(t, normal)
+            ring_dirs = cos * normal + sin * binormal
+            pos.append(pts[k] + ring_dirs * r[k])
+            nrm.append(ring_dirs)
+            uvs.append(
+                np.column_stack([np.arange(sides + 1) / sides * around, np.full(sides + 1, v)])
+            )
+        n_ring = sides + 1
+        k_idx = np.arange(pts.shape[0] - 1)[:, None]
+        j_idx = np.arange(sides)[None, :]
+        a = base + k_idx * n_ring + j_idx
+        b, c = a + 1, a + n_ring
+        d = c + 1
+        faces.append(np.stack([a, b, c], axis=-1).reshape(-1, 3))
+        faces.append(np.stack([b, d, c], axis=-1).reshape(-1, 3))
+        base += pts.shape[0] * n_ring
+    if not pos:
+        empty = np.zeros((0, 3))
+        return BarkSweep(empty, empty, np.zeros((0, 2)), np.zeros((0, 3), dtype=int))
+    return BarkSweep(
+        points=np.vstack(pos),
+        normals=np.vstack(nrm),
+        uv=np.vstack(uvs),
+        faces=np.vstack(faces).astype(int),
+    )
+
+
+def bark_mesh(skeleton: Skeleton, **sweep_kwargs) -> pv.PolyData:
+    """
+    :func:`bark_sweep` as one PyVista mesh, ready for a bark texture.
+
+    The texture coordinates are set as the mesh's active ones and the normals
+    as point data, so ``plotter.add_mesh(bark_mesh(sk), texture=pv.read_texture(...))``
+    draws textured wood.  Unlike :func:`tree_mesh`, whose ``tube()`` filter
+    writes no texture coordinates, this can carry bark.
+
+    :param skeleton: Skeleton with radii.
+    :param sweep_kwargs: Forwarded to :func:`bark_sweep`.
+    :return: The mesh (empty if nothing grew).
+    """
+    pv = _pyvista()
+    sweep = bark_sweep(skeleton, **sweep_kwargs)
+    if not sweep.n_points:
+        return pv.PolyData()
+    cells = np.hstack([np.full((len(sweep.faces), 1), 3), sweep.faces]).ravel()
+    mesh = pv.PolyData(sweep.points, cells)
+    mesh.point_data["Normals"] = sweep.normals
+    mesh.active_texture_coordinates = sweep.uv
+    return mesh
+
+
 def _unit(vector: np.ndarray) -> np.ndarray:
     """
     Unit vector, falling back to ``+z`` for a degenerate input.

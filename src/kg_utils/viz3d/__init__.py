@@ -37,13 +37,17 @@ from kg_utils.viz3d.layout import (
     golden_spiral_2d,
 )
 from kg_utils.viz3d.organic import (
+    BARK_TILE,
     DROOP_PER_NODE,
     DROOP_STIFF,
     LEAF_ASPECT,
     MAX_ATTRACTORS,
     PIPE_EXPONENT,
+    BarkSweep,
     CameraFrame,
     Skeleton,
+    bark_mesh,
+    bark_sweep,
     colonize,
     crown_spacing,
     droop_skeleton,
@@ -74,6 +78,7 @@ from kg_utils.viz3d.species import (
 )
 
 __all__ = [
+    "BARK_TILE",
     "CROWN_TOP",
     "DEFAULT_HABIT",
     "DEFAULT_LEVEL_SIZE",
@@ -85,6 +90,7 @@ __all__ = [
     "PIPE_EXPONENT",
     "SPECIES",
     "AlliumLayout",
+    "BarkSweep",
     "CameraFrame",
     "FunnelLayout",
     "Habit",
@@ -92,6 +98,8 @@ __all__ = [
     "LayoutEdge",
     "LayoutNode",
     "Skeleton",
+    "bark_mesh",
+    "bark_sweep",
     "colonize",
     "crown_sections",
     "crown_spacing",

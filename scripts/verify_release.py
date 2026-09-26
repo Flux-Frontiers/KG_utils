@@ -61,6 +61,8 @@ REQUIRED_API: dict[str, tuple[str, ...]] = {
         "fibonacci_sphere",
         "golden_spiral_2d",
         "Habit",
+        "bark_mesh",
+        "bark_sweep",
         "crown_sections",
         "droop_skeleton",
         "grow_tree",

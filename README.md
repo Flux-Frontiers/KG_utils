@@ -414,15 +414,17 @@ a limb by what it carries, a prolific year grows visibly heavier wood.
 
 | Function | Description |
 |---|---|
-| `grow_tree(attractors, root, key=...)` | One-call entry point: `colonize` then `pipe_radii`, seeded reproducibly from `key` |
+| `grow_tree(attractors, root, key=..., habit=...)` | One-call entry point: `colonize` then `pipe_radii`, seeded reproducibly from `key`; with a `habit`, grows as that species and droops (`Skeleton.crown` is where the leaves hang) |
 | `colonize()` | Space colonization (Runions, Lane & Prusinkiewicz 2007) → `Skeleton` |
 | `pipe_radii()` | Per-node branch radius by da Vinci's rule (`PIPE_EXPONENT`) |
 | `root_to_tip_paths()` / `smooth_paths()` | Skeleton paths, and their Catmull-Rom smoothing |
 | `tree_mesh()` / `leaf_glyphs()` | Swept-tube wood and foliage as `PolyData`; leaf `size` may be one value or one per leaf |
+| `bark_sweep()` / `bark_mesh()` | Continuous textured bark: one tube per chain with UVs that wrap in whole tiles and keep the image's aspect; `bark_mesh` is the `PolyData` for `add_mesh(..., texture=...)` |
+| `droop_skeleton()` | Bend thin wood toward the ground, carrying the chunks with their twigs |
 | `crown_spacing()` / `seed_from_key()` | Natural length scale of a cloud; stable seed from any string |
 
-The geometry above is NumPy-only and needs just `viz3d`. The three that return
-PyVista objects — `smooth_paths`, `tree_mesh`, `leaf_glyphs` — import it lazily
+The geometry above is NumPy-only and needs just `viz3d`. The four that return
+PyVista objects — `smooth_paths`, `tree_mesh`, `bark_mesh`, `leaf_glyphs` — import it lazily
 and raise a `ModuleNotFoundError` naming the install if it is absent, so reach
 for `viz3d-render` when you intend to build meshes.
 
@@ -433,8 +435,27 @@ skeleton = grow_tree(chunk_positions, root=[0, 0, 0], key="pepys")
 wood = tree_mesh(skeleton)          # needs pyvista; see below
 ```
 
+**Species.** `kg_utils.viz3d.species` makes those trees look like species. A
+`Habit` sets where the crown sits — an envelope (`dome`, `cone`, `umbrella`,
+`spindle`, ...), width, clear bole, whorls — and how the wood grows toward it:
+tropism, reach, step, jitter, taper, a central leader, and gravity droop.
+`SPECIES` holds nine tuned presets (oak, chestnut, fir, plane, blackthorn,
+pine, birch, willow, poplar). The data still sets the height, the sections and
+one crown point per chunk; the habit only decides where they sit and how the
+wood reaches them.
+
+```python
+from kg_utils.viz3d import SPECIES, bark_mesh, crown_sections, grow_tree, section_cluster, vary_habit
+
+habit = vary_habit(SPECIES["willow"], key="pepys")  # vary once, use for both
+tips = crown_sections(n_sections, trunk_height, branch_length, habit)
+crown = np.vstack([section_cluster(n, tip, [0, 0, tip[2]], 1.5, habit) for n, tip in zip(chunks_per_section, tips)])
+skeleton = grow_tree(crown, root=[0, 0, 0], key="pepys", habit=habit)
+wood = bark_mesh(skeleton, aspect=2.0)  # texture coordinates for a 1:2 bark image
+```
+
 > **The `viz3d` extra installs NumPy only.** The geometry above is pure NumPy;
-> only `smooth_paths`, `tree_mesh` and `leaf_glyphs` need PyVista, which they
+> only `smooth_paths`, `tree_mesh`, `bark_mesh` and `leaf_glyphs` need PyVista, which they
 > import lazily. Install `pyvista` alongside if you want meshes — everything
 > else works without it.
 
