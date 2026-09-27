@@ -66,6 +66,7 @@ REQUIRED_API: dict[str, tuple[str, ...]] = {
         "crown_sections",
         "droop_skeleton",
         "grow_tree",
+        "hang_leaves",
         "leaf_glyphs",
         "pipe_radii",
         "root_to_tip_paths",
