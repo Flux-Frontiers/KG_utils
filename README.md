@@ -437,6 +437,7 @@ a limb by what it carries, a prolific year grows visibly heavier wood.
 | `root_to_tip_paths()` / `smooth_paths()` | Skeleton paths, and their Catmull-Rom smoothing |
 | `tree_mesh()` / `leaf_glyphs()` | Swept-tube wood and foliage as `PolyData`; leaf `size` may be one value or one per leaf |
 | `bark_sweep()` / `bark_mesh()` | Continuous textured bark: one tube per chain with UVs that wrap in whole tiles and keep the image's aspect; `bark_mesh` is the `PolyData` for `add_mesh(..., texture=...)` |
+| `hang_leaves()` | Leaves hung as the Knowledge Press web forest hangs them: stalk on the nearest twig within `LEAF_REACH`, blade out and lifted, face to the sky; returns `(bases, blades, faces)` for any renderer to stamp a flat leaf in |
 | `droop_skeleton()` | Bend thin wood toward the ground, carrying the chunks with their twigs |
 | `crown_spacing()` / `seed_from_key()` | Natural length scale of a cloud; stable seed from any string |
 
