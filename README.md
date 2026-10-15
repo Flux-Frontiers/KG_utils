@@ -367,7 +367,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class | Description |
 |---|---|
-| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand |
+| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand. `sync()` rewrites the graph and re-embeds only the nodes whose index text changed |
 
 ### `kg_utils.snapshots`
 
@@ -622,9 +622,19 @@ Either way, sources are deduplicated by the SHA-256 of their *bytes* rather than
 their filename, so the same document arriving twice under different names is
 ingested once.
 
-Every file examined is accounted for, including the ones that did not make it —
-`anydoc` performs no OCR, so scanned PDFs are skipped rather than converted, and
-a corpus should say so rather than simply lack them:
+Each format has one converter:
+
+| Formats | Converter | Needs |
+|---|---|---|
+| `.md`, `.markdown`, `.txt`, `.rst` | `PassthroughConverter` (no transformation) | nothing |
+| `.pdf` | `PdfConverter` (`pymupdf4llm`, the same call `doc_kg` makes) | `[ingest]` or `[pdf]` extra |
+| Word, PowerPoint, Excel, OpenDocument, `.rtf`, `.epub`, `.csv` | `AnydocConverter` | `[ingest]` extra |
+| `.tex`, `.latex`, `.html`, `.htm` | `PandocConverter` | the `pandoc` binary on `PATH` |
+
+Every file examined is accounted for, including the ones that did not make it.
+No converter performs OCR, so a scanned PDF is recorded as failed rather than
+converted, and a missing `pandoc` is recorded the same way; a corpus should say
+so rather than simply lack them:
 
 ```python
 for record in pipeline.manifest().problems():
@@ -633,6 +643,23 @@ for record in pipeline.manifest().problems():
 
 The same records live in `<staging_root>/.ingest/manifest.json`, with the
 converter and version that produced each staged file.
+
+Staged files are bare Markdown; their provenance lives in the manifest. For a
+curated import that keeps provenance in the file itself (the `vault_kg` and
+LLM-wiki case), `write_derived` writes one converted document with YAML
+frontmatter (`source_path` relative to an import root, `source_sha256`,
+`source_format`, `converter`, `converter_version`, `ingested_at`, and the
+document's own title, author, date and page count when it has them). It
+refuses to overwrite, so `ingested_at` is written once:
+
+```python
+from pathlib import Path
+from kg_utils.ingest import PdfConverter, write_derived
+
+src = Path("~/papers/turtlend.pdf").expanduser()
+write_derived(PdfConverter().convert(src), src, Path("RAW/articles/turtlend.md"),
+              source_root=src.parent, extra={"kind": "articles"})
+```
 
 For the end-to-end pipeline — converters, staging layout, manifest schema,
 re-run semantics, and the `kgrag ingest` command that drives build and

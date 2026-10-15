@@ -27,6 +27,7 @@ constructs it any more — see :meth:`SemanticIndex._get_backend`.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -200,20 +201,7 @@ class SemanticIndex:
         for i in range(0, len(nodes), batch_size):
             chunk = nodes[i : i + batch_size]
             texts = [_build_index_text(n) for n in chunk]
-            vecs = self.embedder.embed_texts(texts)
-
-            rows = [
-                {
-                    "id": n["id"],
-                    "kind": n["kind"],
-                    "name": n["name"],
-                    "qualname": n["qualname"] or "",
-                    "module_path": n["module_path"] or "",
-                    "text": text,
-                    "vector": vec,
-                }
-                for n, text, vec in zip(chunk, texts, vecs)
-            ]
+            rows = self._rows(chunk, texts)
             indexed += backend.upsert(rows, batch_size=len(rows))
 
         # No-op unless the backend is a LanceDBBackend with ANN enabled.
@@ -227,6 +215,115 @@ class SemanticIndex:
             "vectors_path": str(self.vectors_path),
             "kinds": list(self.index_kinds),
         }
+
+    def sync(
+        self,
+        store: GraphStore,
+        *,
+        signature: str | None = None,
+        batch_size: int = 256,
+        quiet: bool = True,
+    ) -> dict[str, Any]:
+        """Bring the vector index in line with *store*, embedding only changes.
+
+        Each node's index text is hashed. A node is embedded when it is new or
+        its hash differs from the one recorded at the last sync; vectors for
+        nodes no longer in *store* are deleted; everything else is left as it
+        is. The hashes and the embedder *signature* live in sidecar tables of
+        the sqlite-vec store, separate from ``vec_meta``.
+
+        The first sync after a full :meth:`build` (or on a store that has
+        never been synced) embeds every node once, because no hashes are
+        recorded yet; later syncs are incremental. A changed *signature*
+        (another model or dimension) wipes the store and embeds everything.
+
+        Only :class:`SqliteVecBackend` keeps sync state. With any other
+        backend this falls back to ``build(store, wipe=True)``.
+
+        A vector embedded alone can differ in its last bits from the same text
+        embedded in a batch, so ties in a ranking may order differently than
+        after a full build. The graph itself is unaffected.
+
+        :param store: Authoritative :class:`~kg_utils.store.GraphStore`.
+        :param signature: Embedder identity; defaults to the embedder's class
+            name, its ``model_name`` if it has one, and its dimension.
+        :param batch_size: Number of nodes to embed per batch.
+        :param quiet: Suppress progress output during ingestion.
+        :return: The :meth:`build` stats plus ``embedded_rows`` and
+            ``deleted_rows``.
+        """
+        backend = self._get_backend()
+        if not isinstance(backend, SqliteVecBackend):
+            stats = self.build(store, wipe=True, batch_size=batch_size, quiet=quiet)
+            return {**stats, "embedded_rows": stats["indexed_rows"], "deleted_rows": 0}
+        if quiet:
+            suppress_ingestion_logging()
+
+        if signature is None:
+            signature = ":".join(
+                (
+                    type(self.embedder).__name__,
+                    str(getattr(self.embedder, "model_name", "")),
+                    str(self.embedder.dim),
+                )
+            )
+        nodes = self._read_nodes(store)
+        texts = {n["id"]: _build_index_text(n) for n in nodes}
+        shas = {nid: hashlib.sha256(t.encode("utf-8")).hexdigest() for nid, t in texts.items()}
+
+        backend.open(wipe=False)
+        stored_signature, stored = backend.load_sync_state()
+        if stored_signature and stored_signature != signature:
+            backend.close()
+            backend.open(wipe=True)
+            stored = {}
+        present = backend.existing_ids()
+
+        gone = sorted(present - shas.keys())
+        deleted = backend.delete_ids(gone) if gone else 0
+        todo = [n for n in nodes if n["id"] not in present or stored.get(n["id"]) != shas[n["id"]]]
+
+        embedded = 0
+        for i in range(0, len(todo), batch_size):
+            chunk = todo[i : i + batch_size]
+            rows = self._rows(chunk, [texts[n["id"]] for n in chunk])
+            embedded += backend.upsert(rows, batch_size=len(rows))
+        backend.save_sync_state(
+            signature,
+            {n["id"]: shas[n["id"]] for n in todo},
+            [*gone, *(stored.keys() - shas.keys())],
+        )
+
+        return {
+            "indexed_rows": backend.count(),
+            "embedded_rows": embedded,
+            "deleted_rows": deleted,
+            "dim": self.embedder.dim,
+            "table": self.table_name,
+            "vectors_path": str(self.vectors_path),
+            "kinds": list(self.index_kinds),
+        }
+
+    def _rows(self, nodes: Sequence[dict[str, Any]], texts: Sequence[str]) -> list[dict[str, Any]]:
+        """Embed *texts* and pair each vector with its node's metadata row.
+
+        :param nodes: Node dicts from the graph store.
+        :param texts: Index text for each node, in the same order.
+        :return: Backend rows (``id``, the code-KG meta columns, ``text``, ``vector``).
+        """
+        vecs = self.embedder.embed_texts(list(texts))
+        return [
+            {
+                "id": n["id"],
+                "kind": n["kind"],
+                "name": n["name"],
+                "qualname": n["qualname"] or "",
+                "module_path": n["module_path"] or "",
+                "text": text,
+                "vector": vec,
+            }
+            for n, text, vec in zip(nodes, texts, vecs)
+        ]
 
     # ------------------------------------------------------------------
     # Search

@@ -2,7 +2,7 @@
 
 The acquisition stage that sits *in front of* every KGModule builder.  Point it
 at ``.md``, ``.pdf``, ``.docx``, ``.epub``, ``.pptx``, ``.xlsx``, ``.csv`` (and
-the rest of the ``anydoc`` format set); it converts each to Markdown,
+the rest of the formats ``pymupdf4llm``, ``anydoc`` and ``pandoc`` read); it converts each to Markdown,
 materializes a staging corpus, and records provenance for every file it saw —
 including the ones it could not convert.
 
@@ -36,15 +36,25 @@ from __future__ import annotations
 
 from kg_utils.ingest.converters import (
     ANYDOC_EXTENSIONS,
+    PANDOC_EXTENSIONS,
     PASSTHROUGH_EXTENSIONS,
+    PDF_EXTENSIONS,
     AnydocConverter,
     ConversionError,
     ConversionResult,
     Converter,
+    PandocConverter,
     PassthroughConverter,
+    PdfConverter,
     default_converters,
     resolve_converter,
     supported_extensions,
+)
+from kg_utils.ingest.derived import (
+    PROVENANCE_KEYS,
+    derived_frontmatter,
+    render_derived,
+    write_derived,
 )
 from kg_utils.ingest.manifest import (
     INGEST_DIR,
@@ -63,7 +73,10 @@ __all__ = [
     "INGEST_DIR",
     "MANIFEST_NAME",
     "MANIFEST_VERSION",
+    "PANDOC_EXTENSIONS",
     "PASSTHROUGH_EXTENSIONS",
+    "PDF_EXTENSIONS",
+    "PROVENANCE_KEYS",
     "SKIP_DIRS",
     "AnydocConverter",
     "ConversionError",
@@ -74,10 +87,15 @@ __all__ = [
     "IngestRecord",
     "IngestStats",
     "IngestStatus",
+    "PandocConverter",
     "PassthroughConverter",
+    "PdfConverter",
     "default_converters",
+    "derived_frontmatter",
     "ingest",
+    "render_derived",
     "resolve_converter",
     "sha256_file",
     "supported_extensions",
+    "write_derived",
 ]

@@ -9,14 +9,25 @@ provenance needed to reproduce that conversion later.  Two are shipped:
     downstream chunkers keep applying the right structural parse — a ``.txt``
     file must not become ``.md`` or it would suddenly be parsed for headings.
 
+``PdfConverter``
+    PDF, via ``pymupdf4llm``: the fleet's one PDF authority (sweep item 48).
+    The call is the same bare ``pymupdf4llm.to_markdown(path)`` that
+    ``doc_kg`` makes, so a PDF converts to the same Markdown whether it
+    arrives through ``kgrag ingest`` or ``dockg build``.
+
 ``AnydocConverter``
-    Everything else, via `anydoc <https://github.com/firecrawl/anydoc>`_
+    Office and publishing formats, via `anydoc <https://github.com/firecrawl/anydoc>`_
     (PyPI: ``firecrawl-anydoc``) — a Rust converter with Python bindings that
     emits consistent GitHub-Flavored Markdown for Word, PowerPoint, Excel,
-    OpenDocument, RTF, EPUB, CSV and text-based PDF.
+    OpenDocument, RTF, EPUB and CSV.
 
-``anydoc`` performs no OCR.  Image-only PDFs raise
-:class:`ConversionError`; the pipeline records that as a skip with a reason
+``PandocConverter``
+    LaTeX and HTML, via the ``pandoc`` command, which neither of the above
+    reads.  Pandoc is a system binary, not a Python dependency: when it is
+    absent the file is recorded as failed with that reason.
+
+No converter performs OCR.  A scanned PDF converts to empty output, which
+raises :class:`ConversionError`; the pipeline records that with a reason
 rather than dropping the file silently.
 
 Author: Eric G. Suchanek, PhD
@@ -24,6 +35,8 @@ Author: Eric G. Suchanek, PhD
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -62,9 +75,15 @@ ANYDOC_EXTENSIONS: frozenset[str] = frozenset(
         ".rtf",
         ".epub",
         ".csv",
-        ".pdf",
     }
 )
+
+#: Extensions :class:`PdfConverter` handles.
+PDF_EXTENSIONS: frozenset[str] = frozenset({".pdf"})
+
+#: Extensions :class:`PandocConverter` handles: formats no Python converter
+#: here reads.
+PANDOC_EXTENSIONS: frozenset[str] = frozenset({".tex", ".latex", ".html", ".htm"})
 
 
 class ConversionError(RuntimeError):
@@ -269,6 +288,161 @@ class AnydocConverter:
         )
 
 
+class PdfConverter:
+    """Convert PDF to Markdown with ``pymupdf4llm``.
+
+    The conversion is a bare ``pymupdf4llm.to_markdown(str(path))`` -- no page
+    chunks, no anchors -- exactly what ``doc_kg.pdf_reader`` does, so the two
+    paths produce byte-identical Markdown.  Page anchors are roadmap Phase 2.
+
+    Title, author, creation date and page count are read from the PDF's own
+    metadata into :attr:`ConversionResult.metadata` when present.
+    """
+
+    name = "pymupdf4llm"
+
+    def __init__(self, extensions: frozenset[str] | None = None) -> None:
+        """:param extensions: Suffixes to accept (default: :data:`PDF_EXTENSIONS`)."""
+        self.extensions = extensions if extensions is not None else PDF_EXTENSIONS
+        self._version = ""
+
+    @property
+    def version(self) -> str:
+        """Installed ``pymupdf4llm`` version, read without importing it."""
+        if not self._version:
+            self._version = _installed_version("pymupdf4llm")
+        return self._version
+
+    def handles(self, path: Path) -> bool:
+        """Return ``True`` for suffixes in this converter's extension set."""
+        return path.suffix.lower() in self.extensions
+
+    def convert(self, path: Path) -> ConversionResult:
+        """Convert *path* to Markdown with ``pymupdf4llm``.
+
+        :param path: PDF to convert.
+        :return: Markdown plus provenance, staged as ``.md``.
+        :raises ConversionError: If ``pymupdf4llm`` is not installed, cannot
+            open or parse the file, or the file has no text layer.
+        """
+        try:
+            import pymupdf  # pylint: disable=import-outside-toplevel
+            import pymupdf4llm  # pylint: disable=import-outside-toplevel
+        except ImportError as exc:  # pragma: no cover — depends on install
+            raise ConversionError(
+                "pymupdf4llm is not installed; install the ingest extra: "
+                "pip install 'kgmodule-utils[ingest]'"
+            ) from exc
+        try:
+            markdown = pymupdf4llm.to_markdown(str(path))
+        except Exception as exc:  # noqa: BLE001 — any parser failure is a recorded skip
+            raise ConversionError(f"pymupdf4llm could not parse {path.name}: {exc}") from exc
+        if not markdown.strip():
+            raise ConversionError(
+                "converted to empty output (likely a scanned/image-only document needing OCR)"
+            )
+
+        metadata = {"source_format": "pdf"}
+        try:
+            with pymupdf.open(str(path)) as doc:
+                metadata["pages"] = str(doc.page_count)
+                info = doc.metadata or {}
+                for key, field_name in (
+                    ("title", "title"),
+                    ("author", "author"),
+                    ("creationDate", "created"),
+                ):
+                    value = (info.get(key) or "").strip()
+                    if value:
+                        metadata[field_name] = value
+        except Exception:  # noqa: BLE001 — metadata is optional; the text already converted
+            pass
+        return ConversionResult(
+            markdown=markdown,
+            converter=self.name,
+            converter_version=self.version,
+            suffix=".md",
+            metadata=metadata,
+        )
+
+
+class PandocConverter:
+    """Convert LaTeX and HTML to GitHub-Flavored Markdown with ``pandoc``.
+
+    ``pandoc`` is found on ``PATH`` at conversion time.  It is a system
+    binary rather than a Python dependency, so a missing ``pandoc`` is a
+    recorded failure with an install hint, never a silent skip.
+    """
+
+    name = "pandoc"
+
+    def __init__(self, extensions: frozenset[str] | None = None) -> None:
+        """:param extensions: Suffixes to accept (default: :data:`PANDOC_EXTENSIONS`)."""
+        self.extensions = extensions if extensions is not None else PANDOC_EXTENSIONS
+        self._version = ""
+
+    @property
+    def version(self) -> str:
+        """Version reported by ``pandoc --version``, or ``"unknown"``."""
+        if not self._version:
+            exe = shutil.which("pandoc")
+            self._version = "unknown"
+            if exe:
+                try:
+                    out = subprocess.run(
+                        [exe, "--version"], capture_output=True, text=True, check=True, timeout=30
+                    ).stdout
+                    first = out.splitlines()[0] if out else ""
+                    self._version = first.split()[-1] if first else "unknown"
+                except (OSError, subprocess.SubprocessError):
+                    pass
+        return self._version
+
+    def handles(self, path: Path) -> bool:
+        """Return ``True`` for suffixes in this converter's extension set."""
+        return path.suffix.lower() in self.extensions
+
+    def convert(self, path: Path) -> ConversionResult:
+        """Convert *path* to Markdown with ``pandoc -t gfm --wrap=none``.
+
+        :param path: LaTeX or HTML file to convert.
+        :return: Markdown plus provenance, staged as ``.md``.
+        :raises ConversionError: If ``pandoc`` is not on ``PATH``, fails, or
+            produces empty output.
+        """
+        exe = shutil.which("pandoc")
+        if exe is None:
+            raise ConversionError(
+                "pandoc is not installed; install it (https://pandoc.org/installing.html, "
+                "or `brew install pandoc`) to convert .tex and .html"
+            )
+        try:
+            proc = subprocess.run(
+                [exe, str(path), "-t", "gfm", "--wrap=none"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=300,
+            )
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or "").strip().splitlines()
+            raise ConversionError(
+                f"pandoc failed on {path.name}: {detail[-1] if detail else exc}"
+            ) from exc
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ConversionError(f"pandoc failed on {path.name}: {exc}") from exc
+        if not proc.stdout.strip():
+            raise ConversionError("converted to empty output")
+        fmt = "latex" if path.suffix.lower() in (".tex", ".latex") else "html"
+        return ConversionResult(
+            markdown=proc.stdout,
+            converter=self.name,
+            converter_version=self.version,
+            suffix=".md",
+            metadata={"source_format": fmt},
+        )
+
+
 def _installed_version(distribution: str) -> str:
     """Return the installed version of *distribution*, or ``"unknown"``.
 
@@ -289,12 +463,13 @@ def _installed_version(distribution: str) -> str:
 def default_converters() -> list[Converter]:
     """Return the standard converter chain, most specific first.
 
-    Passthrough is tried before ``anydoc`` so that Markdown and plain text are
-    never round-tripped through a converter that would rewrite them.
+    Passthrough is tried first so that Markdown and plain text are never
+    round-tripped through a converter that would rewrite them.  The other
+    three handle disjoint extension sets, so their order does not matter.
 
     :return: Converters in resolution order.
     """
-    return [PassthroughConverter(), AnydocConverter()]
+    return [PassthroughConverter(), PdfConverter(), AnydocConverter(), PandocConverter()]
 
 
 def resolve_converter(path: Path, converters: list[Converter]) -> Converter | None:
@@ -313,9 +488,10 @@ def resolve_converter(path: Path, converters: list[Converter]) -> Converter | No
 def supported_extensions() -> frozenset[str]:
     """Return every suffix the default converter chain accepts.
 
-    Answers without importing ``anydoc``, so it is safe to call on a core-only
-    install.
+    Answers without importing any converter library, so it is safe to call on
+    a core-only install.  ``pandoc``'s formats are included whether or not the
+    binary is installed; a missing binary is reported per file.
 
     :return: Lower-case suffixes including the leading dot.
     """
-    return PASSTHROUGH_EXTENSIONS | ANYDOC_EXTENSIONS
+    return PASSTHROUGH_EXTENSIONS | PDF_EXTENSIONS | ANYDOC_EXTENSIONS | PANDOC_EXTENSIONS

@@ -456,6 +456,9 @@ class SqliteVecBackend:
         if wipe:
             conn.execute("DROP TABLE IF EXISTS vec_nodes")
             conn.execute("DROP TABLE IF EXISTS vec_meta")
+            # sync() state describes the vectors just dropped.
+            conn.execute(f"DROP TABLE IF EXISTS {SYNC_HASH_TABLE}")
+            conn.execute(f"DROP TABLE IF EXISTS {SYNC_INFO_TABLE}")
         existed = bool(
             conn.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vec_meta'"
@@ -577,6 +580,68 @@ class SqliteVecBackend:
                 removed += self._delete_ids_conn(conn, ids[start : start + 1000])
         return removed
 
+    # -- sync state -----------------------------------------------------
+    #
+    # Two sidecar tables that only :meth:`SemanticIndex.sync` reads and
+    # writes. They are separate from ``vec_meta`` on purpose: every consumer
+    # shares that table and some read it directly, so a full build stays
+    # exactly what it was. A store that has never been synced has neither.
+
+    def load_sync_state(self) -> tuple[str, dict[str, str]]:
+        """Return the stored embedder signature and per-id index-text hashes.
+
+        :return: ``(signature, {node_id: text_sha256})``; ``("", {})`` when
+            the store has never been synced.
+        """
+        conn = self._c()
+        have = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?, ?)",
+                (SYNC_HASH_TABLE, SYNC_INFO_TABLE),
+            ).fetchall()
+        }
+        if have != {SYNC_HASH_TABLE, SYNC_INFO_TABLE}:
+            return "", {}
+        row = conn.execute(
+            f"SELECT value FROM {SYNC_INFO_TABLE} WHERE key = 'signature'"
+        ).fetchone()
+        hashes = dict(conn.execute(f"SELECT id, sha FROM {SYNC_HASH_TABLE}").fetchall())
+        return (row[0] if row else ""), hashes
+
+    def save_sync_state(
+        self, signature: str, written: dict[str, str], removed: Iterable[str]
+    ) -> None:
+        """Record the embedder signature and update the per-id hashes.
+
+        :param signature: Embedder identity the stored vectors were made with.
+        :param written: ``{node_id: text_sha256}`` for ids embedded this run.
+        :param removed: Ids whose vectors were deleted this run.
+        """
+        conn = self._c()
+        with conn:
+            conn.execute(
+                f"CREATE TABLE IF NOT EXISTS {SYNC_HASH_TABLE}(id TEXT PRIMARY KEY, sha TEXT NOT NULL)"
+            )
+            conn.execute(
+                f"CREATE TABLE IF NOT EXISTS {SYNC_INFO_TABLE}(key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+            )
+            conn.execute(
+                f"INSERT OR REPLACE INTO {SYNC_INFO_TABLE}(key, value) VALUES ('signature', ?)",
+                (signature,),
+            )
+            gone = [i for i in removed if i]
+            for start in range(0, len(gone), 1000):
+                chunk = gone[start : start + 1000]
+                conn.execute(
+                    f"DELETE FROM {SYNC_HASH_TABLE} WHERE id IN ({', '.join('?' for _ in chunk)})",
+                    chunk,
+                )
+            conn.executemany(
+                f"INSERT OR REPLACE INTO {SYNC_HASH_TABLE}(id, sha) VALUES (?, ?)",
+                list(written.items()),
+            )
+
     # -- reads ----------------------------------------------------------
 
     def existing_ids(self) -> set[str]:
@@ -620,6 +685,12 @@ class SqliteVecBackend:
             rec["_distance"] = float(row[-1])
             out.append(rec)
         return out
+
+
+#: Sidecar tables holding :meth:`SemanticIndex.sync` state (see
+#: :meth:`SqliteVecBackend.load_sync_state`).
+SYNC_HASH_TABLE = "vec_sync_hash"
+SYNC_INFO_TABLE = "vec_sync_info"
 
 
 def _escape(s: str) -> str:
