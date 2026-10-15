@@ -130,6 +130,34 @@ The `env -u` prefix is not optional: an inherited `VIRTUAL_ENV` silently
 retargets `poetry run` at another repo's interpreter, and the tests then pass
 against the wrong dependency set.
 
+## Step 6b — Test the wheel against every consumer (REQUIRED before tagging)
+
+Fleet repos floor this package with no upper bound, so the next fresh
+install of any of them picks this release up. The only check that a 0.x minor
+breaks nothing is running every consumer against it first. Rule of record:
+`kgrag_priv/docs/FLEET_STANDARDS.md`, "SDK releases are tested against every
+consumer before tagging".
+
+1. `poetry build`; confirm the wheel's METADATA lists each new dependency
+   under its intended extra only.
+2. Consumers: `FLEET_REPOS` from `kgrag_priv/scripts/fleet_audit.py`,
+   filtered to repos whose `pyproject.toml` declares `kgmodule-utils`. Never
+   glob `~/repos/*`.
+3. Delegate to at most two testers (Sonnet is fine), each running its half
+   one repo at a time. Per repo, with `env -u VIRTUAL_ENV -u POETRY_ACTIVE`:
+   `poetry install --with dev --all-extras --sync`; full suite with `-rs`
+   (baseline); `poetry run pip install --force-reinstall --no-deps <wheel>`
+   plus any new extra dependency the repo declares; full suite again;
+   restore with the same sync. Re-download `en_core_web_sm` in `diary_kg`,
+   `gutenberg_kg` and `corpus_pepys` after each sync. `corpus_pepys` is
+   `package-mode = false`: its tests run from the checkout.
+4. Require: zero regressions, no new skips, every venv restored, no tracked
+   file changed. A regression blocks the tag.
+5. Packaging gaps are invisible to suites. For each consumer extra that
+   reaches a changed SDK extra, install it in a fresh venv with the wheel and
+   exercise it once (0.27.0: `kg-rag[ingest]` named anydoc directly and lost
+   PDF support while all 16 suites passed).
+
 ## Step 7 — Commit and tag
 
 ```bash
@@ -155,8 +183,11 @@ Then watch the run: build → GitHub Release → PyPI publish.
 
 ## Downstream
 
-Fleet repos floor `kgmodule-utils>=<version>`; their `poetry lock` fails until
-this is on PyPI. After publishing, tell the user which repos are unblocked.
+A consumer raises its floor only when it starts using something this release
+introduced; every other consumer just relocks onto it. After publishing, list
+the consumers whose locks now trail (`kgrag_priv/scripts/versions_snapshot.py`)
+and any that must raise a floor, and note that the PyPI index can lag the
+upload by minutes (`--refresh`, or retry the lock).
 
 ## Known environment quirk
 
