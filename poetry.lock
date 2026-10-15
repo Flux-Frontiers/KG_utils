@@ -1016,7 +1016,7 @@ groups = ["main", "dev"]
 files = [
     {file = "flatbuffers-25.12.19-py2.py3-none-any.whl", hash = "sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4"},
 ]
-markers = {main = "extra == \"ingest\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "fonttools"
@@ -2459,7 +2459,7 @@ files = [
     {file = "networkx-3.6.1-py3-none-any.whl", hash = "sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762"},
     {file = "networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509"},
 ]
-markers = {main = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz\" or extra == \"ingest\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.extras]
 benchmarking = ["asv", "virtualenv"]
@@ -2598,7 +2598,7 @@ files = [
     {file = "numpy-2.5.2-cp315-cp315t-win_arm64.whl", hash = "sha256:5f8e00be2ec6f45f4e8a41a527f68d44a7d96fee92a650e4d8b1326f77f61e6e"},
     {file = "numpy-2.5.2.tar.gz", hash = "sha256:d482d171c406ae88c5b19cad3b6a1c4c5209f886ab74bc44c2c865c23f52d860"},
 ]
-markers = {main = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\" or extra == \"ingest\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "nvidia-cublas"
@@ -2904,7 +2904,7 @@ files = [
     {file = "onnxruntime-1.31.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:d25cd65874b75fdf16149120a04d0cd4551f860a3c8e2ecec785a1903e41d8aa"},
     {file = "onnxruntime-1.31.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:1ecc1450af28d2cf362990e188ccc81b51388f317f641ad973ab4301473200f2"},
 ]
-markers = {main = "extra == \"ingest\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.dependencies]
 flatbuffers = "*"
@@ -2980,7 +2980,7 @@ files = [
     {file = "packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"},
     {file = "packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79"},
 ]
-markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\" or extra == \"ingest\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "parso"
@@ -3241,7 +3241,7 @@ files = [
     {file = "protobuf-7.35.1-py3-none-any.whl", hash = "sha256:4bc97768d8fe4ad6743c8a19403e314511ed9f6d13205b687e52421c023ac1b9"},
     {file = "protobuf-7.35.1.tar.gz", hash = "sha256:ce115a26fe0c39a2c29973d914d327e516a6455464489fe3cd1e51a1b354f81a"},
 ]
-markers = {main = "(extra == \"ingest\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"ingest\" or extra == \"pdf\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "psutil"
@@ -3273,7 +3273,7 @@ files = [
     {file = "psutil-7.2.2-cp37-abi3-win_arm64.whl", hash = "sha256:8c233660f575a5a89e6d4cb65d9f938126312bca76d8fe087b947b3a1aaac9ee"},
     {file = "psutil-7.2.2.tar.gz", hash = "sha256:0746f5f8d406af344fd547f1c8daa5f5c33dbc293bb8d6a16d80b4bb88f59372"},
 ]
-markers = {main = "(extra == \"viz\" or extra == \"ingest\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"viz\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.extras]
 dev = ["abi3audit", "black", "check-manifest", "colorama ; os_name == \"nt\"", "coverage", "packaging", "psleak", "pylint", "pyperf", "pypinfo", "pyreadline3 ; os_name == \"nt\"", "pytest", "pytest-cov", "pytest-instafail", "pytest-xdist", "pywin32 ; os_name == \"nt\" and implementation_name != \"pypy\"", "requests", "rstcheck", "ruff", "setuptools", "sphinx", "sphinx_rtd_theme", "toml-sort", "twine", "validate-pyproject[all]", "virtualenv", "vulture", "wheel", "wheel ; os_name == \"nt\" and implementation_name != \"pypy\"", "wmi ; os_name == \"nt\" and implementation_name != \"pypy\""]
@@ -3568,7 +3568,7 @@ files = [
     {file = "pymupdf-1.28.2-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:fd481ed48bef56305c41fb7e05a055c03345c899c7b101dad086258b438f8168"},
     {file = "pymupdf-1.28.2.tar.gz", hash = "sha256:5e0be7908a715aa20333caddd73f1d6f01e4cd0c26e869fa2dd0b7f344da2249"},
 ]
-markers = {main = "extra == \"ingest\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "pymupdf-layout"
@@ -3584,7 +3584,7 @@ files = [
     {file = "pymupdf_layout-1.28.2-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:4b44a1d8ebf897b0e862ee2d73e7df73099f1c047fc024d2dd24ef0632d2cb5f"},
     {file = "pymupdf_layout-1.28.2-cp310-abi3-win_amd64.whl", hash = "sha256:a765d3ba0b1622e8d5794772ad4303d824386f04b382a5d31c999a828ed4a089"},
 ]
-markers = {main = "extra == \"ingest\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.dependencies]
 networkx = "*"
@@ -3604,7 +3604,7 @@ files = [
     {file = "pymupdf4llm-1.28.2-py3-none-any.whl", hash = "sha256:55c06c07d128f94c4d9271bd427d16ee219779e7d796a7b9da4e110be3004d96"},
     {file = "pymupdf4llm-1.28.2.tar.gz", hash = "sha256:02681698ef67bda9a2acd5d9e1115d4e88be0eb9c5d68926e5e3cd98cd351874"},
 ]
-markers = {main = "extra == \"ingest\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.dependencies]
 psutil = "*"
@@ -3912,7 +3912,7 @@ files = [
     {file = "pyyaml-6.0.3-cp39-cp39-win_amd64.whl", hash = "sha256:2e71d11abed7344e42a8849600193d15b6def118602c4c176f748e4583246007"},
     {file = "pyyaml-6.0.3.tar.gz", hash = "sha256:d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f"},
 ]
-markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"ingest\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "quiltwright"
@@ -4639,7 +4639,7 @@ files = [
     {file = "tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3"},
     {file = "tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d"},
 ]
-markers = {main = "extra == \"ingest\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.extras]
 widechars = ["wcwidth"]
@@ -5112,6 +5112,7 @@ files = [
 [extras]
 ingest = ["firecrawl-anydoc", "pymupdf4llm"]
 lancedb = ["lancedb"]
+pdf = ["pymupdf4llm"]
 semantic = ["numpy", "rich", "sentence-transformers", "sqlite-vec", "torch", "transformers"]
 sqlite-vec = ["sqlite-vec"]
 synthesis = ["httpx", "openai", "pillow"]
@@ -5124,4 +5125,4 @@ viz3d-render = ["numpy", "pyvista"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "57a7ae441b28d973ce3f7ae4927b909415519465f1aec9b39d0ca153326ccd15"
+content-hash = "a078860051a8f9bda8ee7195ca165e1e3d7bba5b3ed8f1ad1ea414d6c72dfbe9"

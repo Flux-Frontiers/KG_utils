@@ -627,7 +627,7 @@ Each format has one converter:
 | Formats | Converter | Needs |
 |---|---|---|
 | `.md`, `.markdown`, `.txt`, `.rst` | `PassthroughConverter` (no transformation) | nothing |
-| `.pdf` | `PdfConverter` (`pymupdf4llm`, the same call `doc_kg` makes) | `[ingest]` extra |
+| `.pdf` | `PdfConverter` (`pymupdf4llm`, the same call `doc_kg` makes) | `[ingest]` or `[pdf]` extra |
 | Word, PowerPoint, Excel, OpenDocument, `.rtf`, `.epub`, `.csv` | `AnydocConverter` | `[ingest]` extra |
 | `.tex`, `.latex`, `.html`, `.htm` | `PandocConverter` | the `pandoc` binary on `PATH` |
 

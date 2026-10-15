@@ -45,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed; previously they were recorded as unsupported.
 - **The `[ingest]` extra adds `pymupdf4llm>=1.28.2`**, which pulls in
   `pymupdf` (AGPL-3.0 or Artifex commercial; already a core `doc_kg`
-  dependency).
+  dependency). A new **`[pdf]` extra** carries `pymupdf4llm` alone, for
+  consumers that read PDFs but need none of anydoc's formats (`doc_kg`).
 - **`quiltwright` floor raised to `>=0.16.0`** in `[viz3d-qt]`, per the fleet
   pin rule.
 

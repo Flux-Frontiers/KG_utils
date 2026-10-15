@@ -91,6 +91,11 @@ ingest = [
     "firecrawl-anydoc>=0.1.9",
     "pymupdf4llm>=1.28.2",
 ]
+# PDF only: what doc_kg needs to read PDFs through PdfConverter without
+# pulling in anydoc. [ingest] stays the "every format" extra.
+pdf = [
+    "pymupdf4llm>=1.28.2",
+]
 synthesis = [
     "httpx>=0.27.0",
     "openai>=1.30.0",
