@@ -499,14 +499,7 @@ class KGModule(ABC):
             index (:meth:`drop_index`), which no longer matches the new graph.
         :return: :class:`~kg_utils.types.BuildStats` (``indexed_rows`` will be ``None``).
         """
-        extractor = self.make_extractor()
-        node_specs: list[NodeSpec] = []
-        edge_specs: list[EdgeSpec] = []
-        for item in extractor.extract():
-            if isinstance(item, NodeSpec):
-                node_specs.append(item)
-            else:
-                edge_specs.append(item)
+        node_specs, edge_specs = self._extract_specs()
 
         if wipe:
             # A wiped graph invalidates every vector: an index left from the
@@ -525,6 +518,55 @@ class KGModule(ABC):
             total_edges=s["total_edges"],
             node_counts=s["node_counts"],
             edge_counts=s["edge_counts"],
+        )
+
+    def _extract_specs(self) -> tuple[list[NodeSpec], list[EdgeSpec]]:
+        """Drain the extractor into node and edge specs.
+
+        :return: ``(node_specs, edge_specs)`` in extraction order.
+        """
+        node_specs: list[NodeSpec] = []
+        edge_specs: list[EdgeSpec] = []
+        for item in self.make_extractor().extract():
+            if isinstance(item, NodeSpec):
+                node_specs.append(item)
+            else:
+                edge_specs.append(item)
+        return node_specs, edge_specs
+
+    def sync(self) -> BuildStats:
+        """Rebuild the graph, then update the vector index incrementally.
+
+        The graph is always rewritten in full (``wipe=True``): extraction is
+        cheap and a full rewrite keeps "same source, same graph" exact. Only
+        the vectors are incremental: :meth:`SemanticIndex.sync` embeds the
+        nodes whose index text changed, deletes the vectors of nodes that are
+        gone, and leaves the rest. Unlike :meth:`build_graph` with
+        ``wipe=True``, this does not drop the index first.
+
+        The first sync of a store embeds every node once, because no
+        per-node hashes are recorded yet.
+
+        :return: :class:`~kg_utils.specs.BuildStats` with ``indexed_rows``,
+            ``index_dim``, ``embedded_rows`` and ``deleted_rows`` set.
+        """
+        node_specs, edge_specs = self._extract_specs()
+        self.store.write(node_specs, edge_specs, wipe=True)
+        self._post_build_hook(self.store)
+
+        idx = self.index.sync(self.store, signature=f"{self.model_name}:{self.embedder.dim}")
+        s = self.store.stats()
+        return BuildStats(
+            repo_root=str(self.repo_root),
+            db_path=str(self.db_path),
+            total_nodes=s["total_nodes"],
+            total_edges=s["total_edges"],
+            node_counts=s["node_counts"],
+            edge_counts=s["edge_counts"],
+            indexed_rows=idx["indexed_rows"],
+            index_dim=idx["dim"],
+            embedded_rows=idx["embedded_rows"],
+            deleted_rows=idx["deleted_rows"],
         )
 
     def drop_index(self) -> list[Path]:

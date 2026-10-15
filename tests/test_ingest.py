@@ -14,6 +14,7 @@ from kg_utils.ingest import (
     IngestPipeline,
     IngestRecord,
     PassthroughConverter,
+    PdfConverter,
     default_converters,
     ingest,
     resolve_converter,
@@ -213,8 +214,9 @@ def test_failed_records_carry_the_converter_version(tmp_path: Path) -> None:
     stats = IngestPipeline(staging_root=tmp_path / "staged").run([src])
 
     (record,) = [r for r in stats.records if r.status == "failed"]
-    assert record.converter == "anydoc"
-    assert record.converter_version == AnydocConverter().version
+    # PDF goes to pymupdf4llm, the one PDF authority since 0.27.0 (item 48).
+    assert record.converter == "pymupdf4llm"
+    assert record.converter_version == PdfConverter().version
     assert record.converter_version  # not blank
 
 

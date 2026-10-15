@@ -64,6 +64,10 @@ class BuildStats:
     :param edge_counts: Edge counts broken down by relation.
     :param indexed_rows: Number of nodes embedded into LanceDB (``None`` if not built).
     :param index_dim: Embedding dimension (``None`` if not built).
+    :param embedded_rows: Vectors embedded by :meth:`KGModule.sync` (``None``
+        for a full build, which embeds every row).
+    :param deleted_rows: Vectors deleted by :meth:`KGModule.sync` (``None``
+        for a full build).
     """
 
     repo_root: str
@@ -74,6 +78,8 @@ class BuildStats:
     edge_counts: dict[str, int]
     indexed_rows: int | None = None
     index_dim: int | None = None
+    embedded_rows: int | None = None
+    deleted_rows: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise the stats to a plain dictionary."""
@@ -86,6 +92,13 @@ class BuildStats:
             "edge_counts": self.edge_counts,
             "indexed_rows": self.indexed_rows,
             "index_dim": self.index_dim,
+            # Sync-only fields appear only after a sync, so a full build's
+            # dict is unchanged for callers that compare it whole.
+            **(
+                {"embedded_rows": self.embedded_rows, "deleted_rows": self.deleted_rows}
+                if self.embedded_rows is not None
+                else {}
+            ),
         }
 
     def __str__(self) -> str:
@@ -97,6 +110,10 @@ class BuildStats:
         ]
         if self.indexed_rows is not None:
             lines.append(f"indexed     : {self.indexed_rows} vectors  dim={self.index_dim}")
+        if self.embedded_rows is not None:
+            lines.append(
+                f"synced      : {self.embedded_rows} embedded, {self.deleted_rows} deleted"
+            )
         return "\n".join(lines)
 
 

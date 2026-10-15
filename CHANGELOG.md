@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`KGModule.sync()`: incremental vectors.** Rewrites the graph in full
+  (extraction is cheap, and a full rewrite keeps "same source, same graph"
+  exact), then calls the new `SemanticIndex.sync()`, which embeds only the
+  nodes whose index text is new or changed and deletes the vectors of nodes
+  that are gone. The per-node text hashes and an embedder signature live in
+  two sidecar tables of the sqlite-vec store (`vec_sync_hash`,
+  `vec_sync_info`), separate from the shared `vec_meta`, so `build()` is
+  unchanged for every consumer. The first sync of a store embeds everything
+  once; a changed model or dimension wipes and re-embeds; a non-sqlite
+  backend falls back to a full build. `BuildStats` gains `embedded_rows` and
+  `deleted_rows`, present in `to_dict()` only after a sync. Sweep item 79.
+- **`PdfConverter`**, the fleet's one PDF converter: the same bare
+  `pymupdf4llm.to_markdown()` call `doc_kg` makes, so a PDF converts to
+  identical Markdown through `kgrag ingest` and `dockg build`. Records the
+  PDF's title, author, creation date and page count. A PDF with no text layer
+  is a `ConversionError` naming OCR. Sweep item 48.
+- **`PandocConverter`** for `.tex`, `.latex`, `.html` and `.htm`, which no
+  Python converter here reads. Pandoc is a system binary; when it is missing
+  the file is recorded as failed with an install hint.
+- **`write_derived()`** (with `derived_frontmatter()` and `render_derived()`),
+  in the new `kg_utils.ingest.derived`: writes one converted document with
+  provenance frontmatter, for curated imports such as `vaultkg add`. Values
+  are JSON-quoted, so a title containing `: ` cannot break the YAML; the
+  source path is relative to an import root, never absolute; an existing
+  file is never overwritten. The staging pipeline does not use it yet, since
+  DocKG cannot parse frontmatter until roadmap Phase 1.
+
+### Changed
+
+- **`.pdf` moves from `AnydocConverter` to `PdfConverter`.** `kgrag ingest`
+  now converts PDFs with `pymupdf4llm`, matching `dockg build`; a staged PDF's
+  Markdown and manifest `converter` field change accordingly.
+- **`.html` and `.tex` are now ingestible** by `IngestPipeline` where pandoc is
+  installed; previously they were recorded as unsupported.
+- **The `[ingest]` extra adds `pymupdf4llm>=1.28.2`**, which pulls in
+  `pymupdf` (AGPL-3.0 or Artifex commercial; already a core `doc_kg`
+  dependency).
+- **`quiltwright` floor raised to `>=0.16.0`** in `[viz3d-qt]`, per the fleet
+  pin rule.
+
 ## [0.26.0] - 2026-09-26
 
 ### Added
