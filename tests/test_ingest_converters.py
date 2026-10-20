@@ -10,6 +10,11 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+# Hard imports, not importorskip: the dev group installs pymupdf, so a missing
+# module means a broken PDF install (pymupdf4llm 2.0 alone ships no code),
+# which must fail here rather than skip.
+import pymupdf
+import pymupdf4llm
 import pytest
 
 from kg_utils.ingest import (
@@ -26,9 +31,6 @@ from kg_utils.ingest import (
     write_derived,
 )
 from kg_utils.ingest import converters as converters_mod
-
-pymupdf = pytest.importorskip("pymupdf")
-pymupdf4llm = pytest.importorskip("pymupdf4llm")
 
 HAS_PANDOC = shutil.which("pandoc") is not None
 needs_pandoc = pytest.mark.skipif(not HAS_PANDOC, reason="pandoc binary not on PATH")
