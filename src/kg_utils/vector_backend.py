@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -652,6 +652,30 @@ class SqliteVecBackend:
             return {r[0] for r in conn.execute("SELECT id FROM vec_meta").fetchall()}
         except Exception:  # noqa: BLE001
             return set()
+
+    def iter_vectors(self) -> Iterator[tuple[str, Any]]:
+        """Yield ``(id, vector)`` for every stored vector, as float32 arrays.
+
+        An int8 store yields its values divided by 127, the inverse of
+        :meth:`_encode`; cosine is scale-invariant, so rankings are the same
+        either way. For exporters that copy a store's vectors elsewhere, such
+        as :mod:`kg_utils.devicepack`.
+
+        :return: An iterator in ``vec_meta`` rowid order; empty when the
+            store does not exist.
+        """
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
+        if self._conn is None and not self.db_path.exists():
+            return
+        dtype = np.int8 if self.dtype == "int8" else np.float32
+        rows = self._c().execute(
+            "SELECT m.id, v.embedding FROM vec_meta m "
+            "JOIN vec_nodes v ON v.rowid = m.rowid ORDER BY m.rowid"
+        )
+        for node_id, blob in rows:
+            vector = np.frombuffer(blob, dtype=dtype).astype(np.float32)
+            yield node_id, vector / 127.0 if self.dtype == "int8" else vector
 
     def count(self) -> int:
         # Don't create a fresh db file just to count a store that isn't there.
