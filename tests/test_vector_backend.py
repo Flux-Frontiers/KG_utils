@@ -94,6 +94,27 @@ def test_upsert_count_and_existing_ids(backend):
     assert backend.existing_ids() == {f"n{i}" for i in range(8)}
 
 
+def test_iter_vectors_reads_back_what_was_stored(backend):
+    rows, v = _corpus()
+    backend.upsert(rows)
+    got = dict(backend.iter_vectors())
+    assert set(got) == {f"n{i}" for i in range(8)}
+    np.testing.assert_allclose(got["n5"], v[5], rtol=1e-6)
+
+
+def test_iter_vectors_dequantises_an_int8_store(tmp_path):
+    rows, v = _corpus()
+    be = _make_sqlite(tmp_path, dtype="int8")
+    be.open(wipe=True)
+    be.upsert(rows)
+    got = dict(be.iter_vectors())
+    np.testing.assert_allclose(got["n2"], v[2], atol=1 / 127)
+
+
+def test_iter_vectors_of_a_missing_store_is_empty(tmp_path):
+    assert list(_make_sqlite(tmp_path).iter_vectors()) == []
+
+
 def test_search_returns_self_first(backend):
     rows, v = _corpus()
     backend.upsert(rows)

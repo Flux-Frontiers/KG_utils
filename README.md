@@ -26,6 +26,10 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **Unreleased** -- New `kg_utils.devicepack`: the on-device search-pack
+  format the Knowledge Press apps read (passage pack, vector sidecar,
+  manifest, golden rankings), lifted out of gutenberg_kg's `export-swift` so
+  any KG can write it. genealogy_kg's `export-swift` is its first user.
 - **0.27.1 (2026-10-19)** -- `[pdf]` and `[ingest]` work again on a fresh
   install. pymupdf4llm 2.0 is an empty placeholder (its code now ships inside
   pymupdf 2.0), so 0.27.0's `pymupdf4llm>=1.28.2` resolved to no PDF support.
@@ -168,7 +172,8 @@ The SDK covers the full life of a knowledge graph: core contracts and SQLite
 storage (`specs`, `extractor`, `store`, `pipeline`), semantic indexing over
 pluggable vector backends (`semantic`, `vector_backend`, `embed`, `embedder`),
 document ingestion (`ingest`), a shared temporal contract for dated nodes
-(`temporal`), temporal snapshots (`snapshots`), text + image
+(`temporal`), on-device search packs for the Knowledge Press apps
+(`devicepack`), temporal snapshots (`snapshots`), text + image
 synthesis (`synthesis`), centrality analysis (`analysis`), and a visualization
 stack that runs from interactive HTML (`viz`) through 3-D layouts and organic
 trees grown as species (`viz3d`, `viz3d.species`) to Looking Glass light-field
@@ -523,6 +528,21 @@ about the host window.
 | `cast_scene_to_looking_glass()` | Build the PyVista scene, render, write the quilt, and cast it to the display; sweeps the spec's cone capped at 35 degrees unless `view_cone` says otherwise, and returns a `CastResult` |
 | `CastResult` | Outcome of one cast: `path`, `error`, `elapsed`, and the `message` a status bar shows |
 | `DEFAULT_QUILT_PRESET` / `DEFAULT_CAST_SCALE` | The preset and scale a cast uses when no `spec` is given (`"16-landscape"` at half size) |
+
+### `kg_utils.devicepack`
+
+The on-device search-pack format: what the Knowledge Press apps open with no
+server. Needs NumPy for vectors (`semantic` or `viz3d` extra).
+
+| Class / function | Description |
+|---|---|
+| `Passage` | One searchable row: id, KG, kind, content, and the optional title, author, genre and location columns |
+| `write_passage_pack()` | Write `<name>.pack` (passages + FTS5) and its `<name>.vectors` sidecar from a vector map; returns `PackStats` |
+| `search_pack()` | The reference hybrid search: dense over the sidecar, BM25 over FTS5 (phrase, then any term), RRF-fused; filters on `genre` only |
+| `build_manifest()` | `manifest.json`: pack version, the embedder, every pack with sizes and checksums |
+| `build_golden()` | `golden.json`: each query's top-k as the packs answer it, the app's parity gate |
+| `read_vector_sidecar()` | Memory-map a sidecar; rejects a truncated or foreign file |
+| `encode_vector()`, `rrf_fuse()`, `fts_phrase_expression()` | The pieces the search is built from |
 
 ### `kg_utils.analysis`
 
