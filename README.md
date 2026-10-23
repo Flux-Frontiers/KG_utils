@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.27.1-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.28.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -26,10 +26,11 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
-- **Unreleased** -- New `kg_utils.devicepack`: the on-device search-pack
-  format the Knowledge Press apps read (passage pack, vector sidecar,
-  manifest, golden rankings), lifted out of gutenberg_kg's `export-swift` so
-  any KG can write it. genealogy_kg's `export-swift` is its first user.
+- **0.28.0 (2026-10-23)** -- New `kg_utils.devicepack`: the on-device
+  search-pack format the Knowledge Press apps read (passage pack, vector
+  sidecar, manifest, golden rankings), lifted out of gutenberg_kg's
+  `export-swift` so any KG can write it. genealogy_kg's `export-swift` is its
+  first user. `SqliteVecBackend.iter_vectors()` reads a store's vectors back.
 - **0.27.1 (2026-10-19)** -- `[pdf]` and `[ingest]` work again on a fresh
   install. pymupdf4llm 2.0 is an empty placeholder (its code now ships inside
   pymupdf 2.0), so 0.27.0's `pymupdf4llm>=1.28.2` resolved to no PDF support.
@@ -753,7 +754,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.27.1) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.28.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -761,7 +762,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.27.1},
+  version   = {0.28.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

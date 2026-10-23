@@ -1,19 +1,23 @@
-# Release Notes -- v0.27.1
+# Release Notes -- v0.28.0
 
-> Released: 2026-10-19
+> Released: 2026-10-23
 
-### Fixed
+### Added
 
-- **`[pdf]` and `[ingest]` installed no PDF code on a fresh resolve.**
-  pymupdf4llm 2.0 (2026-10-16) is an empty placeholder: the pymupdf 2.0
-  wheel now ships the `pymupdf4llm` module, and the placeholder installs no
-  code and does not depend on pymupdf. Both extras declared
-  `pymupdf4llm>=1.28.2`, so `pip install kgmodule-utils[pdf]==0.27.0` today
-  gets the placeholder and no pymupdf, and `PdfConverter` cannot import.
-  Both extras and the dev group now declare `pymupdf>=2.0`. `PdfConverter`
-  is unchanged; it still calls `pymupdf4llm.to_markdown`. The converter
-  tests import pymupdf directly instead of `importorskip`, so a broken PDF
-  install fails the suite instead of skipping it. Sweep item 86.
+- **`kg_utils.devicepack`: on-device search packs.** The format the
+  Knowledge Press apps read, lifted out of gutenberg_kg's `export-swift` so
+  any KG can write it: a SQLite passage pack with FTS5, an int8 or float32
+  vector sidecar with a 32-byte header, a manifest naming the embedder, and
+  golden reference rankings. `write_passage_pack()` writes a pack from
+  `Passage` rows and a vector map; `search_pack()` is the hybrid reference
+  search (dense plus BM25, fused by reciprocal rank) the app must reproduce;
+  `build_manifest()` and `build_golden()` write the other two files. Search
+  filters on `genre` only, as the Swift engine does. Cross-checked against
+  gutenberg_kg's real packs: all 24 golden rankings identical, scores
+  included. gutenberg_kg is unchanged. Needs NumPy for vectors.
+- **`SqliteVecBackend.iter_vectors()`** yields every stored `(id, vector)`
+  as float32 (an int8 store is divided back by 127), so an exporter can copy
+  a store's vectors into a device pack without reading `vec0` itself.
 
 ---
 
