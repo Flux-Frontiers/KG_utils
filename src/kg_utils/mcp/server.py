@@ -18,7 +18,11 @@ server name (``mcp__pycodekg__query``, ``mcp__dockg__query``), so a per-kind
 spelling such as ``query_codebase`` or ``query_docs`` told it nothing the
 prefix did not, and made every skill describe a different vocabulary. Domain
 tools are added to the returned server with the ordinary ``@server.tool()``
-decorator and keep domain names (``callers``, ``find_path``).
+decorator and keep domain names (``callers``, ``find_path``). A module whose
+own version of a canonical tool does more -- pycode_kg's ``query`` ranks with
+a hybrid score and caps results per module -- replaces it with
+``@server.canonical("query")``, under the same name and only if it keeps
+every canonical parameter (:meth:`KGServer.canonical`).
 
 What lives here and what does not. Everything about the *graph* stays in the
 module's own methods: argument bounds (:mod:`kg_utils.validation`), lazy model
@@ -50,6 +54,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 import anyio
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp.tools import Tool
 from mcp.server.lowlevel.server import Server as LowLevelServer
 from mcp.server.stdio import stdio_server
 
@@ -162,6 +167,49 @@ class KGServer(FastMCP):
         super().remove_tool(name)
         self._refresh_instructions()
 
+    def canonical(self, name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Replace a canonical tool with this module's richer version of it.
+
+        The name stays, so the vocabulary stays the same on every server; what
+        a module may change is everything an agent does not rely on. The
+        replacement must keep each canonical parameter with the same JSON type
+        and the same required-ness, add no new required parameter, and return
+        the same kind of result (structured data or text). Defaults may differ
+        and optional parameters may be added: pycode_kg's ``query`` defaults to
+        hybrid reranking and adds ``paths`` and ``max_per_module``.
+
+        Checked when the module builds its server, so a broken contract fails
+        the module's own tests rather than an agent's call. The tool keeps its
+        place in the tool list.
+
+        :param name: One of :data:`CANONICAL_TOOLS` registered on this server.
+        :return: A decorator that registers the function under *name*.
+        :raises ValueError: If *name* is not a canonical tool registered here.
+        :raises TypeError: If the function breaks the canonical contract; the
+            message lists every way it does.
+        """
+        if name not in CANONICAL_TOOLS:
+            raise ValueError(f"{name!r} is not a canonical tool; add it with @server.tool()")
+        current = self._tool_manager.get_tool(name)
+        if current is None:
+            raise ValueError(f"canonical tool {name!r} is not registered on {self.name!r}")
+
+        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+            candidate = Tool.from_function(fn, name=name)
+            problems = _contract_problems(current, candidate)
+            if problems:
+                raise TypeError(
+                    f"{self.name}: this `{name}` breaks the canonical contract: "
+                    + "; ".join(problems)
+                )
+            # Replace in place: the manager keeps tools in an ordered dict, so
+            # the canonical tool keeps its position in tools/list.
+            self._tool_manager._tools[name] = candidate  # noqa: SLF001
+            self._refresh_instructions()
+            return fn
+
+        return decorator
+
     def tool_specs(self) -> list[dict[str, Any]]:
         """Return each registered tool's name, description and input schema.
 
@@ -182,6 +230,62 @@ class KGServer(FastMCP):
     def _refresh_instructions(self) -> None:
         text = describe_tools(self)
         _lowlevel(self).instructions = f"{self._preamble}\n\n{text}" if self._preamble else text
+
+
+def _json_types(schema: dict[str, Any]) -> frozenset[str]:
+    """The JSON types a parameter schema admits, arrays qualified by item type."""
+    options = schema.get("anyOf") or [schema]
+    out: set[str] = set()
+    for opt in options:
+        kind = opt.get("type", "any")
+        if kind == "array":
+            kind = f"array<{opt.get('items', {}).get('type', 'any')}>"
+        elif "enum" in opt and kind == "any":
+            kind = "string"
+        out.add(kind)
+    return frozenset(out)
+
+
+def _contract_problems(canonical: Tool, candidate: Tool) -> list[str]:
+    """Every way *candidate* fails to stand in for *canonical*; empty if it can."""
+    base_props: dict[str, Any] = canonical.parameters.get("properties", {})
+    new_props: dict[str, Any] = candidate.parameters.get("properties", {})
+    base_req = set(canonical.parameters.get("required", []))
+    new_req = set(candidate.parameters.get("required", []))
+    problems: list[str] = []
+    for param, schema in base_props.items():
+        if param not in new_props:
+            problems.append(f"drops parameter `{param}`")
+            continue
+        before, after = _json_types(schema), _json_types(new_props[param])
+        if before != after:
+            problems.append(
+                f"`{param}` takes {'|'.join(sorted(after))}, not {'|'.join(sorted(before))}"
+            )
+        if (param in base_req) != (param in new_req):
+            problems.append(f"`{param}` must {'' if param in base_req else 'not '}be required")
+    for param in sorted(new_req - set(base_props)):
+        problems.append(f"adds required parameter `{param}`")
+    before, after = _result_kind(canonical), _result_kind(candidate)
+    if before != after:
+        problems.append(f"returns {after}, not {before}")
+    return problems
+
+
+def _result_kind(tool: Tool) -> str:
+    """What a tool's result is, as an agent sees it.
+
+    FastMCP wraps a plain return type (``str``, ``list[...]``) in a one-field
+    ``{"result": ...}`` schema, so the presence of an output schema cannot tell
+    text from structured data; the wrapped field's type can.
+    """
+    schema = tool.output_schema
+    if schema is None:
+        return "unstructured content"
+    if getattr(tool.fn_metadata, "wrap_output", False):
+        kind = schema.get("properties", {}).get("result", {}).get("type", "any")
+        return {"string": "text", "array": "a list"}.get(kind, kind)
+    return "structured data"
 
 
 def _lowlevel(server: FastMCP) -> LowLevelServer:

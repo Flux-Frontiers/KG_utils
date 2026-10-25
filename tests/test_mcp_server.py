@@ -42,6 +42,7 @@ import kg_utils.pipeline as pipeline_mod  # noqa: E402
 from kg_utils.extractor import KGExtractor  # noqa: E402
 from kg_utils.mcp import (  # noqa: E402
     CANONICAL_TOOLS,
+    BuildServer,
     Context,
     KGServer,
     ServableKG,
@@ -312,6 +313,109 @@ def test_name_and_version_reach_the_client(built: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# A module's richer version of a canonical tool
+# ---------------------------------------------------------------------------
+
+
+def test_a_superset_query_replaces_the_canonical_one_in_place(built: Path, no_model: None) -> None:
+    server = make_server(lambda: _KG(built), name="mkg", kind="test")
+
+    @server.canonical("query")
+    def query(
+        q: str,
+        ctx: Context,
+        k: int = 4,  # a different default is allowed
+        hop: int = 1,
+        max_nodes: int = 25,
+        rels: list[str] | None = None,
+        min_score: float = 0.0,
+        rerank_mode: str = "hybrid",  # an added optional parameter is allowed
+    ) -> dict[str, Any]:
+        """Richer query: answers from the module's own code."""
+        return {"q": q, "k": k, "rerank_mode": rerank_mode, "kind": kg_from(ctx).kind()}
+
+    names = [t["name"] for t in manifest(server)["tools"]]
+    assert names == list(CANONICAL_TOOLS), "the replacement kept its place"
+    result = _call(server, "query", {"q": "alpha"})
+    assert not result.isError
+    assert result.structuredContent == {
+        "q": "alpha",
+        "k": 4,
+        "rerank_mode": "hybrid",
+        "kind": "test",
+    }
+    assert "- `query`: Richer query: answers from the module's own code." in (
+        server.instructions or ""
+    )
+
+
+@pytest.mark.parametrize(
+    ("signature", "fragment"),
+    [
+        ("q: str, ctx: Context, k: int = 8", "drops parameter `hop`"),
+        (
+            "q: str, ctx: Context, k: str = '8', hop: int = 1, max_nodes: int = 25, "
+            "rels: list[str] | None = None, min_score: float = 0.0",
+            "`k` takes string, not integer",
+        ),
+        (
+            "q: str, ctx: Context, k: int = 8, hop: int = 1, max_nodes: int = 25, "
+            "rels: str = '', min_score: float = 0.0",
+            "`rels` takes string",
+        ),
+        (
+            "q: str, ctx: Context, scope: str, k: int = 8, hop: int = 1, max_nodes: int = 25, "
+            "rels: list[str] | None = None, min_score: float = 0.0",
+            "adds required parameter `scope`",
+        ),
+        (
+            "ctx: Context, q: str = '', k: int = 8, hop: int = 1, max_nodes: int = 25, "
+            "rels: list[str] | None = None, min_score: float = 0.0",
+            "`q` must be required",
+        ),
+    ],
+)
+def test_a_query_that_breaks_the_contract_is_refused(
+    built: Path, signature: str, fragment: str
+) -> None:
+    server = make_server(lambda: _KG(built), name="mkg", kind="test")
+    namespace: dict[str, Any] = {"Context": Context, "Any": Any}
+    exec(f"def query({signature}) -> dict[str, Any]:\n    return {{}}", namespace)  # noqa: S102
+    with pytest.raises(TypeError, match="breaks the canonical contract") as info:
+        server.canonical("query")(namespace["query"])
+    assert fragment in str(info.value)
+    # Refused means untouched: the canonical tool is still the one registered.
+    assert "rerank" not in json.dumps(manifest(server)["tools"][1])
+
+
+def test_changing_the_result_kind_is_refused(built: Path) -> None:
+    server = make_server(lambda: _KG(built), name="mkg", kind="test")
+
+    def pack_as_dict(
+        q: str,
+        ctx: Context,
+        k: int = 8,
+        hop: int = 1,
+        context: int = 5,
+        max_lines: int = 60,
+        max_nodes: int = 15,
+        rels: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return {}
+
+    with pytest.raises(TypeError, match="returns structured data, not text"):
+        server.canonical("pack")(pack_as_dict)
+
+
+def test_only_registered_canonical_tools_can_be_replaced(built: Path) -> None:
+    server = make_server(lambda: _KG(built), name="mkg", kind="test", neighbors=False)
+    with pytest.raises(ValueError, match="not a canonical tool"):
+        server.canonical("callers")
+    with pytest.raises(ValueError, match="not registered"):
+        server.canonical("neighbors")
+
+
+# ---------------------------------------------------------------------------
 # Transport
 # ---------------------------------------------------------------------------
 
@@ -338,7 +442,7 @@ def test_http_host_decides_rebinding_protection_like_the_constructor(built: Path
 # ---------------------------------------------------------------------------
 
 
-def _cli(build: Callable[[Path, Path | None, Path | None], KGServer]) -> click.Group:
+def _cli(build: BuildServer) -> click.Group:
     @click.group()
     def cli() -> None:
         pass
@@ -350,8 +454,8 @@ def _cli(build: Callable[[Path, Path | None, Path | None], KGServer]) -> click.G
 def test_manifest_flag_answers_without_a_graph(tmp_path: Path) -> None:
     seen: dict[str, Any] = {}
 
-    def build(repo: Path, db: Path | None, vectors: Path | None) -> KGServer:
-        seen.update(repo=repo, db=db, vectors=vectors)
+    def build(repo: Path, db: Path | None, vectors: Path | None, model: str | None) -> KGServer:
+        seen.update(repo=repo, db=db, vectors=vectors, model=model)
 
         def explode() -> ServableKG:
             raise AssertionError("the KG was opened")
@@ -363,11 +467,27 @@ def test_manifest_flag_answers_without_a_graph(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["canonical"] == list(CANONICAL_TOOLS)
-    assert seen == {"repo": tmp_path.resolve(), "db": Path("g.sqlite"), "vectors": None}
+    # A relative --db is taken from --repo, not from the working directory.
+    root = tmp_path.resolve()
+    assert seen == {"repo": root, "db": root / "g.sqlite", "vectors": None, "model": None}
+
+
+def test_absolute_paths_and_model_pass_through(tmp_path: Path) -> None:
+    seen: dict[str, Any] = {}
+
+    def build(repo: Path, db: Path | None, vectors: Path | None, model: str | None) -> KGServer:
+        seen.update(db=db, vectors=vectors, model=model)
+        return make_server(lambda: _KG(repo), name="mkg", kind="test")
+
+    vec = tmp_path / "elsewhere" / "v.sqlite"
+    args = ["mcp", "--vectors", str(vec), "--model", "BAAI/bge-small-en-v1.5", "--manifest"]
+    result = CliRunner().invoke(_cli(build), args)
+    assert result.exit_code == 0, result.output
+    assert seen == {"db": None, "vectors": vec, "model": "BAAI/bge-small-en-v1.5"}
 
 
 def test_command_offers_no_sse(tmp_path: Path) -> None:
-    def build(repo: Path, db: Path | None, vectors: Path | None) -> KGServer:
+    def build(repo: Path, db: Path | None, vectors: Path | None, model: str | None) -> KGServer:
         return make_server(lambda: _KG(repo), name="mkg", kind="test")
 
     result = CliRunner().invoke(_cli(build), ["mcp", "--transport", "sse"])

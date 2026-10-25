@@ -6,15 +6,26 @@ A module's whole server::
 
     from kg_utils.mcp import Context, add_mcp_command, kg_from, make_server
 
-    def build_server(repo, db, vectors):
+    def build_server(repo, db, vectors, model):
+        kwargs = {"model": model} if model else {}
         server = make_server(
-            lambda: PyCodeKG(repo, db, vectors), name="pycodekg", kind="code", version=__version__
+            lambda: PyCodeKG(repo, db, vectors, **kwargs),
+            name="pycodekg",
+            kind="code",
+            version=__version__,
         )
 
         @server.tool()
         def callers(node_id: str, ctx: Context) -> list[dict]:
             \"\"\"Every node that calls this one.\"\"\"
             return kg_from(ctx).callers(node_id)
+
+        @server.canonical("query")   # same name, every canonical parameter kept
+        def query(q: str, ctx: Context, k: int = 8, hop: int = 1, max_nodes: int = 25,
+                  rels: list[str] | None = None, min_score: float = 0.0,
+                  rerank_mode: str = "hybrid") -> dict:
+            \"\"\"Hybrid search, ranked by blended semantic and lexical score.\"\"\"
+            ...
 
         return server
 

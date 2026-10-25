@@ -53,7 +53,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and points file descriptor 1 at stderr, so a `print()` or a C library's
   output (sweep item 87) can no longer corrupt the session. Validation stays
   in the KG's own methods; the server reports their `ValueError` as a tool
-  error. Nothing in the fleet uses it yet.
+  error. A module whose own version of a canonical tool does more replaces
+  it under the same name with `@server.canonical("query")`; the replacement
+  must keep every canonical parameter with its type and required-ness, add
+  no required parameter and return the same kind of result, or the server
+  refuses it at build time with every violation listed. Found while porting
+  pycode_kg, whose `query` reranks with a hybrid score and caps results per
+  module: swapping in the plain canonical tool would have regressed it. The
+  standard command also takes `--model`, and a relative `--db` or
+  `--vectors` is taken from `--repo`, as pycode_kg's command already did.
+  Nothing in the fleet uses it yet.
 - **`KGModule.neighbors(node_id, rels=, direction=, limit=)`**: a node's
   one-hop neighbourhood, its edges and the existing nodes at their far ends.
   Graph only, so it never loads the embedding model; `limit` is bounded by

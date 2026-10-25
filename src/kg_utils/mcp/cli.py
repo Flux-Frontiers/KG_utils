@@ -10,14 +10,17 @@ One command shape, built here, ends that:
 
 .. code-block:: text
 
-    <tool> mcp [--repo DIR] [--db FILE] [--vectors FILE]
+    <tool> mcp [--repo DIR] [--db FILE] [--vectors FILE] [--model NAME]
                [--transport stdio|streamable-http] [--host H] [--port N]
                [--manifest]
 
-``--repo``, ``--db`` and ``--vectors`` are the :class:`~kg_utils.pipeline.KGModule`
-constructor's own arguments; ``--db`` and ``--vectors`` default to the module's
-paths under ``--repo``. ``--manifest`` prints the server's tool list as JSON
-and exits without opening the graph.
+``--repo``, ``--db``, ``--vectors`` and ``--model`` are the
+:class:`~kg_utils.pipeline.KGModule` constructor's own arguments. ``--db`` and
+``--vectors`` default to the module's paths under ``--repo``, and a relative
+one is taken relative to ``--repo``, so a config that names
+``--repo /abs/repo --db .mykg/graph.sqlite`` works from any directory.
+``--model`` defaults to the module's own model. ``--manifest`` prints the
+server's tool list as JSON and exits without opening the graph.
 
 Author: Eric G. Suchanek, PhD
 License: Elastic 2.0
@@ -35,9 +38,10 @@ from kg_utils.mcp.server import TRANSPORTS, KGServer, manifest, run
 
 __all__ = ["BuildServer", "add_mcp_command"]
 
-#: ``(repo, db, vectors) -> server``. ``db`` and ``vectors`` are ``None`` when
-#: the flag was not given, meaning "the module's default under ``repo``".
-BuildServer = Callable[[Path, Path | None, Path | None], KGServer]
+#: ``(repo, db, vectors, model) -> server``. Each of ``db``, ``vectors`` and
+#: ``model`` is ``None`` when its flag was not given, meaning "the module's
+#: default"; ``db`` and ``vectors`` arrive absolute.
+BuildServer = Callable[[Path, Path | None, Path | None, str | None], KGServer]
 
 
 def add_mcp_command(
@@ -49,8 +53,9 @@ def add_mcp_command(
     which has to answer without a graph on disk. :func:`~kg_utils.mcp.make_server`
     takes a factory for exactly this reason, so a module's builder is just::
 
-        def build_server(repo, db, vectors):
-            server = make_server(lambda: MyKG(repo, db, vectors), name="mykg", kind="my")
+        def build_server(repo, db, vectors, model):
+            kwargs = {"model": model} if model else {}
+            server = make_server(lambda: MyKG(repo, db, vectors, **kwargs), name="mykg", kind="my")
             # @server.tool() domain extras here
             return server
 
@@ -83,6 +88,11 @@ def add_mcp_command(
         help="Vector store. Default: the module's path under --repo.",
     )
     @click.option(
+        "--model",
+        default=None,
+        help="Embedding model. Default: the module's own.",
+    )
+    @click.option(
         "--transport",
         type=click.Choice(TRANSPORTS),
         default="stdio",
@@ -103,13 +113,19 @@ def add_mcp_command(
         repo: Path,
         db: Path | None,
         vectors: Path | None,
+        model: str | None,
         transport: str,
         host: str,
         port: int,
         show_manifest: bool,
     ) -> None:
         """Serve this knowledge graph to an AI agent over MCP."""
-        server = build_server(repo.resolve(), db, vectors)
+        root = repo.resolve()
+
+        def under_repo(path: Path | None) -> Path | None:
+            return None if path is None else path if path.is_absolute() else root / path
+
+        server = build_server(root, under_repo(db), under_repo(vectors), model)
         if show_manifest:
             click.echo(json.dumps(manifest(server), indent=2))
             return

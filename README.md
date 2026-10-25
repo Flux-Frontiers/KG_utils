@@ -552,17 +552,18 @@ shared. Plan of record: `kgrag_priv/docs/MCP_CENTRALIZATION_PLAN.md`.
 | Class / function | Description |
 |---|---|
 | `make_server()` | Build a server for one KG with the canonical tools: `stats`, `query`, `pack`, `get_node`, `neighbors`. The KG opens per session and closes after; an unbuilt graph is refused, not served empty |
-| `KGServer` | The `FastMCP` subclass it returns. Add domain tools with `@server.tool()`; the instructions regenerate on every add |
+| `KGServer` | The `FastMCP` subclass it returns. Add domain tools with `@server.tool()`; replace a canonical tool with a richer version under the same name with `@server.canonical("query")`, refused at build time if it drops or retypes a canonical parameter; the instructions regenerate on every change |
 | `kg_from()` | Inside a domain tool, the KG this session opened (declare `ctx: Context`) |
-| `add_mcp_command()` | The standard `<tool> mcp [--repo] [--db] [--vectors] [--transport] [--host] [--port] [--manifest]` |
+| `add_mcp_command()` | The standard `<tool> mcp [--repo] [--db] [--vectors] [--model] [--transport] [--host] [--port] [--manifest]`; relative `--db`/`--vectors` are taken from `--repo` |
 | `manifest()`, `describe_tools()` | The tool list as JSON and as text, without opening the KG |
 | `run()` | Serve over `stdio` (stdout reserved for the protocol, all other output sent to stderr) or `streamable-http`; `sse` is refused |
 
 ```python
 from kg_utils.mcp import Context, add_mcp_command, kg_from, make_server
 
-def build_server(repo, db, vectors):
-    server = make_server(lambda: MyKG(repo, db, vectors), name="mykg", kind="my")
+def build_server(repo, db, vectors, model):
+    kwargs = {"model": model} if model else {}
+    server = make_server(lambda: MyKG(repo, db, vectors, **kwargs), name="mykg", kind="my")
 
     @server.tool()
     def callers(node_id: str, ctx: Context) -> list[dict]:
