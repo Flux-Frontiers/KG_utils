@@ -1027,6 +1027,56 @@ class KGModule(ABC):
         """
         return self.store.node(node_id)
 
+    def neighbors(
+        self,
+        node_id: str,
+        *,
+        rels: tuple[str, ...] | list[str] | None = None,
+        direction: str = "both",
+        limit: int = 50,
+    ) -> dict[str, Any] | None:
+        """Return a node's one-hop neighbourhood: its edges and the nodes at their far ends.
+
+        Reads the graph only, so it never loads the embedding model and works
+        on a KG whose vector index was never built. The arguments arrive from
+        a CLI or an MCP tool call, so they are checked here, once, like
+        :meth:`query`'s.
+
+        :param node_id: The node whose neighbours to return.
+        :param rels: Relation types to follow, or ``None`` for all of them.
+        :param direction: ``"out"``, ``"in"`` or ``"both"``.
+        :param limit: Maximum number of edges, between 1 and
+            :attr:`max_max_nodes`.
+        :return: ``{"node": ..., "edges": [...], "nodes": [...]}``, where
+            ``nodes`` holds each distinct far-end node that exists in the
+            graph, in edge order. ``None`` if *node_id* is not in the graph,
+            matching :meth:`node`.
+        :raises ValueError: On an empty *node_id*, an unknown *direction* or an
+            out-of-range *limit*.
+        """
+        if not isinstance(node_id, str) or not node_id.strip():
+            raise ValueError("node_id must be a non-empty string")
+        bounded_int("limit", limit, 1, self.max_max_nodes)
+        if direction not in ("out", "in", "both"):
+            raise ValueError(f"direction must be 'out', 'in' or 'both', got {direction!r}")
+        node = self.store.node(node_id)
+        if node is None:
+            return None
+        edges = self.store.edges_touching(
+            node_id, direction=direction, rels=list(rels) if rels else None, limit=limit
+        )
+        seen: set[str] = set()
+        nodes: list[dict[str, Any]] = []
+        for e in edges:
+            other = e["dst"] if e["src"] == node_id else e["src"]
+            if other in seen:
+                continue
+            seen.add(other)
+            far = self.store.node(other)
+            if far is not None:
+                nodes.append(far)
+        return {"node": node, "edges": edges, "nodes": nodes}
+
     def close(self) -> None:
         """Close the underlying SQLite connection."""
         if self._store is not None:

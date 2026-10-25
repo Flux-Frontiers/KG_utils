@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`kg_utils.mcp`: one MCP server base for every KG module** (new `mcp`
+  extra: `mcp>=1.23.0,<2`, `click`). Step 0 of
+  `kgrag_priv/docs/MCP_CENTRALIZATION_PLAN.md` (sweep item 93). The fleet ran
+  ten servers in four implementation styles with no shared code; this is the
+  shared part. `make_server(open_kg, name=, kind=)` returns a `KGServer`, a
+  `FastMCP` subclass that already answers the canonical tools -- `stats`,
+  `query`, `pack`, `get_node`, `neighbors` -- under the same names on every
+  server; a module adds its domain tools with `@server.tool()` and reaches its
+  KG with `kg_from(ctx)`. The KG is opened per session and closed after, and a
+  KG whose graph file does not exist is refused at session start instead of
+  served empty. The server's instructions are regenerated whenever a tool is
+  added, so they cannot drift from the tool list. `manifest()` gives the tool
+  list as JSON without opening the KG. `add_mcp_command()` adds the standard
+  `<tool> mcp [--repo] [--db] [--vectors] [--transport] [--host] [--port]
+  [--manifest]`. `run()` serves stdio or streamable HTTP and refuses the
+  deprecated `sse`; under stdio it reserves the real stdout for the protocol
+  and points file descriptor 1 at stderr, so a `print()` or a C library's
+  output (sweep item 87) can no longer corrupt the session. Validation stays
+  in the KG's own methods; the server reports their `ValueError` as a tool
+  error. Nothing in the fleet uses it yet.
+- **`KGModule.neighbors(node_id, rels=, direction=, limit=)`**: a node's
+  one-hop neighbourhood, its edges and the existing nodes at their far ends.
+  Graph only, so it never loads the embedding model; `limit` is bounded by
+  `max_max_nodes`; an unknown node returns `None`, as `node()` does. Backed by
+  the new **`GraphStore.edges_touching()`**, which returns edges in either or
+  both directions, optionally filtered by relation, in a deterministic order.
+
 ## [0.28.0] - 2026-10-23
 
 ### Added

@@ -9,7 +9,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.28.0"
+version = "0.29.0.dev0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -109,6 +109,21 @@ synthesis-mflux = [
     "openai>=1.30.0",
     "pillow>=10.0.0",
     "mflux>=0.9.0",
+]
+
+# MCP server base (kg_utils.mcp): serves any KGModule over MCP with the
+# fleet's canonical tools (stats, query, pack, get_node, neighbors) and the
+# standard `<tool> mcp` command. Capped below 2 with the rest of the fleet
+# (kgrag_priv/docs/MCP_MIGRATION.md): mcp 2.0 renames FastMCP, and this
+# module is the one place in the fleet that rename lands. click is declared
+# rather than inherited, because add_mcp_command builds a click command.
+# Floor measured 2026-10-25 by running tests/test_mcp_server.py against each
+# release: 1.23.0 is the first whose FastMCP turns DNS-rebinding protection on
+# by itself for a loopback host, which the streamable-http path relies on, and
+# 1.21.0 and older no longer import against current pydantic.
+mcp = [
+    "click>=8.1.0",
+    "mcp>=1.23.0,<2",
 ]
 
 [project.urls]

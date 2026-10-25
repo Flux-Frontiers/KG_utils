@@ -174,7 +174,7 @@ storage (`specs`, `extractor`, `store`, `pipeline`), semantic indexing over
 pluggable vector backends (`semantic`, `vector_backend`, `embed`, `embedder`),
 document ingestion (`ingest`), a shared temporal contract for dated nodes
 (`temporal`), on-device search packs for the Knowledge Press apps
-(`devicepack`), temporal snapshots (`snapshots`), text + image
+(`devicepack`), one MCP server base for every module (`mcp`), temporal snapshots (`snapshots`), text + image
 synthesis (`synthesis`), centrality analysis (`analysis`), and a visualization
 stack that runs from interactive HTML (`viz`) through 3-D layouts and organic
 trees grown as species (`viz3d`, `viz3d.species`) to Looking Glass light-field
@@ -207,6 +207,15 @@ extra dependency at all.
 
 ```bash
 pip install 'kgmodule-utils[ingest]'
+```
+
+### With the MCP server base
+
+Serves any `KGModule` to an AI agent over MCP, with the fleet's canonical tools
+and the standard `<tool> mcp` command (`kg_utils.mcp`).
+
+```bash
+pip install 'kgmodule-utils[mcp]'
 ```
 
 ### With deprecated LanceDB support (only for an un-migrated LanceDB store)
@@ -383,7 +392,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class | Description |
 |---|---|
-| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand. `sync()` rewrites the graph and re-embeds only the nodes whose index text changed |
+| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()`, `node()`, `neighbors()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand. `sync()` rewrites the graph and re-embeds only the nodes whose index text changed |
 
 ### `kg_utils.snapshots`
 
@@ -545,6 +554,37 @@ server. Needs NumPy for vectors (`semantic` or `viz3d` extra).
 | `read_vector_sidecar()` | Memory-map a sidecar; rejects a truncated or foreign file |
 | `encode_vector()`, `rrf_fuse()`, `fts_phrase_expression()` | The pieces the search is built from |
 
+### `kg_utils.mcp`
+
+One MCP server base for every KG module (`mcp` extra). A module passes a
+factory that opens its KG and adds its own domain tools; everything else is
+shared. Plan of record: `kgrag_priv/docs/MCP_CENTRALIZATION_PLAN.md`.
+
+| Class / function | Description |
+|---|---|
+| `make_server()` | Build a server for one KG with the canonical tools: `stats`, `query`, `pack`, `get_node`, `neighbors`. The KG opens per session and closes after; an unbuilt graph is refused, not served empty |
+| `KGServer` | The `FastMCP` subclass it returns. Add domain tools with `@server.tool()`; the instructions regenerate on every add |
+| `kg_from()` | Inside a domain tool, the KG this session opened (declare `ctx: Context`) |
+| `add_mcp_command()` | The standard `<tool> mcp [--repo] [--db] [--vectors] [--transport] [--host] [--port] [--manifest]` |
+| `manifest()`, `describe_tools()` | The tool list as JSON and as text, without opening the KG |
+| `run()` | Serve over `stdio` (stdout reserved for the protocol, all other output sent to stderr) or `streamable-http`; `sse` is refused |
+
+```python
+from kg_utils.mcp import Context, add_mcp_command, kg_from, make_server
+
+def build_server(repo, db, vectors):
+    server = make_server(lambda: MyKG(repo, db, vectors), name="mykg", kind="my")
+
+    @server.tool()
+    def callers(node_id: str, ctx: Context) -> list[dict]:
+        """Every node that calls this one."""
+        return kg_from(ctx).callers(node_id)
+
+    return server
+
+add_mcp_command(cli, build_server)
+```
+
 ### `kg_utils.analysis`
 
 | Class / function | Description |
@@ -583,6 +623,10 @@ KG_utils/
 │       │   ├── converters.py # Converter protocol, PassthroughConverter, AnydocConverter
 │       │   ├── manifest.py   # IngestRecord, IngestManifest, IngestStats — per-file provenance
 │       │   └── pipeline.py   # IngestPipeline: walk, convert, stage, dedup by content digest
+│       ├── mcp/              # MCP server base for every KG module (mcp extra)
+│       │   ├── __init__.py
+│       │   ├── server.py     # make_server, KGServer, canonical tools, manifest, run
+│       │   └── cli.py        # add_mcp_command: the standard `<tool> mcp`
 │       ├── retrieval/        # Serialize + enrich KG hits (hit_to_dict, attach_content_by_sqlite)
 │       │   ├── __init__.py
 │       │   └── hits.py
