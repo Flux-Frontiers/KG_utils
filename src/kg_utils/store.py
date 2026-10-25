@@ -1,7 +1,7 @@
 """kg_utils/store.py — SQLite persistence layer for knowledge graph modules.
 
 GraphStore is the authoritative, canonical node/edge store.
-No embeddings, no LanceDB, no domain-specific parsing.
+No embeddings, no vector store, no domain-specific parsing.
 
 Schema
 ------

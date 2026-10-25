@@ -127,21 +127,23 @@ def test_an_unwiped_graph_build_keeps_the_index(repo: Path) -> None:
         assert kg.query("vector index", k=1).nodes
 
 
-def test_drop_index_removes_sidecars_and_a_legacy_store(repo: Path) -> None:
+def test_drop_index_removes_sidecars_and_leaves_a_stray_lancedb_dir(repo: Path) -> None:
+    """Since 0.29.0 nothing reads LanceDB, so the SDK no longer deletes one either."""
     with _kg(repo) as kg:
         kg.build(wipe=True)
         kg.query("graph", k=1)  # opens the index, and with it a connection
         sidecar = kg.vectors_path.parent / f"{kg.vectors_path.name}-wal"
         sidecar.write_bytes(b"")
-        legacy = kg._legacy_store_dir
-        (legacy / "vectors.lance").mkdir(parents=True)
+        stray = kg.vectors_path.parent / "lancedb"
+        (stray / "vectors.lance").mkdir(parents=True)
 
         removed = kg.drop_index()
 
         # WAL mode may also have left a real -shm file; it goes too.
-        assert {kg.vectors_path, sidecar, legacy} <= set(removed)
+        assert {kg.vectors_path, sidecar} <= set(removed)
+        assert stray not in removed and stray.is_dir()
         leftovers = [p for p in kg.vectors_path.parent.iterdir() if p.name.startswith("vectors")]
-        assert not leftovers and not legacy.exists()
+        assert not leftovers
         assert kg.store.node("function:alpha") is not None  # the graph is untouched
         with pytest.raises(VectorStoreNotFoundError):
             kg.query("graph", k=1)

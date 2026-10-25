@@ -10,10 +10,6 @@ Optional dependencies
 
 Install with: pip install 'kgmodule-utils[semantic]'
 
-``lancedb`` is *not* in that extra. It is reachable only via
-``vector_backend="lancedb"`` against a pre-migration store, which additionally
-needs ``pip install 'kgmodule-utils[lancedb]'``.
-
 Typical domain usage::
 
     from kg_utils.pipeline import KGModule
@@ -40,7 +36,6 @@ Typical domain usage::
 from __future__ import annotations
 
 import re
-import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Self, cast
@@ -64,7 +59,7 @@ from kg_utils.validation import (
     bounded_int,
     require_query,
 )
-from kg_utils.vector_backend import VectorBackend, make_backend, resolve_backend_name
+from kg_utils.vector_backend import SqliteVecBackend, VectorBackend
 
 # ---------------------------------------------------------------------------
 # Pure utility functions (domain-agnostic)
@@ -315,18 +310,13 @@ class KGModule(ABC):
     :param db_path: SQLite database path (defaults to ``.<kind>kg/graph.sqlite``
                     under ``repo_root``; set ``_default_dir`` in subclass to override).
     :param vectors_path: sqlite-vec store path (defaults to
-        ``.<kind>kg/vectors.sqlite``). Replaced ``lancedb_dir`` in 0.14.0 — see
-        :attr:`_legacy_store_dir` for the compatibility note.
+        ``.<kind>kg/vectors.sqlite``). Replaced ``lancedb_dir`` in 0.14.0.
     :param model: Sentence-transformer model name for embedding.
     :param table: Vector table name.
-    :param vector_backend: ``"auto"`` (default), ``"sqlite-vec"``, or ``"lancedb"``.
-        ``"auto"`` picks ``sqlite-vec`` for a fresh or already-migrated KG and
-        ``lancedb`` only when an un-migrated LanceDB store already exists beside
-        :paramref:`vectors_path`, so existing corpora keep working untouched.
-        ``"sqlite-vec"`` forces the exact (recall 1.0) sqlite-vec store and
-        requires the ``sqlite-vec`` optional dependency, bundled in the
-        ``semantic`` extra. ``"lancedb"`` forces the legacy LanceDB store and
-        additionally requires the ``lancedb`` extra.
+    :param vector_backend: ``"auto"`` (default) or ``"sqlite-vec"``; both mean
+        the sqlite-vec store, the only backend since 0.29.0. Kept so the many
+        subclasses that pass ``vector_backend="sqlite-vec"`` keep working.
+        ``"lancedb"`` raises :exc:`ValueError` naming the removal.
     """
 
     #: Override in subclass to change the default artefact directory name.
@@ -363,25 +353,21 @@ class KGModule(ABC):
         )
         self.model_name = model
         self.table_name = table
+        if vector_backend not in ("auto", "sqlite-vec"):
+            if vector_backend == "lancedb":
+                raise ValueError(
+                    "vector_backend='lancedb' was removed in kgmodule-utils 0.29.0; "
+                    "sqlite-vec is the only backend. The index is derived from the "
+                    "graph: rebuild it with build_index()."
+                )
+            raise ValueError(
+                f"vector_backend must be 'auto' or 'sqlite-vec', got {vector_backend!r}"
+            )
         self.vector_backend = vector_backend
 
         self._store: GraphStore | None = None
         self._index: SemanticIndex | None = None
         self._embedder: Embedder | None = None
-
-    @property
-    def _legacy_store_dir(self) -> Path:
-        """Where a pre-migration LanceDB store would sit for this KG.
-
-        Deliberately private and derived rather than a constructor argument.
-        ``vector_backend="auto"`` has to know where to *look* for an
-        un-migrated store to keep old corpora working, but that lookup path is
-        not part of the module's API — exposing it as ``lancedb_dir`` was what
-        kept the retired backend's name in every downstream signature.
-
-        :return: The sibling ``lancedb`` directory beside :attr:`vectors_path`.
-        """
-        return self.vectors_path.parent / "lancedb"
 
     # ------------------------------------------------------------------
     # Abstract interface — domain authors implement these
@@ -445,21 +431,13 @@ class KGModule(ABC):
         return self._index
 
     def _make_vector_backend(self) -> VectorBackend:
-        """Resolve :attr:`vector_backend` and construct the concrete backend.
+        """Construct the sqlite-vec store at :attr:`vectors_path`.
 
         Deferred so ``self.embedder.dim`` (which may load the model) is only
         touched when the index is actually built or searched.
         """
-        resolved = resolve_backend_name(
-            self.vector_backend,
-            lancedb_dir=self._legacy_store_dir,
-            sqlite_path=self.vectors_path,
-        )
-        return make_backend(
-            resolved,
-            lancedb_dir=self._legacy_store_dir,
-            sqlite_path=self.vectors_path,
-            table=self.table_name,
+        return SqliteVecBackend(
+            self.vectors_path,
             dim=self.embedder.dim,
             meta_columns=self.index_meta_columns(),
         )
@@ -478,7 +456,7 @@ class KGModule(ABC):
     # ------------------------------------------------------------------
 
     def build(self, *, wipe: bool = False) -> BuildStats:
-        """Full pipeline: extraction → SQLite → LanceDB.
+        """Full pipeline: extraction → SQLite → sqlite-vec.
 
         :param wipe: Clear existing data before writing.
         :return: :class:`~kg_utils.types.BuildStats`.
@@ -573,10 +551,7 @@ class KGModule(ABC):
         """Delete the vector index, closing it first.
 
         Removes the sqlite-vec store with its ``-wal``/``-shm``/``-journal``
-        sidecars, and any legacy LanceDB directory beside it. The legacy
-        directory goes too because the ``"auto"`` backend falls back to it
-        when no sqlite-vec store exists, so leaving it would bring an even
-        older index back into use. The graph is untouched.
+        sidecars. The graph is untouched.
 
         :func:`build_graph` calls this whenever it wipes the graph; call it
         directly to discard an index without rebuilding the graph.
@@ -597,14 +572,10 @@ class KGModule(ABC):
             if path.is_file():
                 path.unlink()
                 removed.append(path)
-        legacy = self._legacy_store_dir
-        if legacy.is_dir():
-            shutil.rmtree(legacy)
-            removed.append(legacy)
         return removed
 
     def build_index(self, *, wipe: bool = False) -> BuildStats:
-        """SQLite → LanceDB only (graph must already exist).
+        """SQLite → sqlite-vec only (graph must already exist).
 
         :param wipe: Delete existing vectors before indexing.
         :return: :class:`~kg_utils.types.BuildStats` with ``indexed_rows`` and ``index_dim`` set.
@@ -1003,20 +974,16 @@ class KGModule(ABC):
         return self.store.callers_of(node_id, rel=rel)
 
     def stats(self) -> dict[str, Any]:
-        """Return store statistics plus the resolved vector backend name.
+        """Return store statistics plus the vector backend name.
 
-        Resolving the backend name only inspects paths on disk — it never
-        loads the embedding model.
+        Reads the graph only; never loads the embedding model.
 
         :return: Dictionary from :meth:`~kg_utils.store.GraphStore.stats`,
-            plus a ``vector_backend`` key (``"lancedb"`` or ``"sqlite-vec"``).
+            plus ``vector_backend``, always ``"sqlite-vec"`` since 0.29.0 and
+            kept because consumers display it.
         """
         s = self.store.stats()
-        s["vector_backend"] = resolve_backend_name(
-            self.vector_backend,
-            lancedb_dir=self._legacy_store_dir,
-            sqlite_path=self.vectors_path,
-        )
+        s["vector_backend"] = "sqlite-vec"
         return s
 
     def node(self, node_id: str) -> dict[str, Any] | None:

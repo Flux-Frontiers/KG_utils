@@ -19,10 +19,6 @@ Optional dependencies
   sentence-transformers — local embedding model
 
 Install with: pip install 'kgmodule-utils[semantic]'
-
-:class:`LanceDBBackend` is re-exported here for the one caller that still reads
-a pre-migration store (``dockg convert-index``), but nothing in this module
-constructs it any more — see :meth:`SemanticIndex._get_backend`.
 """
 
 from __future__ import annotations
@@ -38,12 +34,11 @@ from typing import TYPE_CHECKING, Any
 
 from kg_utils.embed import DEFAULT_MODEL, resolve_model_path
 from kg_utils.embedder import Embedder, SentenceTransformerEmbedder
-from kg_utils.vector_backend import LanceDBBackend, SqliteVecBackend, VectorBackend
+from kg_utils.vector_backend import SqliteVecBackend, VectorBackend
 
 __all__ = [
     "DEFAULT_MODEL",
     "Embedder",
-    "LanceDBBackend",
     "META_COLUMNS",
     "SeedHit",
     "SemanticIndex",
@@ -83,7 +78,7 @@ def _local_model_path(model_name: str) -> Path:
 
 def suppress_ingestion_logging() -> None:
     """Suppress verbose progress output during model loading and ingestion."""
-    for name in ("sentence_transformers", "transformers", "huggingface_hub", "lancedb", "pylance"):
+    for name in ("sentence_transformers", "transformers", "huggingface_hub"):
         logging.getLogger(name).setLevel(logging.WARNING)
 
     try:
@@ -140,10 +135,8 @@ class SemanticIndex:
     disposable — it can be rebuilt from SQLite at any time without data loss.
 
     Changed in 0.14.0: the first parameter was ``lancedb_dir``, a *directory*.
-    It is now ``vectors_path``, a *file*, and the default backend is
-    :class:`SqliteVecBackend` rather than :class:`LanceDBBackend`.  Passing
-    ``lancedb_dir=`` raises :exc:`TypeError`, matching how memory-kg 0.7.0,
-    Metabo_kg 0.10.0 and diary-kg 0.95.0 each dropped the same parameter.
+    It is now ``vectors_path``, a *file*.  Since 0.29.0 sqlite-vec is the only
+    backend.
 
     :param vectors_path: Path to the ``vectors.sqlite`` store (used only when
         the default backend is constructed; ignored if *backend* is given).
@@ -151,8 +144,7 @@ class SemanticIndex:
     :param table: Vector table name.
     :param index_kinds: Node kinds to embed.
     :param backend: Vector store backend. Defaults to a :class:`SqliteVecBackend`
-        over *vectors_path*.  To read a pre-migration LanceDB store, construct a
-        :class:`LanceDBBackend` explicitly and pass it here.
+        over *vectors_path*; pass one to customise it or substitute a test double.
     """
 
     def __init__(
@@ -203,10 +195,6 @@ class SemanticIndex:
             texts = [_build_index_text(n) for n in chunk]
             rows = self._rows(chunk, texts)
             indexed += backend.upsert(rows, batch_size=len(rows))
-
-        # No-op unless the backend is a LanceDBBackend with ANN enabled.
-        if isinstance(backend, LanceDBBackend):
-            backend.maybe_create_ann_index(quiet=quiet)
 
         return {
             "indexed_rows": indexed,
@@ -371,11 +359,6 @@ class SemanticIndex:
 
         Deferred so the embedder's ``dim`` (which may load the model) is only
         touched when the index is actually built or searched.
-
-        Changed in 0.14.0: this used to default to :class:`LanceDBBackend`.
-        ``KGModule`` always passes an explicit backend, so the fleet never hit
-        that default — but bare use of this class silently created a LanceDB
-        store long after the fleet had migrated off it.
         """
         if self._backend is None:
             self._backend = SqliteVecBackend(
@@ -388,8 +371,8 @@ class SemanticIndex:
     def close(self) -> None:
         """Close the backend's connection, if it has one open.
 
-        Backends that hold no connection (LanceDB) have nothing to close; the
-        check is by attribute so third-party backends need not implement it.
+        The check is by attribute, so a backend that holds no connection
+        need not implement ``close``.
         """
         close = getattr(self._backend, "close", None)
         if close is not None:

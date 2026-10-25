@@ -20,7 +20,7 @@ description = "Reusable constraint types to use with typing.Annotated"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "(extra == \"mcp\" or extra == \"lancedb\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"mcp\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "annotated_types-0.8.0-py3-none-any.whl", hash = "sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0"},
     {file = "annotated_types-0.8.0.tar.gz", hash = "sha256:13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7"},
@@ -426,7 +426,7 @@ files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
-markers = {main = "(extra == \"mcp\" or extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-qt\" or extra == \"lancedb\" or extra == \"synthesis\") and platform_system == \"Windows\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "<empty>"}
+markers = {main = "(extra == \"mcp\" or extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-qt\" or extra == \"synthesis\") and platform_system == \"Windows\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "<empty>"}
 
 [[package]]
 name = "contourpy"
@@ -863,22 +863,6 @@ mkdocs = ["markdown (>=3.3)", "mkdocs (>=1.4.0)", "pymdown-extensions (>=10.0)"]
 toml = ["tomli (>=2.0.0) ; python_version < \"3.11\""]
 trio = ["trio (>=0.10.0)"]
 yaml = ["pyyaml (>=6.0.1)"]
-
-[[package]]
-name = "deprecation"
-version = "2.1.0"
-description = "A library to handle automated deprecations"
-optional = true
-python-versions = "*"
-groups = ["main"]
-markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
-files = [
-    {file = "deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"},
-    {file = "deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff"},
-]
-
-[package.dependencies]
-packaging = "*"
 
 [[package]]
 name = "detect-secrets"
@@ -1960,76 +1944,6 @@ files = [
 ]
 
 [[package]]
-name = "lance-namespace"
-version = "0.9.0"
-description = "Lance Namespace interface and plugin registry"
-optional = true
-python-versions = ">=3.8"
-groups = ["main"]
-markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
-files = [
-    {file = "lance_namespace-0.9.0-py3-none-any.whl", hash = "sha256:f785ff10927e4ce0db69986576670fedd37f8a33521e8a4630c6be22db8061b2"},
-    {file = "lance_namespace-0.9.0.tar.gz", hash = "sha256:f738b641cc615b17323baa4eb47900f184688739ee3d2ea9fe39396b9588e53d"},
-]
-
-[package.dependencies]
-lance-namespace-urllib3-client = "0.9.0"
-
-[[package]]
-name = "lance-namespace-urllib3-client"
-version = "0.9.0"
-description = "Lance Namespace Specification"
-optional = true
-python-versions = ">=3.8"
-groups = ["main"]
-markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
-files = [
-    {file = "lance_namespace_urllib3_client-0.9.0-py3-none-any.whl", hash = "sha256:be819c8cffb1e460a3a504dbf52d1ca009560a48e7202b8c4279998e4adf9fe4"},
-    {file = "lance_namespace_urllib3_client-0.9.0.tar.gz", hash = "sha256:cf796fa5307fa4dde91fe4bec2af28b90ba79191852d4394e8fe44276538e40f"},
-]
-
-[package.dependencies]
-pydantic = ">=2"
-python-dateutil = ">=2.8.2"
-typing-extensions = ">=4.7.1"
-urllib3 = ">=1.25.3,<3.0.0"
-
-[[package]]
-name = "lancedb"
-version = "0.37.1"
-description = "lancedb"
-optional = true
-python-versions = ">=3.10"
-groups = ["main"]
-markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
-files = [
-    {file = "lancedb-0.37.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:c15c46f23cf6959c79fb93cdba2c76536cf784d3134386662da03dc6ccac3c26"},
-    {file = "lancedb-0.37.1-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:35d872d920cbfdc3771fbcd33f2c63bff6ff7203d6d2ba8fe4330e98eb859d12"},
-    {file = "lancedb-0.37.1-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:86597f4dbc51a33a07341550dc77d21a1ddd1f7539266eda5bb64c4f3bd11cca"},
-    {file = "lancedb-0.37.1-cp310-abi3-win_amd64.whl", hash = "sha256:488eca15361dfc34439500c9e2607c4fb2b8bf190fa1003bd54b1d6eb40e0316"},
-]
-
-[package.dependencies]
-deprecation = ">=2.1.0"
-lance-namespace = ">=0.3.2"
-numpy = ">=1.24.0"
-packaging = ">=23.0"
-pyarrow = ">=16"
-pydantic = ">=1.10"
-tqdm = ">=4.27.0"
-
-[package.extras]
-azure = ["adlfs (>=2024.2.0)"]
-clip = ["open-clip-torch", "pillow (>=12.1.1)", "torch"]
-dev = ["pre-commit (>=3.5.0)", "pyright (>=1.1.350)", "ruff (>=0.3.0)", "typing-extensions (>=4.0.0) ; python_full_version < \"3.11.0\""]
-docs = ["mkdocs", "mkdocs-jupyter", "mkdocs-material", "mkdocstrings-python"]
-embeddings = ["awscli (>=1.44.38)", "boto3 (>=1.28.57)", "botocore (>=1.31.57)", "cohere (>=4.0)", "colpali-engine (>=0.3.10)", "google-genai (>=1.0.0)", "huggingface-hub (>=0.19.0)", "ibm-watsonx-ai (>=1.1.2) ; python_full_version >= \"3.10.0\"", "instructorembedding (>=1.0.1)", "ollama (>=0.3.0)", "open-clip-torch (>=2.20.0)", "openai (>=1.6.1)", "pillow (>=12.1.1)", "requests (>=2.31.0)", "sentence-transformers (>=2.2.0)", "sentencepiece (>=0.1.99)", "torch (>=2.0.0)"]
-otel = ["opentelemetry-api"]
-pylance = ["pylance (>=5.0.0b5)"]
-siglip = ["pillow (>=12.1.1)", "sentencepiece", "torch", "transformers (>=4.41.0)"]
-tests = ["aiohttp (>=3.9.0)", "boto3 (>=1.28.57)", "datafusion (>=54,<55)", "duckdb (>=0.9.0)", "opentelemetry-sdk (>=1.30.0)", "pandas (>=1.4)", "polars (>=0.19,<=1.32.3)", "pyarrow (<25)", "pyarrow-stubs (>=16.0)", "pylance (==10.0.0)", "pytest (>=7.0)", "pytest-asyncio (>=0.21)", "pytest-mock (>=3.10)", "pytz (>=2023.3)", "requests (>=2.31.0)"]
-
-[[package]]
 name = "markdown-it-py"
 version = "4.2.0"
 description = "Python port of markdown-it. Markdown parsing, done right!"
@@ -2684,7 +2598,7 @@ files = [
     {file = "numpy-2.5.2-cp315-cp315t-win_arm64.whl", hash = "sha256:5f8e00be2ec6f45f4e8a41a527f68d44a7d96fee92a650e4d8b1326f77f61e6e"},
     {file = "numpy-2.5.2.tar.gz", hash = "sha256:d482d171c406ae88c5b19cad3b6a1c4c5209f886ab74bc44c2c865c23f52d860"},
 ]
-markers = {main = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "nvidia-cublas"
@@ -3066,7 +2980,7 @@ files = [
     {file = "packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"},
     {file = "packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79"},
 ]
-markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"ingest\" or extra == \"pdf\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [[package]]
 name = "parso"
@@ -3395,60 +3309,6 @@ files = [
 tests = ["pytest"]
 
 [[package]]
-name = "pyarrow"
-version = "25.0.1"
-description = "Python library for Apache Arrow"
-optional = true
-python-versions = ">=3.10"
-groups = ["main"]
-markers = "extra == \"lancedb\" and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
-files = [
-    {file = "pyarrow-25.0.1-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:0b1edbb2f385a6a65e9711b62ba86ac54a7816a3f8d17bb3e8a5929d65fb2485"},
-    {file = "pyarrow-25.0.1-cp310-cp310-macosx_12_0_x86_64.whl", hash = "sha256:a4dd8bf99a8fac133efc0ed6a92f5fddbe2adba0d0f6dd720e39ba9855cea85c"},
-    {file = "pyarrow-25.0.1-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:bddd0c4f7630c2a3ddf6347c1bdaa79d97bcf6bd445f9e60c816b7d77c85a5ae"},
-    {file = "pyarrow-25.0.1-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:a4d6d5e9a3d1879a97c08ded0c797579b7965eafd0f0c26c30b45ccc06db939b"},
-    {file = "pyarrow-25.0.1-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:514ddb60285631af068875550c90eddc181db3e8e63a032b1559be189e82f056"},
-    {file = "pyarrow-25.0.1-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:cab40b1edfef0262e0e5251aa2c58d75630f24d06dd7794480243acc001a1d7d"},
-    {file = "pyarrow-25.0.1-cp310-cp310-win_amd64.whl", hash = "sha256:60e89d8f13861a1f7f8d950fa54aebb8023b30734d0ac51ffa80beabe2df4bba"},
-    {file = "pyarrow-25.0.1-cp311-cp311-macosx_12_0_arm64.whl", hash = "sha256:51093dd9e10325fbdb3c10a2ae7c4806e5c822d94e74ae4938b26524a3323fee"},
-    {file = "pyarrow-25.0.1-cp311-cp311-macosx_12_0_x86_64.whl", hash = "sha256:eb6203482ff3746a5632303a7279ae0b5a304c46985b49ed1378cb350ea6728d"},
-    {file = "pyarrow-25.0.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:880523be3d29efcf83d3998835d206118ccf35e3871dbd2fb60408cf6b007a80"},
-    {file = "pyarrow-25.0.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:25f8720bf6387d5dc2ebd2622112de630760419e4b66134405dd24110d15f37e"},
-    {file = "pyarrow-25.0.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:4facd65742a024a4a366328a1d2292062d72d6e023c1b7dda8d4c37544933a25"},
-    {file = "pyarrow-25.0.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:aa0559502e1cd6254d6814614085dd9c5a3dd0419362978a936a3f68a9e5c3df"},
-    {file = "pyarrow-25.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:62cd0d785b8aa6675ee355f9fc02252a340f4441257c42674937826fd7594325"},
-    {file = "pyarrow-25.0.1-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:df961f2e7ae9cf496459259d798652c70625f6c080650d6952f8c04053c58ee9"},
-    {file = "pyarrow-25.0.1-cp312-cp312-macosx_12_0_x86_64.whl", hash = "sha256:cc4aa407fde9fc660be3939e49ea31f50f3e9fec17c0ec63159f7711edd3efc9"},
-    {file = "pyarrow-25.0.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:4340f0ba6c1d2e13f21658de1d7c662ca2545018568d0030a1e9afca159d87e3"},
-    {file = "pyarrow-25.0.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:5389cdf79447ed1515c9e31620e6e1e2302249564d603f2ad727d4f6d313e4c3"},
-    {file = "pyarrow-25.0.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:d51592cb7561e87877c506113e7adbf1342ab579e6c21f0ef44b8ba41cb74c80"},
-    {file = "pyarrow-25.0.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:6109c94d8b9f3b17a041daca16cacb2f651ad8f1ef70a4232c2c0f37a23da2a8"},
-    {file = "pyarrow-25.0.1-cp312-cp312-win_amd64.whl", hash = "sha256:8858d7bfc22e3f51529aeaa4077225029724623e4595dc9eff8c793935c34140"},
-    {file = "pyarrow-25.0.1-cp313-cp313-macosx_12_0_arm64.whl", hash = "sha256:c7c534ec03c358a76ea3e505e74c1b6aef290af90c444dfd092dbfe23e755b85"},
-    {file = "pyarrow-25.0.1-cp313-cp313-macosx_12_0_x86_64.whl", hash = "sha256:dda9470024204d7bbf2042b47c6e8a0e47a3eeb8e34405882dfaea6577e0c153"},
-    {file = "pyarrow-25.0.1-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:44a9120ce5bd81936b8ab9a88076e3fd47c2c6838e0e43630fed83626aca81d9"},
-    {file = "pyarrow-25.0.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:0befcf816e45a1af33ac775a9970b749e4868a230c7372f0ae5e932bee27039f"},
-    {file = "pyarrow-25.0.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:3f89685964f46e4216103c75483aac0c0692a5f72212d7ca835adba5ede56ce3"},
-    {file = "pyarrow-25.0.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:6943e2fe7954d29d84de45d29d34c8dc36ce96570e67d89aa9976e650a4a9138"},
-    {file = "pyarrow-25.0.1-cp313-cp313-win_amd64.whl", hash = "sha256:31e49a7888fcdf3a835da33ae777f6bb9a866334e5a789282fc26dcf426f7f15"},
-    {file = "pyarrow-25.0.1-cp314-cp314-macosx_12_0_arm64.whl", hash = "sha256:bf0b672390cdcb640d7288f96b826d71ff4e9abb254a86c89890baf51a29cee6"},
-    {file = "pyarrow-25.0.1-cp314-cp314-macosx_12_0_x86_64.whl", hash = "sha256:38a9a4b4b9613380e200641891495a56c3d5a98a092db4a870af9975e220471d"},
-    {file = "pyarrow-25.0.1-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:0b726ad7e7b669be982b0c71c07fe4b037d654354130da79a7902a669e93a66b"},
-    {file = "pyarrow-25.0.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:9171748cdf796972d85a4b60157c279913e242992e350c90c7450182a9838b2a"},
-    {file = "pyarrow-25.0.1-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:b7a296aac7a71fa0886c08e155ddb6c636a50013f801f6178daafa0f9e726188"},
-    {file = "pyarrow-25.0.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:0fe7c8b6c03969b49c8c66182e4a18e3819ab92d07cfab5d8370c531b9369ef0"},
-    {file = "pyarrow-25.0.1-cp314-cp314-win_amd64.whl", hash = "sha256:f729cfdbd36fd99d543b67a914d2de044c84ebe45be8b34902b299b608c15c8f"},
-    {file = "pyarrow-25.0.1-cp314-cp314t-macosx_12_0_arm64.whl", hash = "sha256:59a2de54c0cbd954da861eee4d1d330f8e909c45b53455baef696380f2c55033"},
-    {file = "pyarrow-25.0.1-cp314-cp314t-macosx_12_0_x86_64.whl", hash = "sha256:35935cd5de130aa5cf4dea052a63e6bf2e17006c35c3a468194242b9b2bf5956"},
-    {file = "pyarrow-25.0.1-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:f3831aaa25c67a99f99dc8b05873cb9d64560390372e2aa197ce9dd4a3f06a44"},
-    {file = "pyarrow-25.0.1-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:6a1fdfc6659b6b19022f2e50627fb5cf7156a66c46bf4299379955cbe742382a"},
-    {file = "pyarrow-25.0.1-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:169d3429d5be7c752125890620f75a60776d38b0035eddae939651640822332e"},
-    {file = "pyarrow-25.0.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:119297a6dc197e45d9c6d4415f7814a67ffa36c180d26f68c154c58067ae782d"},
-    {file = "pyarrow-25.0.1-cp314-cp314t-win_amd64.whl", hash = "sha256:4288f27577352d608ca08553b0865e4a9b3aa14820c5d95b53337218d609835b"},
-    {file = "pyarrow-25.0.1.tar.gz", hash = "sha256:9150a83248bfed9813ea3c3af74c3856c1984d444aa28e58bf7733b9750ddf6a"},
-]
-
-[[package]]
 name = "pycparser"
 version = "3.0"
 description = "C parser in Python"
@@ -3468,7 +3328,7 @@ description = "Data validation using Python type hints"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"mcp\" or extra == \"lancedb\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"mcp\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pydantic-2.13.4-py3-none-any.whl", hash = "sha256:45a282cde31d808236fd7ea9d919b128653c8b38b393d1c4ab335c62924d9aba"},
     {file = "pydantic-2.13.4.tar.gz", hash = "sha256:c40756b57adaa8b1efeeced5c196f3f3b7c435f90e84ea7f443901bec8099ef6"},
@@ -3491,7 +3351,7 @@ description = "Core functionality for Pydantic validation and serialization"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"mcp\" or extra == \"lancedb\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"mcp\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "pydantic_core-2.46.4-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:a396dcc17e5a0b164dbe026896245a4fa9ff402edca1dff0be3d53a517f74de4"},
     {file = "pydantic_core-2.46.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:da4b951fe36dc7c3a1ccb4e3cd1747c3542b8c9ceede8fc86cae054e764485f5"},
@@ -3862,7 +3722,7 @@ description = "Extensions to the standard Python datetime module"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
     {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
@@ -4888,7 +4748,7 @@ description = "Python 2 and 3 compatibility utilities"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 groups = ["main"]
-markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
@@ -5155,7 +5015,7 @@ description = "Fast, Extensible Progress Meter"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"lancedb\" or extra == \"synthesis\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"semantic\" or extra == \"synthesis-mflux\" or extra == \"synthesis\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "tqdm-4.70.0-py3-none-any.whl", hash = "sha256:7f585706bfddbdebf89daac705b2dfcc16890130727d3197ca62c732b4310953"},
     {file = "tqdm-4.70.0.tar.gz", hash = "sha256:55b0b0dbd97462d06ebee91e4dac24ed4d4702be82b24f07e6c1d27e08cea220"},
@@ -5365,7 +5225,7 @@ description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(python_version == \"3.13\" or extra == \"mcp\" or extra == \"synthesis\" or extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\") and (extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"mcp\" or extra == \"lancedb\" or extra == \"synthesis\")"
+markers = "(python_version == \"3.13\" or extra == \"mcp\" or extra == \"synthesis\" or extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\") and (sys_platform == \"darwin\" or sys_platform == \"linux\") and (extra == \"synthesis-mflux\" or extra == \"semantic\" or extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"mcp\" or extra == \"synthesis\")"
 files = [
     {file = "typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
     {file = "typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"},
@@ -5378,7 +5238,7 @@ description = "Runtime typing introspection tools"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "(extra == \"mcp\" or extra == \"lancedb\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
+markers = "(extra == \"mcp\" or extra == \"synthesis\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")"
 files = [
     {file = "typing_inspection-0.4.4-py3-none-any.whl", hash = "sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147"},
     {file = "typing_inspection-0.4.4.tar.gz", hash = "sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47"},
@@ -5398,7 +5258,7 @@ files = [
     {file = "urllib3-2.8.0-py3-none-any.whl", hash = "sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3"},
     {file = "urllib3-2.8.0.tar.gz", hash = "sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63"},
 ]
-markers = {main = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\" or extra == \"lancedb\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
+markers = {main = "(extra == \"viz3d-render\" or extra == \"viz3d-qt\" or extra == \"synthesis-mflux\") and (sys_platform == \"darwin\" or sys_platform == \"linux\")", dev = "sys_platform == \"darwin\" or sys_platform == \"linux\""}
 
 [package.extras]
 brotli = ["brotli (>=1.2.0) ; platform_python_implementation == \"CPython\"", "brotlicffi (>=1.2.0.0) ; platform_python_implementation != \"CPython\""]
@@ -5511,7 +5371,6 @@ files = [
 
 [extras]
 ingest = ["firecrawl-anydoc", "pymupdf"]
-lancedb = ["lancedb"]
 mcp = ["click", "mcp"]
 pdf = ["pymupdf"]
 semantic = ["numpy", "rich", "sentence-transformers", "sqlite-vec", "torch", "transformers"]
@@ -5526,4 +5385,4 @@ viz3d-render = ["numpy", "pyvista"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "8b63929163a65e932e27da26bb31ab11c46df5a8def351b2adf93439299774d0"
+content-hash = "b73b14ffe2d865b6ff9dc951118571e6ca9244dd9fd9ef5a8ac3bd44f0c4e693"

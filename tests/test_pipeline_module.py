@@ -359,11 +359,6 @@ class TestVectorBackendSelection:
         with pytest.raises(TypeError, match="lancedb_dir"):
             _TextKG(corpus, lancedb_dir=tmp_path / "kg" / "lancedb")  # ty: ignore[unknown-argument]
 
-    def test_legacy_store_dir_sits_beside_vectors_path(self, corpus: Path, tmp_path: Path) -> None:
-        """The "auto" probe path is derived, not configured."""
-        kg = _TextKG(corpus, vectors_path=tmp_path / "kg" / "vectors.sqlite")
-        assert kg._legacy_store_dir == tmp_path / "kg" / "lancedb"
-
     def test_sqlite_vec_build_then_fresh_instance_queries(
         self, corpus: Path, tmp_path: Path
     ) -> None:

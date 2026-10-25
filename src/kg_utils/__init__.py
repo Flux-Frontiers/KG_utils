@@ -62,8 +62,6 @@ The core install is stdlib-only; everything heavier is opt-in.
     pip install 'kgmodule-utils[semantic]'         # sentence-transformers + torch
                                                    #   + sqlite-vec (the default backend)
     pip install 'kgmodule-utils[sqlite-vec]'       # sqlite-vec alone
-    pip install 'kgmodule-utils[lancedb]'          # LanceDBBackend, for un-migrated
-                                                   #   legacy stores only
     pip install 'kgmodule-utils[viz]'              # pyvis — interactive graph HTML
     pip install 'kgmodule-utils[viz3d]'            # numpy — 3-D graph layout
     pip install 'kgmodule-utils[viz3d-render]'     # + pyvista — build the meshes,

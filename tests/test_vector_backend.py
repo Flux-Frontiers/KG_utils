@@ -1,25 +1,12 @@
-"""Tests for kg_utils.vector_backend — SqliteVecBackend, and LanceDB's ANN gate.
+"""Tests for kg_utils.vector_backend — SqliteVecBackend, the one backend.
 
-SqliteVecBackend is the default backend and is exercised through the
-VectorBackend protocol against real sqlite-vec (no mocks): protocol
-conformance, an int8 round-trip (sqlite-vec gotcha: raw blobs must be wrapped
-with vec_int8), and a SemanticIndex integration test with a deterministic fake
-embedder (no model download).
+Exercised through the VectorBackend protocol against real sqlite-vec (no
+mocks): protocol conformance, an int8 round-trip (sqlite-vec gotcha: raw blobs
+must be wrapped with vec_int8), and a SemanticIndex integration test with a
+deterministic fake embedder (no model download).
 
-**LanceDB is no longer exercised against a real store.** It is legacy — the
-default moved to sqlite-vec, and nothing in the fleet builds a LanceDB index
-any more — so requiring the `lancedb` extra to run this file cost more than it
-bought. It cost a great deal, in fact: the import gate was at module scope, so
-a CI job without `lancedb` skipped the *sqlite-vec* tests too, and
-`vector_backend.py` sat at 45% coverage with the default backend untested.
-
-What survives is `TestAnnGate` and the `_pq_subvectors` tests, which drive
-`maybe_create_ann_index` through a mock table and never call `open()` — so
-they need no `lancedb` install. `doc_kg` still imports `LanceDBBackend` and
-`_pq_subvectors` for un-migrated stores, and this is what keeps that path from
-being wholly untested. The parts only reachable through a real LanceDB
-connection (`open`, `upsert`, `search`, `delete_ids`) are now uncovered by
-design; see the note in the module docstring of `kg_utils.vector_backend`.
+The LanceDB ANN-gate tests that used to live here went with ``LanceDBBackend``
+in 0.29.0.
 """
 
 # pylint: disable=redefined-outer-name,missing-function-docstring
@@ -27,18 +14,15 @@ design; see the note in the module docstring of `kg_utils.vector_backend`.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
 from kg_utils.semantic import SeedHit, SemanticIndex
 from kg_utils.vector_backend import (
-    LanceDBBackend,
     SqliteVecBackend,
     VectorBackend,
     VectorStoreNotFoundError,
-    _pq_subvectors,
 )
 
 sqlite_vec = pytest.importorskip("sqlite_vec")
@@ -78,7 +62,7 @@ def backend(tmp_path) -> VectorBackend:
 
 
 # ---------------------------------------------------------------------------
-# Protocol conformance — both backends
+# Protocol conformance
 # ---------------------------------------------------------------------------
 
 
@@ -193,7 +177,7 @@ def test_sqlite_wipe_resets(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# SemanticIndex over both backends (deterministic fake embedder)
+# SemanticIndex over the backend (deterministic fake embedder)
 # ---------------------------------------------------------------------------
 
 _KEYWORDS = ["alpha", "beta", "gamma", "delta"]
@@ -235,101 +219,6 @@ class _FakeStore:
             }
             for kw in _KEYWORDS
         ]
-
-
-# ---------------------------------------------------------------------------
-# LanceDB ANN gating (moved here from doc_kg; mock table, no real LanceDB)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("dim", [384, 768, 100, 1024, 17])
-def test_pq_subvectors_divides_dim(dim):
-    m = _pq_subvectors(dim)
-    assert m >= 1
-    assert dim % m == 0
-
-
-def test_pq_subvectors_targets_about_16_dims():
-    assert _pq_subvectors(384) == 24  # 384 / 16
-    assert _pq_subvectors(768) == 48
-
-
-def _lance_with_mock(tmp_path, mock_tbl, **kw):
-    be = LanceDBBackend(tmp_path / "ld", table="t", dim=384, meta_columns=META, **kw)
-    be._tbl = mock_tbl
-    return be
-
-
-class TestAnnGate:
-    def test_below_threshold_skips_index(self, tmp_path):
-        tbl = MagicMock()
-        tbl.count_rows.return_value = 3_278
-        be = _lance_with_mock(tmp_path, tbl, ann_threshold=50_000)
-        assert be.maybe_create_ann_index(quiet=True) is False
-        tbl.create_index.assert_not_called()
-
-    def test_at_or_above_threshold_builds_index(self, tmp_path):
-        tbl = MagicMock()
-        tbl.count_rows.return_value = 683_001
-        be = _lance_with_mock(tmp_path, tbl, ann_threshold=50_000, ann_index_type="IVF_FLAT")
-        assert be.maybe_create_ann_index(quiet=True) is True
-        tbl.create_index.assert_called_once()
-        _, kwargs = tbl.create_index.call_args
-        assert kwargs["metric"] == "cosine"
-        assert kwargs["vector_column_name"] == "vector"
-        assert kwargs["num_partitions"] >= 1
-
-    def test_ivf_pq_passes_num_sub_vectors(self, tmp_path):
-        tbl = MagicMock()
-        tbl.count_rows.return_value = 100_000
-        be = _lance_with_mock(tmp_path, tbl, ann_threshold=1, ann_index_type="IVF_PQ")
-        be.maybe_create_ann_index(quiet=True)
-        _, kwargs = tbl.create_index.call_args
-        assert kwargs["num_sub_vectors"] == 24
-
-    def test_ivf_flat_omits_num_sub_vectors(self, tmp_path):
-        tbl = MagicMock()
-        tbl.count_rows.return_value = 100_000
-        be = _lance_with_mock(tmp_path, tbl, ann_threshold=1, ann_index_type="IVF_FLAT")
-        be.maybe_create_ann_index(quiet=True)
-        _, kwargs = tbl.create_index.call_args
-        assert "num_sub_vectors" not in kwargs
-
-    def test_threshold_zero_disables_index(self, tmp_path):
-        tbl = MagicMock()
-        tbl.count_rows.return_value = 1_000_000
-        be = _lance_with_mock(tmp_path, tbl, ann_threshold=0)
-        assert be.maybe_create_ann_index(quiet=True) is False
-        tbl.create_index.assert_not_called()
-
-    def test_num_partitions_sqrt_heuristic(self, tmp_path):
-        tbl = MagicMock()
-        tbl.count_rows.return_value = 1_000_000  # sqrt = 1000
-        be = _lance_with_mock(tmp_path, tbl, ann_threshold=1)
-        be.maybe_create_ann_index(quiet=True)
-        _, kwargs = tbl.create_index.call_args
-        assert kwargs["num_partitions"] == 1000
-
-    def test_create_index_failure_falls_back_to_flat(self, tmp_path):
-        tbl = MagicMock()
-        tbl.count_rows.return_value = 100_000
-        tbl.create_index.side_effect = RuntimeError("lancedb said no")
-        be = _lance_with_mock(tmp_path, tbl, ann_threshold=1)
-        assert be.maybe_create_ann_index(quiet=True) is False
-
-    def test_legacy_lancedb_without_index_type_kwarg(self, tmp_path):
-        tbl = MagicMock()
-        tbl.count_rows.return_value = 100_000
-
-        def _create(*_args, **kwargs):
-            if "index_type" in kwargs:
-                raise TypeError("unexpected keyword 'index_type'")
-            return None
-
-        tbl.create_index.side_effect = _create
-        be = _lance_with_mock(tmp_path, tbl, ann_threshold=1)
-        assert be.maybe_create_ann_index(quiet=True) is True
-        assert tbl.create_index.call_count == 2
 
 
 def test_semantic_index_over_backend(tmp_path):

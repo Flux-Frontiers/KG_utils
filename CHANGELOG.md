@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **LanceDB support.** `LanceDBBackend`, `_pq_subvectors()`,
+  `resolve_backend_name()`, `make_backend()`, the `lancedb` extra and
+  `vector_backend="lancedb"` are gone, along with the ANN-index branch in
+  `SemanticIndex.build()` and `KGModule._legacy_store_dir`. sqlite-vec is the
+  only backend; `VectorBackend` stays as the seam. Nothing in the fleet had
+  built a LanceDB index since the sqlite-vec migration; the backend survived
+  as a reader for un-migrated stores, and `dockg convert-index` was its last
+  caller. Folded into the 0.29.0 wheel with the MCP base
+  (`kgrag_priv/docs/MCP_CENTRALIZATION_PLAN.md`, step 0b). **Breaking:** a
+  store that was never migrated can no longer be read; rebuild its index with
+  `build_index()`, which derives it from the graph.
+
+### Changed
+
+- **`KGModule(vector_backend=)` accepts `"auto"` and `"sqlite-vec"`, both
+  meaning sqlite-vec,** and raises `ValueError` naming the removal for
+  `"lancedb"` and anything else. Kept because pycode_kg, tscode_kg, swift_kg,
+  ftree_kg and others pass `"sqlite-vec"`. `stats()["vector_backend"]` is
+  always `"sqlite-vec"`, kept because consumers display it; resolving it no
+  longer inspects the disk.
+- **`KGModule.drop_index()` no longer deletes a `lancedb/` directory** beside
+  the store. Nothing reads one any more, so the SDK leaves it alone.
+
 ### Added
 
 - **`kg_utils.mcp`: one MCP server base for every KG module** (new `mcp`

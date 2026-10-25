@@ -18,7 +18,7 @@
 
 ## Overview
 
-kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through pluggable vector indexing (sqlite-vec; a deprecated LanceDB backend remains only for un-migrated stores) and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
+kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through vector indexing on sqlite-vec and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
 
 Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [TypeScriptKG](https://github.com/Flux-Frontiers/tscode_kg), and [FTreeKG](https://github.com/Flux-Frontiers/ftree_kg) subclass `KGModule` from here and implement exactly three methods: `make_extractor()`, `kind()`, and `analyze()`. The rest — [DocKG](https://github.com/Flux-Frontiers/doc_kg), MemoryKG, MetaboKG, and others — keep their own pipelines and pull in the shared pieces they need: embedders, vector backends, snapshots, synthesis.
 
@@ -218,17 +218,6 @@ and the standard `<tool> mcp` command (`kg_utils.mcp`).
 pip install 'kgmodule-utils[mcp]'
 ```
 
-### With deprecated LanceDB support (only for an un-migrated LanceDB store)
-
-**LanceDB is deprecated** — sqlite-vec is the backend for all new stores. As of
-0.10.0 `lancedb` is no longer part of `[semantic]`. Install it explicitly only
-if you have a pre-existing, un-migrated LanceDB store on disk; migrate when you
-can.
-
-```bash
-pip install 'kgmodule-utils[semantic,lancedb]'
-```
-
 ### With text + image synthesis (oMLX / Ollama / OpenAI / mflux-serve)
 
 ```bash
@@ -383,7 +372,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class / function | Description |
 |---|---|
-| `SemanticIndex` | Vector index over a pluggable backend (sqlite-vec default; LanceDB deprecated): `build()`, `search()`, `close()` |
+| `SemanticIndex` | Vector index over sqlite-vec (`VectorBackend` is the seam, `SqliteVecBackend` its one implementation): `build()`, `search()`, `close()` |
 | `SentenceTransformerEmbedder` | Local embedding via sentence-transformers |
 | `resolve_model_path()` | Resolve model name / alias to local cache path |
 | `suppress_ingestion_logging()` | Silence verbose HF / tqdm output during ingestion |
@@ -612,7 +601,7 @@ KG_utils/
 │       ├── extractor.py      # KGExtractor ABC
 │       ├── store.py          # GraphStore (SQLite)
 │       ├── semantic.py       # SemanticIndex, SentenceTransformerEmbedder, SeedHit
-│       ├── vector_backend.py # VectorBackend protocol, SqliteVecBackend (default), LanceDBBackend (deprecated)
+│       ├── vector_backend.py # VectorBackend protocol, SqliteVecBackend
 │       ├── pipeline.py       # KGModule concrete base class
 │       ├── module.py         # Re-export shim
 │       ├── embed.py          # Embedder protocol, model registry
@@ -751,16 +740,15 @@ git clone https://github.com/Flux-Frontiers/KG_utils.git
 cd KG_utils
 poetry env use python3.12
 poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" \
-  --extras "lancedb" --extras "viz3d-render" --extras "viz3d-qt"
+  --extras "viz3d-render" --extras "viz3d-qt" --extras "mcp"
 ```
 
 **The extras are not optional for testing.** The core install is deliberately
 zero-dependency (`dependencies = []`), so `poetry install --with dev` on its own
 installs no runtime packages at all — pytest then aborts during *collection* on
 missing `numpy` and `httpx` and runs nothing. The six extras above are what CI
-installs: the test job omits `lancedb` (the vector-backend tests no longer need
-it), but the type-check job requires it so ty can resolve the legacy backend's
-imports — and pre-commit runs ty, so install it locally.
+installs, in both the test and the type-check job, and pre-commit runs ty, so
+install them locally.
 
 Run the fast test suite (no model downloads) — **750 passed, 1 skipped** (the
 skip is a test that needs `doc_kg`, which the SDK cannot depend on):
