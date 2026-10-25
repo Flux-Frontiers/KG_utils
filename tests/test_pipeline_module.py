@@ -72,7 +72,7 @@ class _TextKG(KGModule):
 
     def analyze(self) -> str:
         s = self.stats()
-        return f"# TextKG\nnodes={s['total_nodes']}"
+        return f"# TextKG\nnodes={s['nodes']['total']}"
 
     def _kind_priority(self, kind: str) -> int:
         return {"function": 0, "module": 1}.get(kind, 99)
@@ -142,7 +142,7 @@ class TestBuildGraph:
         kg.build_graph(wipe=True)
         kg.build_graph(wipe=True)
         s = kg.stats()
-        assert s["total_nodes"] == 5  # not doubled
+        assert s["nodes"]["total"] == 5  # not doubled
 
 
 # ---------------------------------------------------------------------------
@@ -168,8 +168,10 @@ class TestBuildIndex:
 class TestKGModuleConvenience:
     def test_stats_returns_dict(self, kg: _TextKG) -> None:
         s = kg.stats()
-        assert "total_nodes" in s
-        assert s["total_nodes"] == 5
+        assert s["kind"] == "text"
+        assert s["nodes"] == {"total": 5, "by_kind": {"function": 4, "module": 1}}
+        assert s["edges"] == {"total": 4, "by_rel": {"CONTAINS": 4}}
+        assert "total_nodes" not in s and "node_counts" not in s
 
     def test_node_fetches_by_id(self, kg: _TextKG) -> None:
         n = kg.node("function:src/corpus.py:embedder")
@@ -291,7 +293,7 @@ class TestKGModulePack:
 def test_context_manager_closes_store(corpus: Path) -> None:
     with _TextKG(corpus) as kg:
         s = kg.stats()
-        assert s["total_nodes"] > 0
+        assert s["nodes"]["total"] > 0
     # connection closed — further access should reopen or be None
     assert kg._store is None or kg._store._con is None
 

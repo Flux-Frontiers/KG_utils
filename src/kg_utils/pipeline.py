@@ -50,6 +50,7 @@ from kg_utils.semantic import (
     suppress_ingestion_logging,
 )
 from kg_utils.specs import BuildStats, EdgeSpec, NodeSpec, QueryResult, SnippetPack
+from kg_utils.stats import stats_from_store
 from kg_utils.store import DEFAULT_RELS, GraphStore
 from kg_utils.validation import (
     MAX_HOP,
@@ -974,17 +975,20 @@ class KGModule(ABC):
         return self.store.callers_of(node_id, rel=rel)
 
     def stats(self) -> dict[str, Any]:
-        """Return store statistics plus the vector backend name.
+        """Return the KG's statistics in the fleet shape (:mod:`kg_utils.stats`).
 
-        Reads the graph only; never loads the embedding model.
+        ``{"kind", "nodes": {"total", "by_kind"}, "edges": {"total", "by_rel"}}``
+        plus every other key :meth:`~kg_utils.store.GraphStore.stats` reports
+        (``meaningful_nodes``, ``docstring_coverage``, ``db_path``, ...) and
+        ``vector_backend``, always ``"sqlite-vec"`` since 0.29.0. Reads the
+        graph only; never loads the embedding model.
 
-        :return: Dictionary from :meth:`~kg_utils.store.GraphStore.stats`,
-            plus ``vector_backend``, always ``"sqlite-vec"`` since 0.29.0 and
-            kept because consumers display it.
+        Changed in 0.29.0: the flat ``total_nodes`` / ``node_counts`` keys are
+        the store's, not this method's; snapshots read the store.
+
+        :return: The statistics dict.
         """
-        s = self.store.stats()
-        s["vector_backend"] = "sqlite-vec"
-        return s
+        return stats_from_store(self.kind(), self.store.stats(), vector_backend="sqlite-vec")
 
     def node(self, node_id: str) -> dict[str, Any] | None:
         """Fetch a single node by ID from the store.

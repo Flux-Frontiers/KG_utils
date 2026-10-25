@@ -44,6 +44,8 @@ License: Elastic 2.0
 from __future__ import annotations
 
 import contextlib
+import functools
+import inspect
 import io
 import os
 import sys
@@ -60,6 +62,7 @@ from mcp.server.stdio import stdio_server
 
 from kg_utils.mcp._names import CANONICAL_TOOLS, TRANSPORTS
 from kg_utils.specs import QueryResult, SnippetPack
+from kg_utils.stats import stats_problems
 
 __all__ = [
     "CANONICAL_TOOLS",
@@ -279,7 +282,10 @@ class KGServer(FastMCP):
             raise ValueError(f"canonical tool {name!r} is not registered on {self.name!r}")
 
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
-            candidate = Tool.from_function(fn, name=name)
+            # A module's own stats still answers in the fleet shape: checked
+            # on every call, since the shape is a value, not a signature.
+            served = _checking_stats(fn) if name == "stats" else fn
+            candidate = Tool.from_function(served, name=name)
             problems = _contract_problems(_contract(name), candidate)
             if problems:
                 raise TypeError(
@@ -513,17 +519,48 @@ def _session_banner(name: str, kg: Any) -> str:
     return "\n".join(lines)
 
 
+def checked_stats(stats: Any) -> Any:
+    """Return *stats* if it is in the fleet shape (:mod:`kg_utils.stats`).
+
+    :param stats: What a KG's ``stats()`` returned.
+    :return: *stats*, unchanged.
+    :raises ValueError: Naming every way it departs from the shape; the
+        ``stats`` tool reports it as a tool error.
+    """
+    problems = stats_problems(stats)
+    if problems:
+        raise ValueError("stats is not in the fleet shape: " + "; ".join(problems))
+    return stats
+
+
+def _checking_stats(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Wrap a module's ``stats`` tool so its result is checked, keeping its signature."""
+    if inspect.iscoroutinefunction(fn):
+
+        @functools.wraps(fn)
+        async def checked_async(*args: Any, **kwargs: Any) -> Any:
+            return checked_stats(await fn(*args, **kwargs))
+
+        return checked_async
+
+    @functools.wraps(fn)
+    def checked(*args: Any, **kwargs: Any) -> Any:
+        return checked_stats(fn(*args, **kwargs))
+
+    return checked
+
+
 def _register_canonical(server: KGServer, *, with_neighbors: bool) -> None:
     """Add the canonical tools. Validation is the KG's; errors become tool errors."""
 
     @server.tool()
     def stats(ctx: Context) -> dict[str, Any]:
-        """Node and edge counts by kind, and the vector backend in use.
+        """Node and edge counts, in total and by kind and relation, plus the KG's own measures.
 
         Reads the graph only: never loads the embedding model, so it is the
         cheap first call of a session.
         """
-        return kg_from(ctx).stats()
+        return checked_stats(kg_from(ctx).stats())
 
     @server.tool()
     def query(

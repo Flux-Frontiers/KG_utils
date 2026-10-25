@@ -31,9 +31,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer inspects the disk.
 - **`KGModule.drop_index()` no longer deletes a `lancedb/` directory** beside
   the store. Nothing reads one any more, so the SDK leaves it alone.
+- **`KGModule.stats()` answers in the fleet's stats shape** (new
+  `kg_utils.stats`, settled 2026-10-25 in kgrag_priv FLEET_STANDARDS, "KG
+  stats shape"): `{"kind", "nodes": {"total", "by_kind"}, "edges": {"total",
+  "by_rel"}}` plus every other key the store reports (`meaningful_nodes`,
+  `docstring_coverage`, `db_path`, ...) and `vector_backend`. Before it the
+  fleet answered `stats` in three spellings (`node_count`, `total_nodes`,
+  `nodes`), and KGRAG translated each adapter by hand. **Breaking:** the flat
+  `total_nodes` / `total_edges` / `node_counts` / `edge_counts` keys are gone
+  from `KGModule.stats()`; they stay on `GraphStore.stats()`, which snapshots
+  read. `SnapshotManager.capture()` flattens a nested `graph_stats_dict`, so
+  snapshots persist the same keys whichever they are handed.
+- **The canonical `stats` MCP tool checks the shape on every call**, the
+  default tool and a module's `server.canonical("stats")` replacement alike;
+  a departure is a tool error naming each problem.
 
 ### Added
 
+- **`kg_utils.stats`**: `kg_stats()` builds the fleet stats shape (totals summed
+  from the breakdowns, so they cannot disagree), `stats_from_store()` reshapes a
+  store's flat `stats()`, `flat_stats()` is the inverse, and `stats_problems()`
+  lists every departure.
 - **`kg_utils.mcp`: one MCP server base for every KG module** (new `mcp`
   extra: `mcp>=1.23.0,<2`, `click`). Step 0 of
   `kgrag_priv/docs/MCP_CENTRALIZATION_PLAN.md` (sweep item 93). The fleet ran

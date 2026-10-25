@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from kg_utils.snapshots.models import PruneResult, Snapshot, SnapshotManifest
+from kg_utils.stats import flat_stats
 
 
 def _issues_delta(issues_a: list[str], issues_b: list[str]) -> dict[str, list[str]]:
@@ -204,7 +205,8 @@ class SnapshotManager:
 
         :param version: Version string; auto-detected from package if None.
         :param branch: Git branch; auto-detected if None.
-        :param graph_stats_dict: Output from the KG's ``stats()`` method.
+        :param graph_stats_dict: Output from the KG's ``stats()`` or its store's;
+            the fleet's nested shape is flattened to the store's keys.
         :param tree_hash: Git tree hash, recorded as provenance; auto-detected
             if not provided. It is no longer the snapshot's key.
         :param hotspots: Top hotspot entries.
@@ -246,7 +248,9 @@ class SnapshotManager:
         if not key:
             key = datetime.now(UTC).isoformat()
 
-        metrics: dict[str, Any] = dict(graph_stats_dict or {})
+        # A module's public stats() is nested (kg_utils.stats); snapshots persist
+        # the store's flat keys either way, so history stays comparable.
+        metrics: dict[str, Any] = flat_stats(graph_stats_dict or {})
         metrics.update(self._domain_metrics(metrics))
         metrics.update(extra_metrics)
         metrics = self._relativize_paths(metrics)

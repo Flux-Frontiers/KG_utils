@@ -180,7 +180,7 @@ def test_graph_tools_never_load_the_model(built: Path, no_model: None) -> None:
 
     r = _with_client(server, session)
     assert not r["stats"].isError
-    assert r["stats"].structuredContent["total_nodes"] == 3
+    assert r["stats"].structuredContent["nodes"]["total"] == 3
     assert not r["get_node"].isError
     assert r["get_node"].structuredContent["id"] == "alpha"
     assert not r["neighbors"].isError
@@ -649,7 +649,7 @@ def test_stdio_subprocess_survives_stdout_writes(tmp_path: Path) -> None:
     names, answer, is_error, stats = anyio.run(main)
     assert names == [*CANONICAL_TOOLS, "noisy"]
     assert (answer, is_error) == ("stdio", False)
-    assert stats["total_nodes"] == 1
+    assert stats["nodes"]["total"] == 1
     stderr = (tmp_path / "stderr.log").read_text(encoding="utf-8")
     for line in (
         "python print to stdout",
@@ -685,3 +685,40 @@ def test_query_and_pack_with_the_real_model(tmp_path: Path) -> None:
     q, p = _with_client(server, session)
     assert not q.isError and q.structuredContent["returned_nodes"] >= 1
     assert not p.isError and "alpha" in _text(p)
+
+
+# ---------------------------------------------------------------------------
+# The stats shape (kg_utils.stats), enforced on every call
+# ---------------------------------------------------------------------------
+
+
+class _FlatStatsKG(_KG):
+    def stats(self) -> dict[str, Any]:  # the pre-0.29 flat form
+        return self.store.stats()
+
+
+def test_stats_answers_in_the_fleet_shape(built: Path) -> None:
+    out = _call(make_server(lambda: _KG(built), name="mkg", kind="code"), "stats")
+    assert not out.isError
+    assert set(out.structuredContent) >= {"kind", "nodes", "edges"}
+    assert out.structuredContent["nodes"]["total"] == sum(
+        out.structuredContent["nodes"]["by_kind"].values()
+    )
+
+
+def test_a_flat_stats_is_a_tool_error(built: Path) -> None:
+    out = _call(make_server(lambda: _FlatStatsKG(built), name="mkg", kind="code"), "stats")
+    assert out.isError and "not in the fleet shape" in _text(out)
+
+
+def test_a_modules_own_stats_is_checked_too(built: Path) -> None:
+    server = make_server(lambda: _KG(built), name="mkg", kind="code")
+
+    @server.canonical("stats")
+    def stats(ctx: Context) -> dict[str, Any]:
+        """A module's richer stats that forgot the shape."""
+        return {"node_count": 1}
+
+    out = _call(server, "stats")
+    assert out.isError and "`nodes` must be an object" in _text(out)
+    assert [t["name"] for t in manifest(server)["tools"]][0] == "stats"
