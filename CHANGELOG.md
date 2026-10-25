@@ -62,7 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   module: swapping in the plain canonical tool would have regressed it. The
   standard command also takes `--model`, and a relative `--db` or
   `--vectors` is taken from `--repo`, as pycode_kg's command already did.
-  Nothing in the fleet uses it yet.
+  Importing `kg_utils.mcp` to register the command does not import `mcp`,
+  which loads only when a server is built: `mcp` costs about half a second
+  against pycode_kg's whole CLI startup of about 0.17 s, and every command
+  would have paid it. Nothing in the fleet uses it yet.
 - **`KGModule.neighbors(node_id, rels=, direction=, limit=)`**: a node's
   one-hop neighbourhood, its edges and the existing nodes at their far ends.
   Graph only, so it never loads the embedding model; `limit` is bounded by

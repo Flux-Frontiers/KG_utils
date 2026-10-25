@@ -31,23 +31,30 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
-from kg_utils.mcp.server import TRANSPORTS, KGServer, manifest, run
+from kg_utils.mcp._names import TRANSPORTS
+
+if TYPE_CHECKING:
+    from kg_utils.mcp.server import KGServer
 
 __all__ = ["BuildServer", "add_mcp_command"]
 
 #: ``(repo, db, vectors, model) -> server``. Each of ``db``, ``vectors`` and
 #: ``model`` is ``None`` when its flag was not given, meaning "the module's
 #: default"; ``db`` and ``vectors`` arrive absolute.
-BuildServer = Callable[[Path, Path | None, Path | None, str | None], KGServer]
+BuildServer = Callable[[Path, Path | None, Path | None, str | None], "KGServer"]
 
 
 def add_mcp_command(
     cli: click.Group, build_server: BuildServer, *, name: str = "mcp"
 ) -> click.Command:
     """Add the standard ``mcp`` subcommand to a module's click group.
+
+    Registering the command does not import ``mcp``; that happens only when
+    the command runs, so a module's other commands start as fast as before.
 
     *build_server* must not open the KG: it is called for ``--manifest`` too,
     which has to answer without a graph on disk. :func:`~kg_utils.mcp.make_server`
@@ -120,6 +127,8 @@ def add_mcp_command(
         show_manifest: bool,
     ) -> None:
         """Serve this knowledge graph to an AI agent over MCP."""
+        from kg_utils.mcp.server import manifest, run  # noqa: PLC0415 -- see add_mcp_command
+
         root = repo.resolve()
 
         def under_repo(path: Path | None) -> Path | None:

@@ -58,11 +58,13 @@ from mcp.server.fastmcp.tools import Tool
 from mcp.server.lowlevel.server import Server as LowLevelServer
 from mcp.server.stdio import stdio_server
 
+from kg_utils.mcp._names import CANONICAL_TOOLS, TRANSPORTS
 from kg_utils.specs import QueryResult, SnippetPack
 
 __all__ = [
     "CANONICAL_TOOLS",
     "TRANSPORTS",
+    "Context",
     "KGServer",
     "ServableKG",
     "describe_tools",
@@ -71,13 +73,6 @@ __all__ = [
     "manifest",
     "run",
 ]
-
-#: The tools every fleet KG server answers, with the same names and meanings.
-CANONICAL_TOOLS: tuple[str, ...] = ("stats", "query", "pack", "get_node", "neighbors")
-
-#: Transports :func:`run` serves. HTTP+SSE is deprecated in the 2026-07-28 MCP
-#: specification and is deliberately absent; streamable HTTP replaces it.
-TRANSPORTS: tuple[str, ...] = ("stdio", "streamable-http")
 
 #: Hosts for which FastMCP turns on DNS-rebinding protection by itself.
 _LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")

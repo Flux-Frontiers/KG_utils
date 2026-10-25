@@ -40,25 +40,22 @@ the decision.
 
 from __future__ import annotations
 
-try:
-    from mcp.server.fastmcp import Context
-except ImportError as exc:  # pragma: no cover -- depends on install
-    raise ImportError(
-        "kg_utils.mcp needs the mcp extra: pip install 'kgmodule-utils[mcp]'"
-    ) from exc
+from typing import TYPE_CHECKING, Any
 
+from kg_utils.mcp._names import CANONICAL_TOOLS, TRANSPORTS
 from kg_utils.mcp.cli import BuildServer, add_mcp_command
-from kg_utils.mcp.server import (
-    CANONICAL_TOOLS,
-    TRANSPORTS,
-    KGServer,
-    ServableKG,
-    describe_tools,
-    kg_from,
-    make_server,
-    manifest,
-    run,
-)
+
+if TYPE_CHECKING:
+    from kg_utils.mcp.server import (
+        Context,
+        KGServer,
+        ServableKG,
+        describe_tools,
+        kg_from,
+        make_server,
+        manifest,
+        run,
+    )
 
 __all__ = [
     "CANONICAL_TOOLS",
@@ -74,3 +71,31 @@ __all__ = [
     "manifest",
     "run",
 ]
+
+#: Loaded from :mod:`kg_utils.mcp.server` on first use, so that importing this
+#: package -- which a module's CLI does to register ``add_mcp_command`` -- does
+#: not import ``mcp`` (about half a second) on every command.
+_SERVER_NAMES = frozenset(
+    {
+        "Context",
+        "KGServer",
+        "ServableKG",
+        "describe_tools",
+        "kg_from",
+        "make_server",
+        "manifest",
+        "run",
+    }
+)
+
+
+def __getattr__(name: str) -> Any:
+    if name not in _SERVER_NAMES:
+        raise AttributeError(f"module 'kg_utils.mcp' has no attribute {name!r}")
+    try:
+        from kg_utils.mcp import server  # noqa: PLC0415
+    except ImportError as exc:  # pragma: no cover -- depends on install
+        raise ImportError(
+            "kg_utils.mcp needs the mcp extra: pip install 'kgmodule-utils[mcp]'"
+        ) from exc
+    return getattr(server, name)
