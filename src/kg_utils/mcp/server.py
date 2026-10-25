@@ -50,7 +50,7 @@ import sys
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 import anyio
 from mcp.server.fastmcp import Context, FastMCP
@@ -84,7 +84,8 @@ class ServableKG(Protocol):
 
     :class:`kg_utils.pipeline.KGModule` satisfies it as it stands. A module
     with its own pipeline satisfies it by providing these five methods with
-    these keyword arguments; ``neighbors()`` is optional (see
+    these keyword arguments (it may accept more, with defaults);
+    ``neighbors()`` is optional (see
     :func:`make_server`). Each method validates its own arguments and raises
     ``ValueError`` on bad input; the server never re-checks them.
     """
@@ -93,11 +94,30 @@ class ServableKG(Protocol):
         """Return graph statistics. Must not load the embedding model."""
         ...
 
-    def query(self, q: str, **kwargs: Any) -> QueryResult:
+    def query(
+        self,
+        q: str,
+        *,
+        k: int = ...,
+        hop: int = ...,
+        rels: tuple[str, ...] = ...,
+        max_nodes: int = ...,
+        min_score: float = ...,
+    ) -> QueryResult:
         """Hybrid query: semantic seeds expanded through the graph."""
         ...
 
-    def pack(self, q: str, **kwargs: Any) -> SnippetPack:
+    def pack(
+        self,
+        q: str,
+        *,
+        k: int = ...,
+        hop: int = ...,
+        rels: tuple[str, ...] = ...,
+        context: int = ...,
+        max_lines: int = ...,
+        max_nodes: int | None = ...,
+    ) -> SnippetPack:
         """Hybrid query with source-grounded snippets."""
         ...
 
@@ -108,6 +128,14 @@ class ServableKG(Protocol):
     def close(self) -> None:
         """Release the graph's resources."""
         ...
+
+
+if TYPE_CHECKING:
+    from kg_utils.pipeline import KGModule
+
+    def _kgmodule_is_servable(kg: KGModule) -> ServableKG:
+        """Fails type checking if KGModule stops satisfying the protocol."""
+        return kg
 
 
 class KGServer(FastMCP):
