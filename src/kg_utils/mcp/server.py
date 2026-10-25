@@ -66,6 +66,7 @@ __all__ = [
     "TRANSPORTS",
     "Context",
     "KGServer",
+    "SearchableKG",
     "ServableKG",
     "describe_tools",
     "kg_from",
@@ -80,19 +81,34 @@ _LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
 
 @runtime_checkable
 class ServableKG(Protocol):
-    """What a KG must offer to be served.
+    """What every served KG must offer: what ``stats`` and ``get_node`` call.
 
-    :class:`kg_utils.pipeline.KGModule` satisfies it as it stands. A module
-    with its own pipeline satisfies it by providing these five methods with
-    these keyword arguments (it may accept more, with defaults);
-    ``neighbors()`` is optional (see
-    :func:`make_server`). Each method validates its own arguments and raises
-    ``ValueError`` on bad input; the server never re-checks them.
+    That is all a module needs if it registers its own ``query`` and ``pack``
+    with :meth:`KGServer.canonical`, as doc_kg does: its search sizes excerpts
+    by characters and fuses dense and keyword seeds, so it shares the
+    canonical parameters but not ``KGModule``'s. A KG served with the default
+    ``query`` and ``pack`` must also be a :class:`SearchableKG`;
+    ``neighbors()`` is optional (see :func:`make_server`). Each method
+    validates its own arguments and raises ``ValueError`` on bad input; the
+    server never re-checks them.
     """
 
     def stats(self) -> dict[str, Any]:
         """Return graph statistics. Must not load the embedding model."""
         ...
+
+    def node(self, node_id: str) -> dict[str, Any] | None:
+        """Return one node, or ``None`` if the id is not in the graph."""
+        ...
+
+    def close(self) -> None:
+        """Release the graph's resources."""
+        ...
+
+
+@runtime_checkable
+class SearchableKG(ServableKG, Protocol):
+    """A KG the default ``query`` and ``pack`` tools can serve: :class:`KGModule`'s shape."""
 
     def query(
         self,
@@ -121,21 +137,62 @@ class ServableKG(Protocol):
         """Hybrid query with source-grounded snippets."""
         ...
 
-    def node(self, node_id: str) -> dict[str, Any] | None:
-        """Return one node, or ``None`` if the id is not in the graph."""
-        ...
-
-    def close(self) -> None:
-        """Release the graph's resources."""
-        ...
-
 
 if TYPE_CHECKING:
     from kg_utils.pipeline import KGModule
 
-    def _kgmodule_is_servable(kg: KGModule) -> ServableKG:
-        """Fails type checking if KGModule stops satisfying the protocol."""
+    def _kgmodule_is_searchable(kg: KGModule) -> SearchableKG:
+        """Fails type checking if KGModule stops fitting the default tools."""
         return kg
+
+
+# ---------------------------------------------------------------------------
+# The canonical contract: the parameters every server's version must keep.
+# Reference signatures only; FastMCP derives the schemas compared against.
+# ---------------------------------------------------------------------------
+
+
+def _contract_stats() -> dict[str, Any]:
+    return {}
+
+
+def _contract_query(
+    q: str, k: int = 8, hop: int = 1, max_nodes: int = 25, rels: list[str] | None = None
+) -> dict[str, Any]:
+    return {}
+
+
+def _contract_pack(
+    q: str, k: int = 8, hop: int = 1, max_nodes: int = 15, rels: list[str] | None = None
+) -> str:
+    return ""
+
+
+def _contract_get_node(node_id: str) -> dict[str, Any]:
+    return {}
+
+
+def _contract_neighbors(
+    node_id: str,
+    rels: list[str] | None = None,
+    direction: Literal["out", "in", "both"] = "both",
+    limit: int = 50,
+) -> dict[str, Any]:
+    return {}
+
+
+_CONTRACT_FUNCS: dict[str, Callable[..., Any]] = {
+    "stats": _contract_stats,
+    "query": _contract_query,
+    "pack": _contract_pack,
+    "get_node": _contract_get_node,
+    "neighbors": _contract_neighbors,
+}
+
+
+def _contract(name: str) -> Tool:
+    """The canonical contract for *name*, as a FastMCP tool to compare against."""
+    return Tool.from_function(_CONTRACT_FUNCS[name], name=name)
 
 
 class KGServer(FastMCP):
@@ -195,11 +252,15 @@ class KGServer(FastMCP):
 
         The name stays, so the vocabulary stays the same on every server; what
         a module may change is everything an agent does not rely on. The
-        replacement must keep each canonical parameter with the same JSON type
-        and the same required-ness, add no new required parameter, and return
-        the same kind of result (structured data or text). Defaults may differ
-        and optional parameters may be added: pycode_kg's ``query`` defaults to
-        hybrid reranking and adds ``paths`` and ``max_per_module``.
+        replacement must keep each parameter of the canonical contract with
+        the same JSON type and the same required-ness, add no new required
+        parameter, and return the same kind of result (structured data or
+        text). The contract is only what every domain shares: ``query`` and
+        ``pack`` take ``q``, ``k``, ``hop``, ``max_nodes`` and ``rels``.
+        Defaults may differ and optional parameters may be added, and the
+        default tools' own extras (``min_score``, ``context``, ``max_lines``)
+        are not part of it: pycode_kg adds ``paths`` and hybrid reranking,
+        doc_kg sizes excerpts by ``max_chars`` instead of lines.
 
         Checked when the module builds its server, so a broken contract fails
         the module's own tests rather than an agent's call. The tool keeps its
@@ -219,7 +280,7 @@ class KGServer(FastMCP):
 
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
             candidate = Tool.from_function(fn, name=name)
-            problems = _contract_problems(current, candidate)
+            problems = _contract_problems(_contract(name), candidate)
             if problems:
                 raise TypeError(
                     f"{self.name}: this `{name}` breaks the canonical contract: "
@@ -393,7 +454,9 @@ def make_server(
     empty graph and answer every query with nothing, which is what an unbuilt
     vault did on 2026-09-22.
 
-    :param open_kg: Zero-argument factory returning the KG to serve.
+    :param open_kg: Zero-argument factory returning the KG to serve. With the
+        default ``query`` and ``pack`` it must be a :class:`SearchableKG`; a
+        module that replaces both needs only a :class:`ServableKG`.
     :param name: Server name, the tool binary's name (``pycodekg``).
     :param kind: KG kind (``code``, ``doc``).
     :param version: The serving package's version, reported to clients.

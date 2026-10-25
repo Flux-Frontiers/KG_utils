@@ -62,6 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   module: swapping in the plain canonical tool would have regressed it. The
   standard command also takes `--model`, and a relative `--db` or
   `--vectors` is taken from `--repo`, as pycode_kg's command already did.
+  What a replacement must keep is the canonical contract, only what every
+  domain shares: `query` and `pack` take `q`, `k`, `hop`, `max_nodes` and
+  `rels`. The default tools' own extras (`min_score`, `context`,
+  `max_lines`) are not part of it, found when doc_kg, whose search sizes
+  excerpts by characters, came to adopt the base. `ServableKG` is the
+  minimum every served KG needs (`stats`, `node`, `close`); `SearchableKG`
+  adds the `query` and `pack` shape the default tools call, which
+  `KGModule` satisfies and a type check guards.
   Importing `kg_utils.mcp` to register the command does not import `mcp`,
   which loads only when a server is built: `mcp` costs about half a second
   against pycode_kg's whole CLI startup of about 0.17 s, and every command

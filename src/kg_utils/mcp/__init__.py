@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from kg_utils.mcp.server import (
         Context,
         KGServer,
+        SearchableKG,
         ServableKG,
         describe_tools,
         kg_from,
@@ -63,6 +64,7 @@ __all__ = [
     "BuildServer",
     "Context",
     "KGServer",
+    "SearchableKG",
     "ServableKG",
     "add_mcp_command",
     "describe_tools",
@@ -79,6 +81,7 @@ _SERVER_NAMES = frozenset(
     {
         "Context",
         "KGServer",
+        "SearchableKG",
         "ServableKG",
         "describe_tools",
         "kg_from",

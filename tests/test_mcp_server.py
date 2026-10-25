@@ -388,6 +388,64 @@ def test_a_query_that_breaks_the_contract_is_refused(
     assert "rerank" not in json.dumps(manifest(server)["tools"][1])
 
 
+def test_a_doc_shaped_query_and_pack_satisfy_the_contract(built: Path) -> None:
+    """doc_kg's search has no ``min_score`` and sizes excerpts by characters.
+
+    The contract is what every domain shares, not the default tools' extras,
+    so a version without ``min_score``, ``context`` or ``max_lines`` is fine.
+    """
+    server = make_server(lambda: _KG(built), name="mkg", kind="test")
+
+    @server.canonical("query")
+    def query(
+        q: str,
+        ctx: Context,
+        k: int = 8,
+        hop: int = 1,
+        max_nodes: int = 25,
+        rels: list[str] | None = None,
+        node_kinds: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Doc-style query."""
+        return {}
+
+    @server.canonical("pack")
+    def pack(
+        q: str,
+        ctx: Context,
+        k: int = 8,
+        hop: int = 1,
+        max_nodes: int = 15,
+        rels: list[str] | None = None,
+        max_chars: int = 2000,
+        traced: bool = False,
+    ) -> str:
+        """Doc-style pack."""
+        return ""
+
+    props = {t["name"]: t["input_schema"]["properties"] for t in manifest(server)["tools"]}
+    assert "max_chars" in props["pack"] and "context" not in props["pack"]
+    assert "min_score" not in props["query"]
+
+
+def test_a_kg_with_only_stats_node_and_close_is_servable() -> None:
+    from kg_utils.mcp import SearchableKG
+
+    class Minimal:
+        def stats(self) -> dict[str, Any]:
+            return {}
+
+        def node(self, node_id: str) -> dict[str, Any] | None:
+            return None
+
+        def close(self) -> None:
+            pass
+
+    assert isinstance(Minimal(), ServableKG)
+    assert not isinstance(Minimal(), SearchableKG)
+    assert isinstance(_KG(Path(".")), SearchableKG)
+
+
 def test_changing_the_result_kind_is_refused(built: Path) -> None:
     server = make_server(lambda: _KG(built), name="mkg", kind="test")
 
