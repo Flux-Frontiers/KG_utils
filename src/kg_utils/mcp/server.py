@@ -284,7 +284,7 @@ class KGServer(FastMCP):
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
             # A module's own stats still answers in the fleet shape: checked
             # on every call, since the shape is a value, not a signature.
-            served = _checking_stats(fn) if name == "stats" else fn
+            served = _checking_stats(fn, self.kind) if name == "stats" else fn
             candidate = Tool.from_function(served, name=name)
             problems = _contract_problems(_contract(name), candidate)
             if problems:
@@ -519,33 +519,37 @@ def _session_banner(name: str, kg: Any) -> str:
     return "\n".join(lines)
 
 
-def checked_stats(stats: Any) -> Any:
+def checked_stats(stats: Any, kind: str | None = None) -> Any:
     """Return *stats* if it is in the fleet shape (:mod:`kg_utils.stats`).
 
     :param stats: What a KG's ``stats()`` returned.
+    :param kind: The serving KG's kind; when given, ``stats["kind"]`` must
+        equal it, since the shape's ``kind`` is the server's.
     :return: *stats*, unchanged.
     :raises ValueError: Naming every way it departs from the shape; the
         ``stats`` tool reports it as a tool error.
     """
     problems = stats_problems(stats)
+    if kind is not None and not problems and stats["kind"] != kind:
+        problems.append(f"`kind` is {stats['kind']!r}, but this server's kind is {kind!r}")
     if problems:
         raise ValueError("stats is not in the fleet shape: " + "; ".join(problems))
     return stats
 
 
-def _checking_stats(fn: Callable[..., Any]) -> Callable[..., Any]:
+def _checking_stats(fn: Callable[..., Any], kind: str) -> Callable[..., Any]:
     """Wrap a module's ``stats`` tool so its result is checked, keeping its signature."""
     if inspect.iscoroutinefunction(fn):
 
         @functools.wraps(fn)
         async def checked_async(*args: Any, **kwargs: Any) -> Any:
-            return checked_stats(await fn(*args, **kwargs))
+            return checked_stats(await fn(*args, **kwargs), kind)
 
         return checked_async
 
     @functools.wraps(fn)
     def checked(*args: Any, **kwargs: Any) -> Any:
-        return checked_stats(fn(*args, **kwargs))
+        return checked_stats(fn(*args, **kwargs), kind)
 
     return checked
 
@@ -560,7 +564,7 @@ def _register_canonical(server: KGServer, *, with_neighbors: bool) -> None:
         Reads the graph only: never loads the embedding model, so it is the
         cheap first call of a session.
         """
-        return checked_stats(kg_from(ctx).stats())
+        return checked_stats(kg_from(ctx).stats(), server.kind)
 
     @server.tool()
     def query(

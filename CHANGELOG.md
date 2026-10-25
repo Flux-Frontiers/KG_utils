@@ -44,7 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   snapshots persist the same keys whichever they are handed.
 - **The canonical `stats` MCP tool checks the shape on every call**, the
   default tool and a module's `server.canonical("stats")` replacement alike;
-  a departure is a tool error naming each problem.
+  a departure is a tool error naming each problem. That includes a `kind`
+  other than the server's own (`make_server(kind=...)`), which the shape
+  alone cannot catch: a server wrapping another module's KG must say which
+  KG it serves.
 
 ### Added
 

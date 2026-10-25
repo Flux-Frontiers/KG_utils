@@ -698,7 +698,7 @@ class _FlatStatsKG(_KG):
 
 
 def test_stats_answers_in_the_fleet_shape(built: Path) -> None:
-    out = _call(make_server(lambda: _KG(built), name="mkg", kind="code"), "stats")
+    out = _call(make_server(lambda: _KG(built), name="mkg", kind="test"), "stats")
     assert not out.isError
     assert set(out.structuredContent) >= {"kind", "nodes", "edges"}
     assert out.structuredContent["nodes"]["total"] == sum(
@@ -722,3 +722,20 @@ def test_a_modules_own_stats_is_checked_too(built: Path) -> None:
     out = _call(server, "stats")
     assert out.isError and "`nodes` must be an object" in _text(out)
     assert [t["name"] for t in manifest(server)["tools"]][0] == "stats"
+
+
+def test_stats_must_carry_the_servers_kind(built: Path) -> None:
+    out = _call(make_server(lambda: _KG(built), name="mkg", kind="doc"), "stats")
+    assert out.isError and "this server's kind is 'doc'" in _text(out)
+
+
+def test_a_modules_own_stats_must_carry_the_servers_kind(built: Path) -> None:
+    server = make_server(lambda: _KG(built), name="mkg", kind="gutenberg")
+
+    @server.canonical("stats")
+    def stats(ctx: Context) -> dict[str, Any]:
+        """The served KG's stats, under the KG it wraps."""
+        return kg_from(ctx).stats()
+
+    out = _call(server, "stats")
+    assert out.isError and "`kind` is 'test'" in _text(out)
