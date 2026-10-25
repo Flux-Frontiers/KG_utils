@@ -477,6 +477,7 @@ def make_server(
                 f"{name}: no graph at {db_path}. Build it before serving it, "
                 f"or point --repo/--db at the built one."
             )
+        print(_session_banner(name, kg), file=sys.stderr, flush=True)
         try:
             yield kg
         finally:
@@ -485,6 +486,31 @@ def make_server(
     server = KGServer(name, kind=kind, version=version, preamble=instructions, lifespan=lifespan)
     _register_canonical(server, with_neighbors=neighbors)
     return server
+
+
+#: What the session banner reports, and the KG attributes it reads them from.
+#: ``KGModule`` has ``repo_root``; doc_kg's ``DocKG`` has ``corpus_root``.
+_BANNER_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("repo", ("repo_root", "corpus_root")),
+    ("db", ("db_path",)),
+    ("vectors", ("vectors_path",)),
+    ("model", ("model_name",)),
+)
+
+
+def _session_banner(name: str, kg: Any) -> str:
+    """The resolved locations a session is serving, for the MCP host's log.
+
+    Written to stderr when the session opens the KG, because only the opened
+    KG knows its resolved paths: a banner printed earlier could only say
+    "default", which leaves an operator guessing which store answers.
+    """
+    lines = [f"{name}: serving"]
+    for label, attrs in _BANNER_FIELDS:
+        value = next((getattr(kg, a) for a in attrs if getattr(kg, a, None) is not None), None)
+        if value is not None:
+            lines.append(f"  {label:<8}: {value}")
+    return "\n".join(lines)
 
 
 def _register_canonical(server: KGServer, *, with_neighbors: bool) -> None:
@@ -685,6 +711,8 @@ def run(
             f"transport must be one of {', '.join(TRANSPORTS)}, got {transport!r}"
             + (" (HTTP+SSE is deprecated in the MCP specification)" if transport == "sse" else "")
         )
+    where = "stdio" if transport == "stdio" else f"streamable-http on {host}:{port}"
+    print(f"{server.name} MCP server starting ({where})", file=sys.stderr, flush=True)
     if transport == "stdio":
         anyio.run(_run_stdio, server)
         return

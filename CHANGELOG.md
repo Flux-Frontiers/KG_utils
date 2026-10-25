@@ -53,7 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and points file descriptor 1 at stderr, so a `print()` or a C library's
   output (sweep item 87) can no longer corrupt the session. Validation stays
   in the KG's own methods; the server reports their `ValueError` as a tool
-  error. A module whose own version of a canonical tool does more replaces
+  error. The MCP host's log gets a starting line naming the transport and,
+  when a session opens, the resolved repo, graph, vector store and model
+  it serves, on stderr; the per-module servers each printed one, and the
+  base had dropped it. A module whose own version of a canonical tool does more replaces
   it under the same name with `@server.canonical("query")`; the replacement
   must keep every canonical parameter with its type and required-ness, add
   no required parameter and return the same kind of result, or the server

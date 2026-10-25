@@ -296,6 +296,21 @@ def test_domain_tools_ride_along_and_are_described(built: Path) -> None:
     assert "kind_string" not in (server.instructions or "")
 
 
+def test_the_session_banner_reports_resolved_paths_on_stderr(
+    built: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    server = make_server(lambda: _KG(built), name="mkg", kind="test")
+    _call(server, "stats")
+    err = capsys.readouterr().err
+    assert "\\n" not in err, "real newlines, not escaped ones"
+    lines = err.splitlines()
+    assert lines[0] == "mkg: serving"
+    assert f"  repo    : {built.resolve()}" in lines
+    assert f"  db      : {built.resolve() / '.mkg' / 'graph.sqlite'}" in lines
+    assert f"  vectors : {built.resolve() / '.mkg' / 'vectors.sqlite'}" in lines
+    assert any(ln.startswith("  model   : ") for ln in lines)
+
+
 def test_name_and_version_reach_the_client(built: Path) -> None:
     server = make_server(lambda: _KG(built), name="mkg", kind="test", version="4.5.6")
 
@@ -636,7 +651,13 @@ def test_stdio_subprocess_survives_stdout_writes(tmp_path: Path) -> None:
     assert (answer, is_error) == ("stdio", False)
     assert stats["total_nodes"] == 1
     stderr = (tmp_path / "stderr.log").read_text(encoding="utf-8")
-    for line in ("python print to stdout", "sys.stdout.write", "raw fd 1 write"):
+    for line in (
+        "python print to stdout",
+        "sys.stdout.write",
+        "raw fd 1 write",
+        "skg MCP server starting (stdio)",
+        "skg: serving",
+    ):
         assert line in stderr, f"{line!r} did not reach stderr"
 
 
