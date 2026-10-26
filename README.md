@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.28.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.29.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -26,6 +26,13 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.29.0 (2026-10-25)** -- New `kg_utils.mcp`: one MCP server base for every
+  KG module (`mcp` extra), with the fleet's canonical tools (`stats`, `query`,
+  `pack`, `get_node`, `neighbors`) and the standard `<tool> mcp` command; new
+  `kg_utils.stats`: one shape for a KG's statistics, which `KGModule.stats()`
+  now returns; `KGModule.neighbors()`. **Breaking:** LanceDB support is gone
+  (sqlite-vec is the only backend), and `KGModule.stats()` no longer returns
+  the flat `total_nodes` / `node_counts` keys (`flat_stats()` gives them back).
 - **0.28.0 (2026-10-23)** -- New `kg_utils.devicepack`: the on-device
   search-pack format the Knowledge Press apps read (passage pack, vector
   sidecar, manifest, golden rankings), lifted out of gutenberg_kg's
@@ -174,7 +181,7 @@ storage (`specs`, `extractor`, `store`, `pipeline`), semantic indexing over
 pluggable vector backends (`semantic`, `vector_backend`, `embed`, `embedder`),
 document ingestion (`ingest`), a shared temporal contract for dated nodes
 (`temporal`), on-device search packs for the Knowledge Press apps
-(`devicepack`), one MCP server base for every module (`mcp`), temporal snapshots (`snapshots`), text + image
+(`devicepack`), one MCP server base for every module (`mcp`), one shape for a KG's statistics (`stats`), temporal snapshots (`snapshots`), text + image
 synthesis (`synthesis`), centrality analysis (`analysis`), and a visualization
 stack that runs from interactive HTML (`viz`) through 3-D layouts and organic
 trees grown as species (`viz3d`, `viz3d.species`) to Looking Glass light-field
@@ -575,6 +582,22 @@ def build_server(repo, db, vectors, model):
 add_mcp_command(cli, build_server)
 ```
 
+### `kg_utils.stats`
+
+The fleet's one shape for a KG's statistics. Every module's public `stats()`,
+and so every server's canonical `stats` tool, returns `{"kind", "nodes":
+{"total", "by_kind"}, "edges": {"total", "by_rel"}}` plus the module's own
+measures as top-level extras. `KGModule.stats()` already does; a store's own
+`stats()` keeps its flat `total_nodes` / `node_counts` keys, which snapshots
+persist.
+
+| Function | Description |
+|---|---|
+| `kg_stats()` | Build the shape from per-kind and per-relation counts; the totals are summed from them, so they cannot disagree |
+| `stats_from_store()` | Reshape a store's flat `stats()`, keeping its other keys as extras |
+| `flat_stats()` | The inverse: the flat keys, for a report or a snapshot |
+| `stats_problems()` | Every way a dict departs from the shape; the `stats` tool reports them as a tool error |
+
 ### `kg_utils.analysis`
 
 | Class / function | Description |
@@ -787,7 +810,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.28.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.29.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -795,7 +818,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.28.0},
+  version   = {0.29.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},
