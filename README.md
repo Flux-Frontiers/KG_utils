@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.28.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.29.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -18,7 +18,7 @@
 
 ## Overview
 
-kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through pluggable vector indexing (sqlite-vec; a deprecated LanceDB backend remains only for un-migrated stores) and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
+kgmodule-utils is the **shared SDK layer** for the Flux-Frontiers knowledge-graph ecosystem. It provides everything a domain KG module needs — from type abstractions and SQLite graph storage through vector indexing on sqlite-vec and a full build/query/pack pipeline — so domain authors implement only what is specific to their source domain.
 
 Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/pycode_kg), [TypeScriptKG](https://github.com/Flux-Frontiers/tscode_kg), and [FTreeKG](https://github.com/Flux-Frontiers/ftree_kg) subclass `KGModule` from here and implement exactly three methods: `make_extractor()`, `kind()`, and `analyze()`. The rest — [DocKG](https://github.com/Flux-Frontiers/doc_kg), MemoryKG, MetaboKG, and others — keep their own pipelines and pull in the shared pieces they need: embedders, vector backends, snapshots, synthesis.
 
@@ -26,6 +26,13 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.29.0 (2026-10-25)** -- New `kg_utils.mcp`: one MCP server base for every
+  KG module (`mcp` extra), with the fleet's canonical tools (`stats`, `query`,
+  `pack`, `get_node`, `neighbors`) and the standard `<tool> mcp` command; new
+  `kg_utils.stats`: one shape for a KG's statistics, which `KGModule.stats()`
+  now returns; `KGModule.neighbors()`. **Breaking:** LanceDB support is gone
+  (sqlite-vec is the only backend), and `KGModule.stats()` no longer returns
+  the flat `total_nodes` / `node_counts` keys (`flat_stats()` gives them back).
 - **0.28.0 (2026-10-23)** -- New `kg_utils.devicepack`: the on-device
   search-pack format the Knowledge Press apps read (passage pack, vector
   sidecar, manifest, golden rankings), lifted out of gutenberg_kg's
@@ -174,7 +181,7 @@ storage (`specs`, `extractor`, `store`, `pipeline`), semantic indexing over
 pluggable vector backends (`semantic`, `vector_backend`, `embed`, `embedder`),
 document ingestion (`ingest`), a shared temporal contract for dated nodes
 (`temporal`), on-device search packs for the Knowledge Press apps
-(`devicepack`), temporal snapshots (`snapshots`), text + image
+(`devicepack`), one MCP server base for every module (`mcp`), one shape for a KG's statistics (`stats`), temporal snapshots (`snapshots`), text + image
 synthesis (`synthesis`), centrality analysis (`analysis`), and a visualization
 stack that runs from interactive HTML (`viz`) through 3-D layouts and organic
 trees grown as species (`viz3d`, `viz3d.species`) to Looking Glass light-field
@@ -209,15 +216,13 @@ extra dependency at all.
 pip install 'kgmodule-utils[ingest]'
 ```
 
-### With deprecated LanceDB support (only for an un-migrated LanceDB store)
+### With the MCP server base
 
-**LanceDB is deprecated** — sqlite-vec is the backend for all new stores. As of
-0.10.0 `lancedb` is no longer part of `[semantic]`. Install it explicitly only
-if you have a pre-existing, un-migrated LanceDB store on disk; migrate when you
-can.
+Serves any `KGModule` to an AI agent over MCP, with the fleet's canonical tools
+and the standard `<tool> mcp` command (`kg_utils.mcp`).
 
 ```bash
-pip install 'kgmodule-utils[semantic,lancedb]'
+pip install 'kgmodule-utils[mcp]'
 ```
 
 ### With text + image synthesis (oMLX / Ollama / OpenAI / mflux-serve)
@@ -374,7 +379,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class / function | Description |
 |---|---|
-| `SemanticIndex` | Vector index over a pluggable backend (sqlite-vec default; LanceDB deprecated): `build()`, `search()`, `close()` |
+| `SemanticIndex` | Vector index over sqlite-vec (`VectorBackend` is the seam, `SqliteVecBackend` its one implementation): `build()`, `search()`, `close()` |
 | `SentenceTransformerEmbedder` | Local embedding via sentence-transformers |
 | `resolve_model_path()` | Resolve model name / alias to local cache path |
 | `suppress_ingestion_logging()` | Silence verbose HF / tqdm output during ingestion |
@@ -383,7 +388,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class | Description |
 |---|---|
-| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand. `sync()` rewrites the graph and re-embeds only the nodes whose index text changed |
+| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()`, `node()`, `neighbors()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand. `sync()` rewrites the graph and re-embeds only the nodes whose index text changed |
 
 ### `kg_utils.snapshots`
 
@@ -545,6 +550,54 @@ server. Needs NumPy for vectors (`semantic` or `viz3d` extra).
 | `read_vector_sidecar()` | Memory-map a sidecar; rejects a truncated or foreign file |
 | `encode_vector()`, `rrf_fuse()`, `fts_phrase_expression()` | The pieces the search is built from |
 
+### `kg_utils.mcp`
+
+One MCP server base for every KG module (`mcp` extra). A module passes a
+factory that opens its KG and adds its own domain tools; everything else is
+shared. Plan of record: `kgrag_priv/docs/MCP_CENTRALIZATION_PLAN.md`.
+
+| Class / function | Description |
+|---|---|
+| `make_server()` | Build a server for one KG with the canonical tools: `stats`, `query`, `pack`, `get_node`, `neighbors`. The KG opens per session and closes after; an unbuilt graph is refused, not served empty |
+| `KGServer` | The `FastMCP` subclass it returns. Add domain tools with `@server.tool()`; replace a canonical tool with a richer version under the same name with `@server.canonical("query")`, refused at build time if it drops or retypes a canonical parameter; the instructions regenerate on every change |
+| `kg_from()` | Inside a domain tool, the KG this session opened (declare `ctx: Context`) |
+| `add_mcp_command()` | The standard `<tool> mcp [--repo] [--db] [--vectors] [--model] [--transport] [--host] [--port] [--manifest]`; relative `--db`/`--vectors` are taken from `--repo` |
+| `manifest()`, `describe_tools()` | The tool list as JSON and as text, without opening the KG |
+| `run()` | Serve over `stdio` (stdout reserved for the protocol, all other output sent to stderr) or `streamable-http`; `sse` is refused |
+
+```python
+from kg_utils.mcp import Context, add_mcp_command, kg_from, make_server
+
+def build_server(repo, db, vectors, model):
+    kwargs = {"model": model} if model else {}
+    server = make_server(lambda: MyKG(repo, db, vectors, **kwargs), name="mykg", kind="my")
+
+    @server.tool()
+    def callers(node_id: str, ctx: Context) -> list[dict]:
+        """Every node that calls this one."""
+        return kg_from(ctx).callers(node_id)
+
+    return server
+
+add_mcp_command(cli, build_server)
+```
+
+### `kg_utils.stats`
+
+The fleet's one shape for a KG's statistics. Every module's public `stats()`,
+and so every server's canonical `stats` tool, returns `{"kind", "nodes":
+{"total", "by_kind"}, "edges": {"total", "by_rel"}}` plus the module's own
+measures as top-level extras. `KGModule.stats()` already does; a store's own
+`stats()` keeps its flat `total_nodes` / `node_counts` keys, which snapshots
+persist.
+
+| Function | Description |
+|---|---|
+| `kg_stats()` | Build the shape from per-kind and per-relation counts; the totals are summed from them, so they cannot disagree |
+| `stats_from_store()` | Reshape a store's flat `stats()`, keeping its other keys as extras |
+| `flat_stats()` | The inverse: the flat keys, for a report or a snapshot |
+| `stats_problems()` | Every way a dict departs from the shape; the `stats` tool reports them as a tool error |
+
 ### `kg_utils.analysis`
 
 | Class / function | Description |
@@ -572,7 +625,7 @@ KG_utils/
 │       ├── extractor.py      # KGExtractor ABC
 │       ├── store.py          # GraphStore (SQLite)
 │       ├── semantic.py       # SemanticIndex, SentenceTransformerEmbedder, SeedHit
-│       ├── vector_backend.py # VectorBackend protocol, SqliteVecBackend (default), LanceDBBackend (deprecated)
+│       ├── vector_backend.py # VectorBackend protocol, SqliteVecBackend
 │       ├── pipeline.py       # KGModule concrete base class
 │       ├── module.py         # Re-export shim
 │       ├── embed.py          # Embedder protocol, model registry
@@ -583,6 +636,10 @@ KG_utils/
 │       │   ├── converters.py # Converter protocol, PassthroughConverter, AnydocConverter
 │       │   ├── manifest.py   # IngestRecord, IngestManifest, IngestStats — per-file provenance
 │       │   └── pipeline.py   # IngestPipeline: walk, convert, stage, dedup by content digest
+│       ├── mcp/              # MCP server base for every KG module (mcp extra)
+│       │   ├── __init__.py
+│       │   ├── server.py     # make_server, KGServer, canonical tools, manifest, run
+│       │   └── cli.py        # add_mcp_command: the standard `<tool> mcp`
 │       ├── retrieval/        # Serialize + enrich KG hits (hit_to_dict, attach_content_by_sqlite)
 │       │   ├── __init__.py
 │       │   └── hits.py
@@ -707,16 +764,15 @@ git clone https://github.com/Flux-Frontiers/KG_utils.git
 cd KG_utils
 poetry env use python3.12
 poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" \
-  --extras "lancedb" --extras "viz3d-render" --extras "viz3d-qt"
+  --extras "viz3d-render" --extras "viz3d-qt" --extras "mcp"
 ```
 
 **The extras are not optional for testing.** The core install is deliberately
 zero-dependency (`dependencies = []`), so `poetry install --with dev` on its own
 installs no runtime packages at all — pytest then aborts during *collection* on
 missing `numpy` and `httpx` and runs nothing. The six extras above are what CI
-installs: the test job omits `lancedb` (the vector-backend tests no longer need
-it), but the type-check job requires it so ty can resolve the legacy backend's
-imports — and pre-commit runs ty, so install it locally.
+installs, in both the test and the type-check job, and pre-commit runs ty, so
+install them locally.
 
 Run the fast test suite (no model downloads) — **750 passed, 1 skipped** (the
 skip is a test that needs `doc_kg`, which the SDK cannot depend on):
@@ -754,7 +810,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.28.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.29.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -762,7 +818,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.28.0},
+  version   = {0.29.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

@@ -9,7 +9,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "kgmodule-utils"
-version = "0.28.0"
+version = "0.29.0"
 description = "Shared types, graph store, semantic index, and pipeline base for the KGModule SDK"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -29,9 +29,8 @@ requires-python = ">=3.12,<3.14"
 dependencies = []
 
 [project.optional-dependencies]
-# Embedding stack plus the default ("auto") backend, sqlite-vec. Deliberately
-# excludes lancedb: no fleet adapter uses LanceDBBackend directly, so bundling
-# it here was dead weight — see the `lancedb` extra for legacy stores.
+# Embedding stack plus the vector store, sqlite-vec (the only backend since
+# 0.29.0, when LanceDB support and the `lancedb` extra were removed).
 semantic = [
     "numpy>=1.24.0",
     "rich>=13.0.0,<15.0.0",
@@ -71,14 +70,9 @@ viz3d-qt = [
     "quiltwright>=0.16.0",
 ]
 # Exact pin: pre-1.0, breaking minors possible. Prebuilt wheels everywhere;
-# also bundled in `semantic` since "auto" defaults to sqlite-vec.
+# also bundled in `semantic`, since it is the vector store.
 sqlite-vec = [
     "sqlite-vec==0.1.9",
-]
-# LanceDBBackend only, for reading/migrating a legacy un-migrated LanceDB
-# store. Not part of `semantic`; opt in explicitly.
-lancedb = [
-    "lancedb>=0.19.0",
 ]
 # Document ingestion (kg_utils.ingest): pymupdf4llm converts PDF (the same
 # call doc_kg makes, so both paths agree); anydoc converts Word, PowerPoint,
@@ -109,6 +103,21 @@ synthesis-mflux = [
     "openai>=1.30.0",
     "pillow>=10.0.0",
     "mflux>=0.9.0",
+]
+
+# MCP server base (kg_utils.mcp): serves any KGModule over MCP with the
+# fleet's canonical tools (stats, query, pack, get_node, neighbors) and the
+# standard `<tool> mcp` command. Capped below 2 with the rest of the fleet
+# (kgrag_priv/docs/MCP_MIGRATION.md): mcp 2.0 renames FastMCP, and this
+# module is the one place in the fleet that rename lands. click is declared
+# rather than inherited, because add_mcp_command builds a click command.
+# Floor measured 2026-10-25 by running tests/test_mcp_server.py against each
+# release: 1.23.0 is the first whose FastMCP turns DNS-rebinding protection on
+# by itself for a loopback host, which the streamable-http path relies on, and
+# 1.21.0 and older no longer import against current pydantic.
+mcp = [
+    "click>=8.1.0",
+    "mcp>=1.23.0,<2",
 ]
 
 [project.urls]

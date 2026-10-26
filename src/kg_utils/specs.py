@@ -62,7 +62,7 @@ class BuildStats:
     :param total_edges: Total edges written to SQLite.
     :param node_counts: Node counts broken down by kind.
     :param edge_counts: Edge counts broken down by relation.
-    :param indexed_rows: Number of nodes embedded into LanceDB (``None`` if not built).
+    :param indexed_rows: Number of nodes embedded into the vector store (``None`` if not built).
     :param index_dim: Embedding dimension (``None`` if not built).
     :param embedded_rows: Vectors embedded by :meth:`KGModule.sync` (``None``
         for a full build, which embeds every row).

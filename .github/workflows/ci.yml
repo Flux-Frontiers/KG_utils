@@ -64,16 +64,15 @@ jobs:
           key: typecheck-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        # lancedb only: vector_backend.py's LanceDBBackend still imports it
-        # lazily, so ty needs it physically installed to resolve the import,
-        # even though it's no longer part of the semantic extra (see pyproject).
-        # viz3d-render for the same reason as lancedb: viz3d/organic.py imports
+        # viz3d-render: viz3d/organic.py imports
         # pyvista twice — under TYPE_CHECKING for the mesh-builder annotations,
         # and inside _pyvista() behind a try/except — so ty needs it installed to
         # resolve either, and without it tree_mesh, leaf_glyphs and smooth_paths
         # go unchecked. The plain viz3d extra stays NumPy-only, so layout-only
         # consumers are unaffected.
-        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --extras "lancedb" --extras "viz3d-render" --extras "viz3d-qt" --no-interaction
+        # mcp: kg_utils.mcp imports it at module level, so without it the
+        # whole server base goes unchecked.
+        run: poetry install --with dev --extras "semantic" --extras "synthesis" --extras "viz" --extras "viz3d-render" --extras "viz3d-qt" --extras "mcp" --no-interaction
 
       - name: Run ty
         run: poetry run ty check src/
@@ -107,13 +106,11 @@ jobs:
         # gates on at module scope. Without it that whole file skipped, so
         # limb_paths, leaf_frames and LEAF_ASPECT — the PyVista-free accessors
         # the POV-Ray consumers are built on — had no CI coverage at all and
-        # viz3d/organic.py sat at 58%. `lancedb` is deliberately absent: the
-        # vector-backend tests no longer require it (see that file's docstring),
-        # and adding it back would only re-cover the legacy LanceDB store.
+        # viz3d/organic.py sat at 58%.
         run: >-
           poetry install --with dev
           --extras "semantic" --extras "synthesis" --extras "viz"
-          --extras "viz3d-render" --extras "viz3d-qt"
+          --extras "viz3d-render" --extras "viz3d-qt" --extras "mcp"
           --no-interaction
 
       - name: Run tests

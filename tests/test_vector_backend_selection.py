@@ -1,117 +1,100 @@
-"""Tests for kg_utils.vector_backend.resolve_backend_name / make_backend.
+"""What vector backend a KGModule gets, now that there is one.
 
-These are pure path-based selection helpers — no sqlite-vec or lancedb
-import is required to exercise them (constructing a backend object is cheap;
-only *opening* it touches the optional dependency), so this module carries
-no ``importorskip`` guard.
+0.29.0 removed LanceDB: ``LanceDBBackend``, ``resolve_backend_name()``,
+``make_backend()`` and the ``lancedb`` extra. These tests pin what replaced
+the selection logic, and what was kept on purpose because consumers use it:
+the ``vector_backend`` constructor argument (pycode_kg, tscode_kg, swift_kg
+and ftree_kg pass ``"sqlite-vec"``) and the ``vector_backend`` key in
+``stats()`` (pycode_kg and connectome_kg display it).
+
+Nothing here loads a model or opens a store.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from pathlib import Path
+
 import pytest
 
-from kg_utils.vector_backend import (
-    LanceDBBackend,
-    SqliteVecBackend,
-    make_backend,
-    resolve_backend_name,
-)
-
-# ---------------------------------------------------------------------------
-# resolve_backend_name
-# ---------------------------------------------------------------------------
+import kg_utils.vector_backend as vb
+from kg_utils.extractor import KGExtractor
+from kg_utils.pipeline import KGModule
+from kg_utils.specs import EdgeSpec, NodeSpec
+from kg_utils.vector_backend import SqliteVecBackend
 
 
-def test_auto_resolves_sqlite_vec_when_neither_store_exists(tmp_path):
-    resolved = resolve_backend_name(
-        "auto",
-        lancedb_dir=tmp_path / "lancedb",
-        sqlite_path=tmp_path / "vectors.sqlite",
-    )
-    assert resolved == "sqlite-vec"
+class _Extractor(KGExtractor):
+    def node_kinds(self) -> list[str]:
+        return ["function"]
+
+    def edge_kinds(self) -> list[str]:
+        return []
+
+    def meaningful_node_kinds(self) -> list[str]:
+        return ["function"]
+
+    def extract(self) -> Iterator[NodeSpec | EdgeSpec]:
+        yield NodeSpec(node_id="f", kind="function", name="f", qualname="f", source_path="m.py")
 
 
-def test_auto_resolves_sqlite_vec_when_sidecar_exists(tmp_path):
-    (tmp_path / "vectors.sqlite").write_bytes(b"")
-    resolved = resolve_backend_name(
-        "auto",
-        lancedb_dir=tmp_path / "lancedb",
-        sqlite_path=tmp_path / "vectors.sqlite",
-    )
-    assert resolved == "sqlite-vec"
+class _KG(KGModule):
+    _default_dir = ".vbkg"
+
+    def make_extractor(self) -> KGExtractor:
+        return _Extractor(self.repo_root)
+
+    def kind(self) -> str:
+        return "test"
+
+    def analyze(self) -> str:
+        return "# test"
 
 
-def test_auto_resolves_lancedb_when_unmigrated_store_exists(tmp_path):
-    lancedb_dir = tmp_path / "lancedb"
-    lancedb_dir.mkdir()
-    (lancedb_dir / "table.lance").write_bytes(b"")
-    resolved = resolve_backend_name(
-        "auto",
-        lancedb_dir=lancedb_dir,
-        sqlite_path=tmp_path / "vectors.sqlite",
-    )
-    assert resolved == "lancedb"
+@pytest.mark.parametrize("name", ["auto", "sqlite-vec"])
+def test_both_spellings_mean_sqlite_vec(tmp_path: Path, name: str) -> None:
+    kg = _KG(tmp_path, vector_backend=name)
+    kg.build_graph(wipe=True)
+    try:
+        assert kg.stats()["vector_backend"] == "sqlite-vec"
+    finally:
+        kg.close()
 
 
-def test_auto_resolves_sqlite_vec_when_lancedb_dir_empty(tmp_path):
-    lancedb_dir = tmp_path / "lancedb"
-    lancedb_dir.mkdir()
-    resolved = resolve_backend_name(
-        "auto",
-        lancedb_dir=lancedb_dir,
-        sqlite_path=tmp_path / "vectors.sqlite",
-    )
-    assert resolved == "sqlite-vec"
+def test_lancedb_is_refused_naming_the_removal(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match=r"removed in kgmodule-utils 0\.29\.0"):
+        _KG(tmp_path, vector_backend="lancedb")
 
 
-@pytest.mark.parametrize("explicit", ["lancedb", "sqlite-vec"])
-def test_explicit_names_pass_through(tmp_path, explicit):
-    resolved = resolve_backend_name(
-        explicit,
-        lancedb_dir=tmp_path / "lancedb",
-        sqlite_path=tmp_path / "vectors.sqlite",
-    )
-    assert resolved == explicit
+def test_an_unknown_backend_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="'auto' or 'sqlite-vec'"):
+        _KG(tmp_path, vector_backend="faiss")
 
 
-# ---------------------------------------------------------------------------
-# make_backend
-# ---------------------------------------------------------------------------
+def test_a_stray_lancedb_dir_no_longer_changes_the_backend(tmp_path: Path) -> None:
+    """Before 0.29.0, "auto" switched to LanceDB when this directory held anything."""
+    (tmp_path / ".vbkg" / "lancedb" / "kg_nodes.lance").mkdir(parents=True)
+    kg = _KG(tmp_path)
+    kg.build_graph(wipe=True)
+    try:
+        assert kg.stats()["vector_backend"] == "sqlite-vec"
+    finally:
+        kg.close()
 
 
-def test_make_backend_sqlite_vec(tmp_path):
-    backend = make_backend(
-        "sqlite-vec",
-        lancedb_dir=tmp_path / "lancedb",
-        sqlite_path=tmp_path / "vectors.sqlite",
-        table="t",
-        dim=8,
-        meta_columns=("kind", "name"),
-    )
+def test_the_backend_built_is_sqlite_vec(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    kg = _KG(tmp_path)
+
+    class _Dim:
+        dim = 8
+
+    monkeypatch.setattr(type(kg), "embedder", property(lambda _self: _Dim()))
+    backend = kg._make_vector_backend()
     assert isinstance(backend, SqliteVecBackend)
-    assert backend.dim == 8
 
 
-def test_make_backend_lancedb(tmp_path):
-    backend = make_backend(
-        "lancedb",
-        lancedb_dir=tmp_path / "lancedb",
-        sqlite_path=tmp_path / "vectors.sqlite",
-        table="t",
-        dim=8,
-        meta_columns=("kind", "name"),
-    )
-    assert isinstance(backend, LanceDBBackend)
-    assert backend.table_name == "t"
-
-
-def test_make_backend_rejects_unknown_name(tmp_path):
-    with pytest.raises(ValueError, match="Unknown vector backend"):
-        make_backend(
-            "faiss",
-            lancedb_dir=tmp_path / "lancedb",
-            sqlite_path=tmp_path / "vectors.sqlite",
-            table="t",
-            dim=8,
-            meta_columns=("kind",),
-        )
+@pytest.mark.parametrize(
+    "name", ["LanceDBBackend", "resolve_backend_name", "make_backend", "_pq_subvectors"]
+)
+def test_removed_names_are_gone(name: str) -> None:
+    assert not hasattr(vb, name)
