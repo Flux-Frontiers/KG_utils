@@ -379,7 +379,9 @@ class GraphStore:
         is scoped to definitions whose qualname is ``f"{receiver_class}.{name}"``
         instead of the bare trailing-name match against every definition in the
         graph. A typed stub that matches nothing does not fall back to the
-        untyped guess; it simply stays unresolved.  Idempotent — duplicate
+        untyped guess; it simply stays unresolved.  A stub whose ``metadata``
+        sets ``scope_local`` (a per-scope variable or attribute node, not a
+        reference to a definition) is never resolved.  Idempotent — duplicate
         edges are silently ignored.
 
         :return: Number of new RESOLVES_TO edges written.
@@ -417,6 +419,9 @@ class GraphStore:
         for sym_id, sym_name, sym_qualname, sym_metadata_raw in sym_rows:
             if not sym_name:
                 continue
+            sym_metadata = _load_metadata(sym_metadata_raw)
+            if sym_metadata.get("scope_local"):
+                continue
 
             candidates: list[str] = []
             mode = "name_fallback"
@@ -431,7 +436,7 @@ class GraphStore:
 
             receiver_class = None
             if not candidates:
-                receiver_class = _load_metadata(sym_metadata_raw).get("receiver_class")
+                receiver_class = sym_metadata.get("receiver_class")
                 if receiver_class:
                     typed = qualname_to_defs.get(f"{receiver_class}.{sym_name}", [])
                     if typed:

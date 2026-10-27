@@ -324,6 +324,29 @@ def test_resolve_symbols_receiver_typed_no_match_stays_unresolved(
     assert count == 0
 
 
+def test_resolve_symbols_skips_scope_local_stubs(store: GraphStore) -> None:
+    # A per-scope variable node named like a definition is not a reference to
+    # it; only the unflagged stub may resolve.
+    store.write(
+        [
+            _node("fn:a.py:context", "function", "context", qualname="context"),
+            _node(
+                "sym:b.py:Role.install.context",
+                "symbol",
+                "context",
+                qualname="b.py.Role.install.context",
+                metadata={"scope_local": True},
+            ),
+            _node("sym:context", "symbol", "context", qualname="context"),
+        ],
+        [],
+    )
+    assert store.resolve_symbols() == 1
+    ids = {"fn:a.py:context", "sym:b.py:Role.install.context", "sym:context"}
+    resolved = [e for e in store.edges_within(ids) if e["rel"] == "RESOLVES_TO"]
+    assert [e["src"] for e in resolved] == ["sym:context"]
+
+
 # ---------------------------------------------------------------------------
 # callers_of and edges_from
 # ---------------------------------------------------------------------------
