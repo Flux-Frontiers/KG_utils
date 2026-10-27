@@ -65,7 +65,10 @@ DEFAULT_RELS: tuple[str, ...] = ("CONTAINS", "CALLS", "IMPORTS", "INHERITS")
 
 
 def _module_to_dotted_variants(module_path: str | None) -> tuple[str, ...]:
-    """Convert a module path to dotted notation, including common src-layout aliases.
+    """Convert a module path to dotted notation, including common layout aliases.
+
+    A ``src/`` or ``lib/`` root is also dropped, and a package's
+    ``__init__`` module is also named by its package.
 
     :param module_path: Path like ``src/pkg/mod.py``.
     :return: Tuple of dotted variants, e.g. ``("src.pkg.mod", "pkg.mod")``.
@@ -76,8 +79,9 @@ def _module_to_dotted_variants(module_path: str | None) -> tuple[str, ...]:
         module_path = module_path[:-3]
     dotted = module_path.replace("/", ".")
     variants = [dotted]
-    if dotted.startswith("src."):
+    if dotted.startswith(("src.", "lib.")):
         variants.append(dotted[4:])
+    variants += [v.removesuffix(".__init__") for v in variants if v.endswith(".__init__")]
     return tuple(dict.fromkeys(v for v in variants if v))
 
 
@@ -379,8 +383,12 @@ class GraphStore:
         is scoped to definitions whose qualname is ``f"{receiver_class}.{name}"``
         instead of the bare trailing-name match against every definition in the
         graph. A typed stub that matches nothing does not fall back to the
-        untyped guess; it simply stays unresolved.  Idempotent — duplicate
-        edges are silently ignored.
+        untyped guess; it simply stays unresolved.  The same holds for an
+        untyped stub whose bare name matches more than one definition: it
+        stays unresolved rather than linking to every candidate.  A stub whose
+        ``metadata`` sets ``scope_local`` (a per-scope variable or attribute
+        node, not a reference to a definition) is never resolved.
+        Idempotent — duplicate edges are silently ignored.
 
         :return: Number of new RESOLVES_TO edges written.
         """
@@ -417,6 +425,9 @@ class GraphStore:
         for sym_id, sym_name, sym_qualname, sym_metadata_raw in sym_rows:
             if not sym_name:
                 continue
+            sym_metadata = _load_metadata(sym_metadata_raw)
+            if sym_metadata.get("scope_local"):
+                continue
 
             candidates: list[str] = []
             mode = "name_fallback"
@@ -431,7 +442,7 @@ class GraphStore:
 
             receiver_class = None
             if not candidates:
-                receiver_class = _load_metadata(sym_metadata_raw).get("receiver_class")
+                receiver_class = sym_metadata.get("receiver_class")
                 if receiver_class:
                     typed = qualname_to_defs.get(f"{receiver_class}.{sym_name}", [])
                     if typed:
@@ -440,10 +451,9 @@ class GraphStore:
                         confidence = "high"
 
             if not candidates and not receiver_class:
-                candidates = name_to_defs.get(sym_name, [])
-                if len(candidates) > 1:
-                    mode = "name_fallback_ambiguous"
-                    confidence = "low"
+                named = name_to_defs.get(sym_name, [])
+                if len(named) == 1:
+                    candidates = named
 
             for def_id in candidates:
                 evidence: dict[str, Any] = {
@@ -451,8 +461,6 @@ class GraphStore:
                     "confidence": confidence,
                     "symbol": sym_id,
                 }
-                if mode == "name_fallback_ambiguous":
-                    evidence["candidate_count"] = len(candidates)
                 edges.append(
                     (
                         sym_id,

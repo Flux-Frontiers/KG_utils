@@ -51,6 +51,19 @@ def test_dotted_no_src_prefix() -> None:
     assert _module_to_dotted_variants("pkg/mod.py") == ("pkg.mod",)
 
 
+def test_dotted_lib_prefix() -> None:
+    assert _module_to_dotted_variants("lib/pkg/mod.py") == ("lib.pkg.mod", "pkg.mod")
+
+
+def test_dotted_package_init_names_the_package() -> None:
+    assert _module_to_dotted_variants("src/pkg/__init__.py") == (
+        "src.pkg.__init__",
+        "pkg.__init__",
+        "src.pkg",
+        "pkg",
+    )
+
+
 def test_dotted_none() -> None:
     assert _module_to_dotted_variants(None) == ()
 
@@ -266,6 +279,47 @@ def test_resolve_symbols_exact_qualname(store: GraphStore) -> None:
     assert "RESOLVES_TO" in rels
 
 
+def test_resolve_symbols_exact_qualname_lib_layout(store: GraphStore) -> None:
+    # ``from pkg.text import fmt`` on a lib/ layout, with a same-named method
+    # elsewhere: the import names exactly one definition.
+    store.write(
+        [
+            _node(
+                "fn:lib/pkg/text.py:fmt",
+                "function",
+                "fmt",
+                qualname="fmt",
+                source_path="lib/pkg/text.py",
+            ),
+            _node(
+                "m:lib/pkg/b.py:B.fmt",
+                "method",
+                "fmt",
+                qualname="B.fmt",
+                source_path="lib/pkg/b.py",
+            ),
+            _node("sym:pkg.text.fmt", "symbol", "fmt", qualname="pkg.text.fmt"),
+        ],
+        [],
+    )
+    assert store.resolve_symbols() == 1
+    edges = store.edges_within({"fn:lib/pkg/text.py:fmt", "sym:pkg.text.fmt"})
+    assert [e["dst"] for e in edges if e["rel"] == "RESOLVES_TO"] == ["fn:lib/pkg/text.py:fmt"]
+
+
+def test_resolve_symbols_ambiguous_name_stays_unresolved(store: GraphStore) -> None:
+    # Two definitions share the name and nothing narrows the stub: no guess.
+    store.write(
+        [
+            _node("m:a.py:A.close", "method", "close", qualname="A.close"),
+            _node("m:b.py:B.close", "method", "close", qualname="B.close"),
+            _node("sym:conn.close", "symbol", "close", qualname="conn.close"),
+        ],
+        [],
+    )
+    assert store.resolve_symbols() == 0
+
+
 def test_resolve_symbols_idempotent(store: GraphStore) -> None:
     store.write(
         [_node("f:a", "function", "foo"), _node("sym:foo", "symbol", "foo")],
@@ -322,6 +376,29 @@ def test_resolve_symbols_receiver_typed_no_match_stays_unresolved(
     )
     count = store.resolve_symbols()
     assert count == 0
+
+
+def test_resolve_symbols_skips_scope_local_stubs(store: GraphStore) -> None:
+    # A per-scope variable node named like a definition is not a reference to
+    # it; only the unflagged stub may resolve.
+    store.write(
+        [
+            _node("fn:a.py:context", "function", "context", qualname="context"),
+            _node(
+                "sym:b.py:Role.install.context",
+                "symbol",
+                "context",
+                qualname="b.py.Role.install.context",
+                metadata={"scope_local": True},
+            ),
+            _node("sym:context", "symbol", "context", qualname="context"),
+        ],
+        [],
+    )
+    assert store.resolve_symbols() == 1
+    ids = {"fn:a.py:context", "sym:b.py:Role.install.context", "sym:context"}
+    resolved = [e for e in store.edges_within(ids) if e["rel"] == "RESOLVES_TO"]
+    assert [e["src"] for e in resolved] == ["sym:context"]
 
 
 # ---------------------------------------------------------------------------
