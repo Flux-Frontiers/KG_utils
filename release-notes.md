@@ -1,24 +1,18 @@
-# Release Notes -- v0.29.1
+# Release Notes -- v0.29.2
 
-> Released: 2026-10-27
+> Released: 2026-11-02
 
-### Fixed
+### Security
 
-- **Symbol-resolution fan-out.** `GraphStore.resolve_symbols()` no longer
-  links a stub to every definition that shares its bare name. A stub whose
-  name matches more than one definition, with nothing to narrow it, stays
-  unresolved, and a stub whose metadata sets `scope_local` (a per-scope
-  variable or attribute node) is never resolved. On ansible (7,920 `.py`
-  files) these two cases made 7.9M of the graph's 8.5M edges, an 18 GB
-  store, and a build that had not finished after 35 minutes; it now
-  builds in 198 s to 944 MB with 6,897 `RESOLVES_TO` edges, each to a
-  single definition. `name_fallback_ambiguous` edges and their
-  `candidate_count` are no longer written.
-- **Exact-qualname matching on `lib/` layouts and packages.** Dotted module
-  variants now also drop a leading `lib/` (as they already dropped `src/`)
-  and name a package's `__init__` module by its package, so
-  `from pkg.text import fmt` on a `lib/pkg/` layout resolves exactly
-  instead of by name.
+- **Pillow 13.0.0 is the floor** in the `synthesis` and `synthesis-mflux`
+  extras. `pillow>=10.0.0` let a fresh install resolve Pillow 12.3.0, which
+  carries 41 advisories fixed in 13.0.0, some of them critical.
+- **`viz3d-qt` floors quiltwright at 0.17.0**, the first quiltwright release
+  that floors Pillow at 13.0.0, so the extra cannot pull the 12.x line in
+  through it.
+- **Lock refresh** (#47): Pillow 13.0.0, certifi 2026.10.23, filelock 4.2.7,
+  setuptools 84.2.1 and virtualenv 21.15.2, clearing the 56 open Dependabot
+  alerts.
 
 ---
 
