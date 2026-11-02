@@ -66,8 +66,8 @@ viz3d-qt = [
     "PyQt5>=5.15.0",
     # For quiltwright.quilt.resolve_view_cone: the view-cone cap as one shared
     # function rather than a copy of 35.0 per caller.  That landed in 0.14.0;
-    # the floor tracks the latest release (0.16.0), per the fleet pin rule.
-    "quiltwright>=0.16.0",
+    # the floor is 0.17.0, the first release that floors Pillow at 13.0.0.
+    "quiltwright>=0.17.0",
 ]
 # Exact pin: pre-1.0, breaking minors possible. Prebuilt wheels everywhere;
 # also bundled in `semantic`, since it is the vector store.
@@ -96,12 +96,12 @@ pdf = [
 synthesis = [
     "httpx>=0.27.0",
     "openai>=1.30.0",
-    "pillow>=10.0.0",
+    "pillow>=13.0.0",
 ]
 synthesis-mflux = [
     "httpx>=0.27.0",
     "openai>=1.30.0",
-    "pillow>=10.0.0",
+    "pillow>=13.0.0",
     "mflux>=0.9.0",
 ]
 
