@@ -14,6 +14,7 @@ class TextBackend(str, Enum):
     OMLX = "omlx"  # local oMLX / vLLM — OpenAI wire protocol with MLX thinking suppression
     OLLAMA = "ollama"  # local Ollama       — OpenAI wire protocol, no api_key required
     OPENAI = "openai"  # OpenAI cloud API   — requires OPENAI_API_KEY / SYNTH_API_KEY
+    ANTHROPIC = "anthropic"  # Claude API — anthropic SDK; ANTHROPIC_API_KEY or an `ant` profile
 
 
 class ImageBackend(str, Enum):
@@ -37,6 +38,11 @@ _TEXT_DEFAULTS: dict[TextBackend, dict[str, str]] = {
     TextBackend.OPENAI: {
         "endpoint": "https://api.openai.com/v1",
         "model": "gpt-4o-mini",
+    },
+    # The SDK's own endpoint is used when none is set.
+    TextBackend.ANTHROPIC: {
+        "endpoint": "",
+        "model": "claude-opus-5-5",
     },
 }
 
@@ -130,6 +136,9 @@ def text_config_from_env() -> TextConfig:
         or os.environ.get("OPENAI_API_KEY")
         or ""
     )
+    if backend == TextBackend.ANTHROPIC:
+        # An OpenAI key is never a Claude key; empty lets the SDK resolve one.
+        api_key = os.environ.get("ANTHROPIC_API_KEY") or ""
     model = os.environ.get("SYNTH_MODEL") or os.environ.get("VLLM_MODEL") or ""
     return TextConfig(backend=backend, endpoint=endpoint, api_key=api_key, model=model)
 

@@ -1,11 +1,33 @@
 # © 2026 Eric G. Suchanek, PhD — Flux-Frontiers · SPDX-License-Identifier: Elastic-2.0
-"""TextSynthesizer — unified LLM completion across oMLX, Ollama, and OpenAI backends."""
+"""TextSynthesizer — unified LLM completion across oMLX, Ollama, OpenAI and Anthropic backends."""
 
 from __future__ import annotations
 
+import logging
 import re
 
 from kg_utils.synthesis._config import TextBackend, TextConfig
+
+_log = logging.getLogger(__name__)
+
+# OpenAI model ids that the chat-completions route cannot serve: audio, image,
+# realtime and moderation models, embeddings, and the models served only by
+# v1/responses (the -pro and codex ones). Search models answer from the web,
+# not from the passages they are given.
+_OPENAI_NON_CHAT = (
+    "audio",
+    "codex",
+    "embedding",
+    "image",
+    "live",
+    "moderation",
+    "-pro",
+    "realtime",
+    "search",
+    "transcribe",
+    "tts",
+    "whisper",
+)
 
 # ---------------------------------------------------------------------------
 # System prompts
@@ -47,6 +69,8 @@ class TextSynthesizer:
 
     def __init__(self, config: TextConfig) -> None:
         self._cfg = config
+        # OpenAI models that refused a temperature; later calls leave it out.
+        self._fixed_temperature: set[str] = set()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -76,22 +100,48 @@ class TextSynthesizer:
         max_tokens: int | None = None,
         temperature: float = 0.7,
     ) -> str | None:
+        mdl = model or self._cfg.resolved_model()
+        if self._cfg.backend == TextBackend.ANTHROPIC:
+            from kg_utils.synthesis import _anthropic
+
+            raw = _anthropic.complete(
+                self._cfg, messages, model=mdl, max_tokens=max_tokens or self._cfg.max_tokens
+            )
+            return self._strip_thinking(raw) if raw else None
         try:
             client = self._client()
-            mdl = model or self._cfg.resolved_model()
             extra = self._extra_body()
+            openai = self._cfg.backend == TextBackend.OPENAI
+            # OpenAI's reasoning models (gpt-5 and later, o-series) reject
+            # max_tokens; max_completion_tokens is accepted by every OpenAI
+            # chat model. Local servers keep the older name.
+            budget = "max_completion_tokens" if openai else "max_tokens"
             kwargs: dict = {
                 "model": mdl,
                 "messages": messages,
-                "max_tokens": max_tokens or self._cfg.max_tokens,
-                "temperature": temperature,
+                budget: max_tokens or self._cfg.max_tokens,
             }
+            if not (openai and mdl in self._fixed_temperature):
+                kwargs["temperature"] = temperature
             if extra:
                 kwargs["extra_body"] = extra
-            resp = client.chat.completions.create(**kwargs)
+            try:
+                resp = client.chat.completions.create(**kwargs)
+            except Exception as exc:
+                # Reasoning models allow only their default temperature, and
+                # which models those are changes with every release, so the
+                # refusal is the test rather than a list of names.
+                if not (openai and "temperature" in kwargs and "temperature" in str(exc)):
+                    raise
+                self._fixed_temperature.add(mdl)
+                del kwargs["temperature"]
+                resp = client.chat.completions.create(**kwargs)
             raw = (resp.choices[0].message.content or "").strip()
             return self._strip_thinking(raw) or None
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            _log.warning(
+                "text synthesis failed (%s, model %s): %s", self._cfg.backend.value, mdl, exc
+            )
             return None
 
     # ------------------------------------------------------------------
@@ -126,13 +176,29 @@ class TextSynthesizer:
     def list_models(self) -> list[str]:
         """Return the model IDs available at the configured endpoint.
 
+        On OpenAI the account lists every model it can use, most of which are
+        not chat models; only the ones chat completions can answer with are
+        returned.
+
         :returns: List of model ID strings; empty list on failure or if the
                   endpoint does not support the ``/v1/models`` route.
         """
+        if self._cfg.backend == TextBackend.ANTHROPIC:
+            from kg_utils.synthesis import _anthropic
+
+            return _anthropic.list_models(self._cfg)
         try:
-            return [m.id for m in self._client().models.list().data if m.id]
+            ids = [m.id for m in self._client().models.list().data if m.id]
         except Exception:  # noqa: BLE001
             return []
+        if self._cfg.backend != TextBackend.OPENAI:
+            return ids
+        return [
+            i
+            for i in ids
+            if i.startswith(("gpt-", "o1", "o3", "o4", "chat"))
+            and not any(part in i for part in _OPENAI_NON_CHAT)
+        ]
 
     def synthesize_rag(
         self,

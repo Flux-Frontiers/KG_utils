@@ -65,6 +65,10 @@ def text_synth_for_backend(backend: str, fallback: TextSynthesizer) -> TextSynth
         api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("SYNTH_API_KEY") or ""
         return TextSynthesizer(TextConfig(backend=selected, api_key=api_key))
 
+    if selected == TextBackend.ANTHROPIC:
+        api_key = os.environ.get("ANTHROPIC_API_KEY") or ""
+        return TextSynthesizer(TextConfig(backend=selected, api_key=api_key))
+
     return fallback
 
 
