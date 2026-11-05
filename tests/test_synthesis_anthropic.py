@@ -146,3 +146,13 @@ def test_env_config_never_hands_claude_an_openai_key(monkeypatch: pytest.MonkeyP
     cfg = text_config_from_env()
     assert cfg.backend == TextBackend.ANTHROPIC
     assert cfg.api_key == ""
+
+
+def test_missing_credentials_return_none(caplog: pytest.LogCaptureFixture) -> None:
+    with patch("anthropic.Anthropic") as cls:
+        cls.return_value.beta.messages.create.side_effect = TypeError(
+            "Could not resolve authentication method"
+        )
+        with caplog.at_level("WARNING"):
+            assert _synth().complete(MESSAGES) is None
+    assert "authentication" in caplog.text

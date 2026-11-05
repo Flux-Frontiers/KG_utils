@@ -81,7 +81,7 @@ def complete(cfg: TextConfig, messages: list[dict], *, model: str, max_tokens: i
                 raise
             del kwargs["output_config"]
             response = client.beta.messages.create(**kwargs)
-    except anthropic.APIError as exc:
+    except Exception as exc:  # noqa: BLE001 -- an API error, or no credentials (TypeError)
         _log.warning("text synthesis failed (anthropic, model %s): %s", model, exc)
         return None
     if response.stop_reason == "refusal":
