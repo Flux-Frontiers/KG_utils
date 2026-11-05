@@ -527,3 +527,101 @@ def test_list_models_returns_empty_on_exception() -> None:
         synth = _make_synth()
         models = synth.list_models()
     assert models == []
+
+
+# ---------------------------------------------------------------------------
+# OpenAI: newer models' parameters, and the model list
+# ---------------------------------------------------------------------------
+
+
+def _bad_request(message: str) -> Exception:
+    return ValueError(f"Error code: 400 - {{'error': {{'message': \"{message}\"}}}}")
+
+
+def test_complete_openai_sends_max_completion_tokens() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("ok")
+        synth = _make_synth(TextBackend.OPENAI, api_key="k")
+        synth.complete([{"role": "user", "content": "q"}], max_tokens=64)
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert call_kwargs["max_completion_tokens"] == 64
+    assert "max_tokens" not in call_kwargs
+
+
+def test_complete_local_backend_keeps_max_tokens() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("ok")
+        synth = _make_synth(TextBackend.OLLAMA)
+        synth.complete([{"role": "user", "content": "q"}], max_tokens=64)
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+    assert call_kwargs["max_tokens"] == 64
+    assert "max_completion_tokens" not in call_kwargs
+
+
+def test_complete_openai_retries_without_a_refused_temperature() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        create = mock_cls.return_value.chat.completions.create
+        create.side_effect = [
+            _bad_request("Unsupported value: 'temperature' does not support 0.7 with this model."),
+            _completion("answer"),
+            _completion("again"),
+        ]
+        synth = _make_synth(TextBackend.OPENAI, api_key="k")
+        first = synth.complete([{"role": "user", "content": "q"}], model="gpt-5")
+        second = synth.complete([{"role": "user", "content": "q"}], model="gpt-5")
+    assert (first, second) == ("answer", "again")
+    assert "temperature" in create.call_args_list[0][1]
+    # The retry and every later call for that model leave it out.
+    assert "temperature" not in create.call_args_list[1][1]
+    assert "temperature" not in create.call_args_list[2][1]
+    assert create.call_count == 3
+
+
+def test_complete_openai_other_errors_are_not_retried() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        create = mock_cls.return_value.chat.completions.create
+        create.side_effect = _bad_request("This is not a chat model.")
+        synth = _make_synth(TextBackend.OPENAI, api_key="k")
+        assert synth.complete([{"role": "user", "content": "q"}], model="tts-1") is None
+    assert create.call_count == 1
+
+
+def test_complete_failure_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_cls.return_value.chat.completions.create.side_effect = ConnectionError("unreachable")
+        synth = _make_synth()
+        with caplog.at_level("WARNING", logger="kg_utils.synthesis._text"):
+            assert synth.complete([{"role": "user", "content": "q"}]) is None
+    assert "unreachable" in caplog.text
+
+
+def test_list_models_openai_keeps_only_chat_models() -> None:
+    ids = [
+        "gpt-4o",
+        "gpt-5-mini",
+        "gpt-6-sol",
+        "o3",
+        "chat-latest",
+        "gpt-5-pro",
+        "gpt-5.3-codex",
+        "gpt-5-search-api",
+        "gpt-4o-mini-tts",
+        "gpt-4o-transcribe",
+        "gpt-realtime",
+        "gpt-audio",
+        "gpt-image-2",
+        "chatgpt-image-latest",
+        "gpt-live-1",
+        "omni-moderation-latest",
+        "text-embedding-3-small",
+        "whisper-1",
+        "tts-1",
+        "dall-e-3",
+    ]
+    with patch("openai.OpenAI") as mock_cls:
+        mock_cls.return_value.models.list.return_value.data = [_mock_model(i) for i in ids]
+        synth = _make_synth(TextBackend.OPENAI, api_key="k")
+        models = synth.list_models()
+    assert models == ["gpt-4o", "gpt-5-mini", "gpt-6-sol", "o3", "chat-latest"]
