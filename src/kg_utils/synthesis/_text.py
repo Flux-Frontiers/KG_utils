@@ -1,5 +1,5 @@
 # © 2026 Eric G. Suchanek, PhD — Flux-Frontiers · SPDX-License-Identifier: Elastic-2.0
-"""TextSynthesizer — unified LLM completion across oMLX, Ollama, and OpenAI backends."""
+"""TextSynthesizer — unified LLM completion across oMLX, Ollama, OpenAI and Anthropic backends."""
 
 from __future__ import annotations
 
@@ -101,6 +101,13 @@ class TextSynthesizer:
         temperature: float = 0.7,
     ) -> str | None:
         mdl = model or self._cfg.resolved_model()
+        if self._cfg.backend == TextBackend.ANTHROPIC:
+            from kg_utils.synthesis import _anthropic
+
+            raw = _anthropic.complete(
+                self._cfg, messages, model=mdl, max_tokens=max_tokens or self._cfg.max_tokens
+            )
+            return self._strip_thinking(raw) if raw else None
         try:
             client = self._client()
             extra = self._extra_body()
@@ -176,6 +183,10 @@ class TextSynthesizer:
         :returns: List of model ID strings; empty list on failure or if the
                   endpoint does not support the ``/v1/models`` route.
         """
+        if self._cfg.backend == TextBackend.ANTHROPIC:
+            from kg_utils.synthesis import _anthropic
+
+            return _anthropic.list_models(self._cfg)
         try:
             ids = [m.id for m in self._client().models.list().data if m.id]
         except Exception:  # noqa: BLE001
