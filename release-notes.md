@@ -1,18 +1,30 @@
-# Release Notes -- v0.29.2
+# Release Notes — v0.30.0
 
-> Released: 2026-11-02
+> Released: 2026-11-05
 
-### Security
+### Added
 
-- **Pillow 13.0.0 is the floor** in the `synthesis` and `synthesis-mflux`
-  extras. `pillow>=10.0.0` let a fresh install resolve Pillow 12.3.0, which
-  carries 41 advisories fixed in 13.0.0, some of them critical.
-- **`viz3d-qt` floors quiltwright at 0.17.0**, the first quiltwright release
-  that floors Pillow at 13.0.0, so the extra cannot pull the 12.x line in
-  through it.
-- **Lock refresh** (#47): Pillow 13.0.0, certifi 2026.10.23, filelock 4.2.7,
-  setuptools 84.2.1 and virtualenv 21.15.2, clearing the 56 open Dependabot
-  alerts.
+- **An Anthropic text backend.** `TextBackend.ANTHROPIC` (`SYNTH_BACKEND=anthropic`,
+  or `backend="anthropic"` per request) calls Claude through the `anthropic` SDK,
+  now a dependency of the `synthesis` extras. System messages become the
+  `system` parameter; no temperature is sent; effort is `low`, with a retry
+  without it for models that refuse it; `max_tokens` is raised to at least
+  4096 to leave room for thinking; the current models get the server-side
+  refusal fallback. The default model is `claude-opus-5-5`, and the key is
+  `ANTHROPIC_API_KEY` (an OpenAI key is never passed to it).
+
+### Fixed
+
+- **OpenAI gpt-5 and later answer again.** The OpenAI backend sent
+  `max_tokens` and `temperature=0.7`; gpt-5, gpt-5.x, gpt-6, o3 and
+  `chat-latest` reject one or both with a 400, and the error was swallowed,
+  so only the GPT-4 family answered. It now sends `max_completion_tokens`,
+  and retries without the temperature when a model refuses it, remembering
+  that model. A failed completion is logged as a warning.
+- **The OpenAI model list holds only chat models.** `list_models` on OpenAI
+  drops audio, image, realtime, transcription, tts, embedding, moderation,
+  search, codex and `-pro` models, none of which answer through chat
+  completions.
 
 ---
 

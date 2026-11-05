@@ -1,7 +1,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
-[![Version](https://img.shields.io/badge/version-0.29.2-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
+[![Version](https://img.shields.io/badge/version-0.30.0-blue.svg)](https://github.com/Flux-Frontiers/KG_utils/releases)
 [![CI](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/KG_utils/actions/workflows/ci.yml)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21284866-blue.svg)](https://doi.org/10.5281/zenodo.21284866)
@@ -26,6 +26,11 @@ Fleet modules use it in two ways. [PyCodeKG](https://github.com/Flux-Frontiers/p
 
 ## Latest News
 
+- **0.30.0 (2026-11-05)** -- An Anthropic text backend: `SYNTH_BACKEND=anthropic`
+  (or `backend="anthropic"`) answers through Claude via the `anthropic` SDK,
+  now part of the `synthesis` extras. And OpenAI's gpt-5 and later answer
+  again: the OpenAI backend sends `max_completion_tokens`, drops a
+  temperature the model refuses, logs failures, and lists only chat models.
 - **0.29.2 (2026-11-02)** -- A security release. The `synthesis` extras
   floor Pillow at 13.0.0 and `viz3d-qt` floors quiltwright at 0.17.0, so a
   fresh install can no longer resolve Pillow 12.3.0 and its 41 advisories.
@@ -235,7 +240,7 @@ and the standard `<tool> mcp` command (`kg_utils.mcp`).
 pip install 'kgmodule-utils[mcp]'
 ```
 
-### With text + image synthesis (oMLX / Ollama / OpenAI / mflux-serve)
+### With text + image synthesis (oMLX / Ollama / OpenAI / Anthropic / mflux-serve)
 
 ```bash
 pip install 'kgmodule-utils[synthesis]'
@@ -414,7 +419,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class / function | Description |
 |---|---|
-| `TextBackend` | Enum: `omlx` \| `ollama` \| `openai` |
+| `TextBackend` | Enum: `omlx` \| `ollama` \| `openai` \| `anthropic` |
 | `ImageBackend` | Enum: `mflux-local` \| `mflux-serve` \| `openai` |
 | `TextConfig` | Backend config dataclass with `resolved_endpoint()` / `resolved_model()` |
 | `ImageConfig` | Backend config dataclass with `resolved_server_url()` / `resolved_model()` |
@@ -820,7 +825,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 
 **APA**
 
-> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.29.2) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
+> Suchanek, E. G. (2026). *kgmodule-utils: Shared SDK for the KGModule Knowledge-Graph Ecosystem* (Version 0.30.0) [Software]. Flux-Frontiers. https://doi.org/10.5281/zenodo.21284866
 
 **BibTeX**
 
@@ -828,7 +833,7 @@ If you use kgmodule-utils in research or a project, please cite it:
 @software{suchanek_kgmodule_utils,
   author    = {Suchanek, Eric G.},
   title     = {{kgmodule-utils}: Shared SDK for the KGModule Knowledge-Graph Ecosystem},
-  version   = {0.29.2},
+  version   = {0.30.0},
   year      = {2026},
   publisher = {Flux-Frontiers},
   url       = {https://github.com/Flux-Frontiers/KG_utils},

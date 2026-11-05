@@ -1,8 +1,9 @@
 # kg_utils.synthesis — Unified Synthesis Backends
 
 `kg_utils.synthesis` provides a single, consistent interface for text generation and image
-generation across multiple local and cloud backends.  All three text backends use the
-**OpenAI wire protocol** (`/v1/chat/completions`), so switching between them requires only
+generation across multiple local and cloud backends.  The oMLX, Ollama and OpenAI text
+backends use the **OpenAI wire protocol** (`/v1/chat/completions`); the Anthropic backend
+calls Claude through the official `anthropic` SDK. Switching between them requires only
 an environment variable change — no code changes.
 
 ---
@@ -10,7 +11,7 @@ an environment variable change — no code changes.
 ## Installation
 
 ```bash
-# Text synthesis only (oMLX, Ollama, OpenAI text)
+# Text synthesis only (oMLX, Ollama, OpenAI, Anthropic)
 pip install 'kgmodule-utils[synthesis]'
 
 # + local mflux image generation (Apple Silicon)
@@ -21,7 +22,7 @@ pip install 'kgmodule-utils[synthesis-mflux]'
 
 | Extra | Adds |
 |---|---|
-| `synthesis` | `httpx`, `openai`, `pillow` |
+| `synthesis` | `anthropic`, `httpx`, `openai`, `pillow` |
 | `synthesis-mflux` | all of `synthesis` + `mflux` |
 
 ---
@@ -52,9 +53,9 @@ b64 = image.generate_b64(prompt, aspect_ratio="3:2")
 
 | Variable | Default | Description |
 |---|---|---|
-| `SYNTH_BACKEND` | `omlx` | Backend: `omlx` \| `ollama` \| `openai` |
+| `SYNTH_BACKEND` | `omlx` | Backend: `omlx` \| `ollama` \| `openai` \| `anthropic` |
 | `SYNTH_ENDPOINT` | *(backend default)* | Override base URL |
-| `SYNTH_API_KEY` | `""` | Bearer token / OpenAI key |
+| `SYNTH_API_KEY` | `""` | Bearer token / OpenAI key (the `anthropic` backend reads `ANTHROPIC_API_KEY` instead) |
 | `SYNTH_MODEL` | *(backend default)* | Model-id override |
 
 **Legacy aliases** (honoured as fallbacks, no migration needed):
@@ -92,6 +93,7 @@ b64 = image.generate_b64(prompt, aspect_ratio="3:2")
 | `omlx` | `http://localhost:8080/v1` | `Qwen3-4B-Instruct-2507-MLX-8bit` |
 | `ollama` | `http://localhost:11434/v1` | `hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q8_0` |
 | `openai` | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| `anthropic` | *(SDK default)* | `claude-opus-5-5` |
 
 ### Image backends
 
@@ -112,7 +114,20 @@ class TextBackend(str, Enum):
     OMLX   = "omlx"    # local oMLX / vLLM — thinking suppressed via extra_body
     OLLAMA = "ollama"  # local Ollama — no api_key required
     OPENAI = "openai"  # OpenAI cloud — requires OPENAI_API_KEY / SYNTH_API_KEY
+    ANTHROPIC = "anthropic"  # Claude API — anthropic SDK; ANTHROPIC_API_KEY or an `ant` profile
 ```
+
+**OpenAI.** Requests send `max_completion_tokens`, which every OpenAI chat model
+accepts (gpt-5 and later reject `max_tokens`). A model that refuses the requested
+temperature is asked again without it, and later calls for that model leave it out.
+`list_models()` returns only the models chat completions can answer with.
+
+**Anthropic.** System messages become the `system` parameter. No temperature is sent
+(current Claude models reject sampling parameters). Effort is `low`, retried without it
+for a model that refuses it, and `max_tokens` is raised to at least 4096 because thinking
+counts against it. The current models (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5.5) get the
+server-side refusal fallback. A refusal, an API error or missing credentials is logged
+and returns `None`.
 
 ### `TextConfig` (dataclass)
 
