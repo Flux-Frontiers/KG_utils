@@ -31,6 +31,7 @@ _SYNTH_VARS = [
     "VLLM_API_KEY",
     "VLLM_MODEL",
     "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
 ]
 
 _IMAGE_VARS = [
@@ -287,6 +288,7 @@ def test_text_config_from_env_synth_model_takes_priority_over_legacy(
 def test_text_config_from_env_openai_api_key_fallback(
     monkeypatch: pytest.MonkeyPatch, clean_synth: None
 ) -> None:
+    monkeypatch.setenv("SYNTH_BACKEND", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "openai-fallback-key")
     cfg = text_config_from_env()
     assert cfg.api_key == "openai-fallback-key"  # pragma: allowlist secret
@@ -295,10 +297,32 @@ def test_text_config_from_env_openai_api_key_fallback(
 def test_text_config_from_env_synth_api_key_beats_openai(
     monkeypatch: pytest.MonkeyPatch, clean_synth: None
 ) -> None:
+    monkeypatch.setenv("SYNTH_BACKEND", "openai")
     monkeypatch.setenv("SYNTH_API_KEY", "synth-wins")
     monkeypatch.setenv("OPENAI_API_KEY", "openai-loses")
     cfg = text_config_from_env()
     assert cfg.api_key == "synth-wins"  # pragma: allowlist secret
+
+
+@pytest.mark.parametrize("backend", ["", "omlx", "ollama", "anthropic"])
+def test_text_config_from_env_never_sends_the_openai_key_elsewhere(
+    monkeypatch: pytest.MonkeyPatch, clean_synth: None, backend: str
+) -> None:
+    """An OpenAI key must not reach oMLX, Ollama or Anthropic."""
+    if backend:
+        monkeypatch.setenv("SYNTH_BACKEND", backend)
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-only")
+    assert text_config_from_env().api_key == ""
+
+
+@pytest.mark.parametrize("backend", ["openai", "ollama", "anthropic"])
+def test_text_config_from_env_never_sends_the_omlx_key_elsewhere(
+    monkeypatch: pytest.MonkeyPatch, clean_synth: None, backend: str
+) -> None:
+    """VLLM_API_KEY is oMLX's; a cloud backend must not get it."""
+    monkeypatch.setenv("SYNTH_BACKEND", backend)
+    monkeypatch.setenv("VLLM_API_KEY", "omlx-only")
+    assert text_config_from_env().api_key == ""
 
 
 # ---------------------------------------------------------------------------

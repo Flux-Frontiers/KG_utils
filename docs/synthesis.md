@@ -55,7 +55,7 @@ b64 = image.generate_b64(prompt, aspect_ratio="3:2")
 |---|---|---|
 | `SYNTH_BACKEND` | `omlx` | Backend: `omlx` \| `ollama` \| `openai` \| `anthropic` |
 | `SYNTH_ENDPOINT` | *(backend default)* | Override base URL |
-| `SYNTH_API_KEY` | `""` | Bearer token / OpenAI key (the `anthropic` backend reads `ANTHROPIC_API_KEY` instead) |
+| `SYNTH_API_KEY` | `""` | Bearer token for the selected backend. Unset, `omlx` falls back to `VLLM_API_KEY` and `openai` to `OPENAI_API_KEY`; `anthropic` reads `ANTHROPIC_API_KEY`. No backend gets another backend's key |
 | `SYNTH_MODEL` | *(backend default)* | Model-id override |
 
 **Legacy aliases** (honoured as fallbacks, no migration needed):
@@ -63,7 +63,7 @@ b64 = image.generate_b64(prompt, aspect_ratio="3:2")
 | Legacy var | Maps to |
 |---|---|
 | `VLLM_ENDPOINT_URL` | `SYNTH_ENDPOINT` |
-| `VLLM_API_KEY` | `SYNTH_API_KEY` |
+| `VLLM_API_KEY` | `SYNTH_API_KEY`, for the `omlx` backend only |
 | `VLLM_MODEL` | `SYNTH_MODEL` |
 
 ### Image synthesis
