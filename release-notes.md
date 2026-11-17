@@ -1,30 +1,18 @@
-# Release Notes — v0.30.0
+# Release Notes — v0.30.1
 
-> Released: 2026-11-05
+> Released: 2026-11-17
 
-### Added
+### Changed
 
-- **An Anthropic text backend.** `TextBackend.ANTHROPIC` (`SYNTH_BACKEND=anthropic`,
-  or `backend="anthropic"` per request) calls Claude through the `anthropic` SDK,
-  now a dependency of the `synthesis` extras. System messages become the
-  `system` parameter; no temperature is sent; effort is `low`, with a retry
-  without it for models that refuse it; `max_tokens` is raised to at least
-  4096 to leave room for thinking; the current models get the server-side
-  refusal fallback. The default model is `claude-opus-5-5`, and the key is
-  `ANTHROPIC_API_KEY` (an OpenAI key is never passed to it).
-
-### Fixed
-
-- **OpenAI gpt-5 and later answer again.** The OpenAI backend sent
-  `max_tokens` and `temperature=0.7`; gpt-5, gpt-5.x, gpt-6, o3 and
-  `chat-latest` reject one or both with a 400, and the error was swallowed,
-  so only the GPT-4 family answered. It now sends `max_completion_tokens`,
-  and retries without the temperature when a model refuses it, remembering
-  that model. A failed completion is logged as a warning.
-- **The OpenAI model list holds only chat models.** `list_models` on OpenAI
-  drops audio, image, realtime, transcription, tts, embedding, moderation,
-  search, codex and `-pro` models, none of which answer through chat
-  completions.
+- **The image rewrite prompt asks for an accurate scene.** `_IMAGE_REWRITE_SYSTEM`
+  keeps the art-director prompt and adds rules: show the scene at the end of
+  the moment, show a person turned into something only as what they became,
+  place a narrator or eyewitness in the scene, describe people by appearance
+  and period clothing, keep everyone clothed, ask for no lettering, and stay
+  under 120 words. Tested 2026-11-17 on four answers rendered through FLUX.2
+  klein: with Qwen3.6-35B-A3B or Qwen3.8-27B as the rewrite model, Lot's wife
+  appears only as the pillar of salt and Pepys watches from his boat. The 4B
+  model ignores the transformation rule either way.
 
 ---
 
