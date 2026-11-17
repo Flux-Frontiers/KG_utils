@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.2] - 2026-11-17
+
 ### Fixed
 
 - **A synthesis key goes only to its own backend.** `text_config_from_env()`
