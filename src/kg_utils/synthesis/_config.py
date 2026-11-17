@@ -130,12 +130,13 @@ def text_config_from_env() -> TextConfig:
         backend = TextBackend.OMLX
 
     endpoint = os.environ.get("SYNTH_ENDPOINT") or os.environ.get("VLLM_ENDPOINT_URL") or ""
-    api_key = (
-        os.environ.get("SYNTH_API_KEY")
-        or os.environ.get("VLLM_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-        or ""
-    )
+    # Each key goes only to its own backend: VLLM_API_KEY is oMLX's and
+    # OPENAI_API_KEY is OpenAI's, so neither reaches another server.
+    api_key = os.environ.get("SYNTH_API_KEY") or ""
+    if not api_key and backend is TextBackend.OMLX:
+        api_key = os.environ.get("VLLM_API_KEY") or ""
+    elif not api_key and backend is TextBackend.OPENAI:
+        api_key = os.environ.get("OPENAI_API_KEY") or ""
     if backend == TextBackend.ANTHROPIC:
         # An OpenAI key is never a Claude key; empty lets the SDK resolve one.
         api_key = os.environ.get("ANTHROPIC_API_KEY") or ""
