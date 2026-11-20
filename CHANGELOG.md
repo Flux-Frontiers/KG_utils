@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **An Art Techno logo.** The backplane: one board carries a bus, and five KG
+  modules stand in their own slots on it, with the tagline THE SDK UNDER EVERY
+  GRAPH. `scripts/build_logo.py` draws the mark, a 64 px icon and a banner as
+  SVG under `assets/` and writes the PNGs. The README shows the banner at the
+  top, by absolute raw URL so PyPI shows it too.
+
 ## [0.30.2] - 2026-11-17
 
 ### Fixed
