@@ -180,6 +180,25 @@ whitespace-only are silently skipped.
 
 Returns `None` when no snippets carry content or when the backend returns no response.
 
+#### `rewrite_for_image` system prompts
+
+`kg_utils.synthesis` exports two system prompts for the rewrite:
+
+| Name | For | Asks for |
+|---|---|---|
+| `IMAGE_REWRITE_SYSTEM` (default) | Historical prose: diaries, books | The scene as the passage leaves it, with people in period dress |
+| `IMAGE_REWRITE_TECHNICAL_SYSTEM` | Non-prose text: source code, structured records, agent memory, graph data such as neurons and pathways | A clear technical or scientific illustration, with no invented people or period scenes |
+
+```python
+from kg_utils.synthesis import IMAGE_REWRITE_TECHNICAL_SYSTEM
+
+prompt, err = text.rewrite_for_image(code_snippet, system=IMAGE_REWRITE_TECHNICAL_SYSTEM)
+```
+
+Through a LAN worker, pass the same string to `WorkerClient.rewrite(text, system=...)`.
+It travels as an optional `system` field of the `rewrite` op. A worker on a
+kgmodule-utils older than 0.31.0 ignores the field and uses the historical prompt.
+
 #### `rewrite_for_image` return value
 
 Returns `(prompt, error)`.  On success `error` is `None`.  On failure `prompt` falls
