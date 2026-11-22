@@ -122,6 +122,16 @@ def test_rewrite_returns_prompt_and_none_error() -> None:
     assert err is None
 
 
+def test_rewrite_sends_system_only_when_set() -> None:
+    client = WorkerClient("http://localhost:8000")
+    with patch("httpx.post", return_value=_Resp({"output": {"prompt": "p"}})) as mock_post:
+        client.rewrite("code", system="draw it")
+        client.rewrite("prose")
+    first, second = (c.kwargs["json"]["input"] for c in mock_post.call_args_list)
+    assert first["system"] == "draw it"
+    assert "system" not in second
+
+
 def test_rewrite_returns_original_text_and_error_on_failed_worker() -> None:
     client = WorkerClient("http://localhost:8000")
     with patch("httpx.post", return_value=_Resp({"status": "FAILED", "error": "rewrite failed"})):

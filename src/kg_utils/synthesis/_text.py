@@ -59,6 +59,30 @@ _IMAGE_REWRITE_SYSTEM = (
     "Keep it under 120 words. Output ONLY the prompt, nothing else."
 )
 
+#: Historical prose (diaries, books) to image prompt; the default for
+#: :meth:`TextSynthesizer.rewrite_for_image`.
+IMAGE_REWRITE_SYSTEM = _IMAGE_REWRITE_SYSTEM
+
+#: Non-prose text (source code, structured records, agent memory, scientific
+#: graph data) to image prompt. Pass as ``system=`` to ``rewrite_for_image``.
+IMAGE_REWRITE_TECHNICAL_SYSTEM = (
+    "You are an expert scientific and technical illustrator. Given a passage of non-prose "
+    "text, such as source code, a structured record, an agent's memory note, or scientific "
+    "graph data about neurons, pathways or molecules, write a single concise image generation "
+    "prompt (one paragraph, no bullet points, no quotation marks) that ACCURATELY depicts what "
+    "the text describes for a text-to-image model. Decide what the text is about and render "
+    "that subject as a clear, concrete technical or scientific illustration: a neuron and its "
+    "connections, a metabolic pathway, a molecule, or a process shown as physical parts and "
+    "flows. Name every key subject concretely (its shape, material, color, and how the parts "
+    "connect) and give the composition, lighting and illustration style. Describe functions, "
+    "cell types, compounds and records by their form and role, since the image model does not "
+    "know names or identifiers. Do NOT invent people, characters, story scenes or historical "
+    "settings the text does not describe. Do NOT include any text, labels, captions, code, "
+    "numbers, axis labels, legends or words in the scene description, and never ask for "
+    "lettering to appear on anything. Keep it under 120 words. Output ONLY the prompt, "
+    "nothing else."
+)
+
 
 # ---------------------------------------------------------------------------
 # Synthesizer
@@ -254,21 +278,26 @@ class TextSynthesizer:
         corpus_text: str,
         *,
         model: str | None = None,
+        system: str | None = None,
     ) -> tuple[str, str | None]:
-        """Rewrite a historical corpus passage into an image-generation prompt.
+        """Rewrite a corpus passage into an image-generation prompt.
 
         Uses the same backend and model as RAG synthesis so no second model load
         is required.  Pass ``model=`` to use a lighter model for this step if
         synthesis and rewrite are called from the same hot path.
 
-        :param corpus_text: Raw historical passage to convert into a visual scene.
+        :param corpus_text: Raw passage to convert into a visual scene.
         :param model: Override the configured model for this single call.
+        :param system: Override the system prompt. ``None`` uses
+                       :data:`IMAGE_REWRITE_SYSTEM`, written for historical prose;
+                       pass :data:`IMAGE_REWRITE_TECHNICAL_SYSTEM` for code,
+                       records, memory or scientific graph data.
         :returns: ``(prompt, error)`` — prompt is the rewritten scene description
                   (falls back to the original text on failure); error is ``None``
                   on success or a short message otherwise.
         """
         messages = [
-            {"role": "system", "content": _IMAGE_REWRITE_SYSTEM},
+            {"role": "system", "content": system or IMAGE_REWRITE_SYSTEM},
             {"role": "user", "content": corpus_text},
         ]
         result = self._complete(messages, model=model, max_tokens=300, temperature=0.7)
