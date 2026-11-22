@@ -52,7 +52,11 @@ from kg_utils.synthesis._config import (
     text_config_from_env,
 )
 from kg_utils.synthesis._image import ImageSynthesizer
-from kg_utils.synthesis._text import TextSynthesizer
+from kg_utils.synthesis._text import (
+    IMAGE_REWRITE_SYSTEM,
+    IMAGE_REWRITE_TECHNICAL_SYSTEM,
+    TextSynthesizer,
+)
 from kg_utils.synthesis.factory import (
     image_synth_for_backend,
     normalize_openai_base_url,
@@ -84,4 +88,6 @@ __all__ = [
     "normalize_openai_base_url",
     "text_synth_for_backend",
     "image_synth_for_backend",
+    "IMAGE_REWRITE_SYSTEM",
+    "IMAGE_REWRITE_TECHNICAL_SYSTEM",
 ]

@@ -48,6 +48,22 @@ def test_handle_aux_ops_rewrite_success() -> None:
     assert result == {"prompt": "rewritten prompt", "error": None}
 
 
+def test_handle_aux_ops_rewrite_passes_system() -> None:
+    text = _text_synth()
+    handle_aux_ops(
+        {"op": "rewrite", "text": "code", "system": "draw it"},
+        lambda _: text,
+        lambda _: _image_synth(),
+    )
+    text.rewrite_for_image.assert_called_once_with("code", model=None, system="draw it")  # type: ignore[attr-defined]
+
+
+def test_handle_aux_ops_rewrite_without_system_uses_default() -> None:
+    text = _text_synth()
+    handle_aux_ops({"op": "rewrite", "text": "prose"}, lambda _: text, lambda _: _image_synth())
+    text.rewrite_for_image.assert_called_once_with("prose", model=None, system=None)  # type: ignore[attr-defined]
+
+
 def test_handle_aux_ops_rewrite_requires_text() -> None:
     result = handle_aux_ops(
         {"op": "rewrite", "text": "   "},

@@ -162,7 +162,7 @@ synth = text_synthesizer_from_env()   # convenience factory
 |---|---|---|
 | `list_models()` | `list[str]` | Model IDs available at the endpoint; `[]` on failure |
 | `synthesize_rag(query, snippets, *, model, max_k, system)` | `str \| None` | Grounded answer from corpus hits |
-| `rewrite_for_image(corpus_text, *, model)` | `tuple[str, str \| None]` | `(image_prompt, error)` |
+| `rewrite_for_image(corpus_text, *, model, system)` | `tuple[str, str \| None]` | `(image_prompt, error)`; `system` defaults to `IMAGE_REWRITE_SYSTEM` (historical prose), or pass `IMAGE_REWRITE_TECHNICAL_SYSTEM` for code, records, memory or graph data |
 
 #### `synthesize_rag` parameters
 

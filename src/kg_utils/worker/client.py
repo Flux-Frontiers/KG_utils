@@ -106,12 +106,15 @@ class WorkerClient:
         text: str,
         backend: str = "",
         model: str = "",
+        system: str = "",
     ) -> tuple[str, str | None]:
         payload: dict = {"input": {"op": "rewrite", "text": text}}
         if backend:
             payload["input"]["backend"] = backend
         if model:
             payload["input"]["model"] = model
+        if system:
+            payload["input"]["system"] = system
         if self._secret:
             payload["input"]["secret"] = self._secret
 

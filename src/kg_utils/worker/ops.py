@@ -39,7 +39,8 @@ def handle_aux_ops(
 
         synth = text_synth_factory(inp.get("backend", ""))
         model_override = (inp.get("model") or "").strip() or None
-        prompt, error = synth.rewrite_for_image(text, model=model_override)
+        system = (inp.get("system") or "").strip() or None
+        prompt, error = synth.rewrite_for_image(text, model=model_override, system=system)
         return {"prompt": prompt, "error": error}
 
     if op == "imagine":

@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GRAPH. `scripts/build_logo.py` draws the mark, a 64 px icon and a banner as
   SVG under `assets/` and writes the PNGs. The README shows the banner at the
   top, by absolute raw URL so PyPI shows it too.
+- **A second image rewrite prompt, for non-prose text.**
+  `TextSynthesizer.rewrite_for_image` takes `system=`; `None` keeps the
+  historical-prose prompt, so existing callers are unchanged. The new
+  `IMAGE_REWRITE_TECHNICAL_SYSTEM` asks for a clear technical or scientific
+  illustration of source code, structured records, agent memory or graph data
+  such as neurons and pathways, with no invented people or period scenes. Both
+  prompts are exported from `kg_utils.synthesis`; the historical one is
+  `IMAGE_REWRITE_SYSTEM`, and `_IMAGE_REWRITE_SYSTEM` still works.
+  `WorkerClient.rewrite(system=...)` sends it as an optional `system` field of
+  the `rewrite` op, and `handle_aux_ops` passes it through. A worker on an
+  older kgmodule-utils ignores the field and uses the historical prompt.
 
 ## [0.30.2] - 2026-11-17
 

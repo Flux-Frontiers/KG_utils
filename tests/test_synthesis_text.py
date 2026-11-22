@@ -12,6 +12,7 @@ import pytest
 
 pytest.importorskip("openai", reason="openai package not installed — skipping synthesis text tests")
 
+from kg_utils.synthesis import IMAGE_REWRITE_SYSTEM, IMAGE_REWRITE_TECHNICAL_SYSTEM
 from kg_utils.synthesis._config import TextBackend, TextConfig
 from kg_utils.synthesis._text import TextSynthesizer
 
@@ -483,6 +484,34 @@ def test_rewrite_for_image_uses_limited_max_tokens() -> None:
         call_kwargs = mock_client.chat.completions.create.call_args[1]
     # rewrite_for_image is intentionally short — max_tokens should be <= 300
     assert call_kwargs["max_tokens"] <= 300
+
+
+def test_rewrite_for_image_default_sends_historical_prompt() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("scene")
+        synth = _make_synth()
+        synth.rewrite_for_image("passage")
+        messages = mock_client.chat.completions.create.call_args[1]["messages"]
+    assert messages[0] == {"role": "system", "content": IMAGE_REWRITE_SYSTEM}
+    assert "historical text" in messages[0]["content"]
+
+
+def test_rewrite_for_image_system_reaches_backend() -> None:
+    with patch("openai.OpenAI") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.completions.create.return_value = _completion("a neuron")
+        synth = _make_synth()
+        prompt, err = synth.rewrite_for_image(
+            "def walk(graph): ...", system=IMAGE_REWRITE_TECHNICAL_SYSTEM
+        )
+        messages = mock_client.chat.completions.create.call_args[1]["messages"]
+    assert (prompt, err) == ("a neuron", None)
+    assert messages == [
+        {"role": "system", "content": IMAGE_REWRITE_TECHNICAL_SYSTEM},
+        {"role": "user", "content": "def walk(graph): ..."},
+    ]
+    assert IMAGE_REWRITE_TECHNICAL_SYSTEM != IMAGE_REWRITE_SYSTEM
 
 
 # ---------------------------------------------------------------------------
