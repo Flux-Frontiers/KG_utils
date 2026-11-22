@@ -284,10 +284,8 @@ def test_wrap_embedder_matches_direct_encode(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    __import__("importlib.util", fromlist=["find_spec"]).find_spec("doc_kg") is None,
-    reason="doc_kg not installed",
-)
+# Hard imports, not a skip: the dev group installs doc-kg, so a missing doc_kg
+# is a broken environment and must fail.
 def test_doc_kg_re_exports_embedder_classes() -> None:
     from doc_kg.index import Embedder as DocEmbedder  # pylint: disable=import-error
     from doc_kg.index import SentenceTransformerEmbedder as DocSTE  # pylint: disable=import-error

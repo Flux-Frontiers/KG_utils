@@ -128,9 +128,9 @@ Repository = "https://github.com/Flux-Frontiers/kg_utils"
 [tool.poetry]
 packages = [{include = "kg_utils", from = "src"}]
 
-# Cross-KG siblings (doc-kg, pycode-kg, agent-kg, kg-rag) are deliberately not
-# declared: never imported here, and listing them deadlocks poetry's resolver
-# (doc-kg and pycode-kg depend on each other). Install them by hand from PyPI.
+# Cross-KG siblings (pycode-kg, agent-kg, kg-rag) are deliberately not declared:
+# they are never imported here. doc-kg is the exception, in the dev group below,
+# because one test imports it.
 
 [tool.poetry.group.dev]
 optional = true
@@ -150,6 +150,10 @@ ty         = ">=0.0.41"
 pre-commit = "^4.5.1"
 # Only needed to regenerate `.secrets.baseline` by hand after an audited change.
 detect-secrets = "^1.5.0"
+# tests/test_embedder.py checks that doc_kg.index still re-exports the embedder
+# classes. doc-kg depends on this package, which poetry satisfies with the
+# source tree, so the lock gains doc-kg alone.
+doc-kg = ">=0.30.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

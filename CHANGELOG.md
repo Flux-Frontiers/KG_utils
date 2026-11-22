@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `rewrite` op, and `handle_aux_ops` passes it through. A worker on an
   older kgmodule-utils ignores the field and uses the historical prompt.
 
+### Changed
+
+- **The dev group installs `doc-kg`, so no test is skipped.** The test that
+  checks `doc_kg.index` still re-exports the embedder classes used to skip
+  unless `doc-kg` had been installed by hand. `doc-kg` is now a dev
+  dependency, and the test imports it directly, so a missing `doc_kg` fails.
+  The lock gains `doc-kg` alone. Nothing in the wheel changes.
+
 ## [0.30.2] - 2026-11-17
 
 ### Fixed

@@ -800,8 +800,9 @@ missing `numpy` and `httpx` and runs nothing. The six extras above are what CI
 installs, in both the test and the type-check job, and pre-commit runs ty, so
 install them locally.
 
-Run the fast test suite (no model downloads) — **750 passed, 1 skipped** (the
-skip is a test that needs `doc_kg`, which the SDK cannot depend on):
+The dev group installs `doc-kg` for the one test that imports it, so no test
+is skipped. Run the fast test suite (no model downloads); it reports
+**988 passed**:
 
 ```bash
 poetry run pytest -m "not integration"
