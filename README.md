@@ -256,17 +256,15 @@ and the standard `<tool> mcp` command (`kg_utils.mcp`).
 pip install 'kgmodule-utils[mcp]'
 ```
 
-### With text + image synthesis (oMLX / Ollama / OpenAI / Anthropic / mflux-serve)
+### With text synthesis (oMLX / Ollama / OpenAI / Anthropic)
 
 ```bash
 pip install 'kgmodule-utils[synthesis]'
 ```
 
-### With local mflux image generation (Apple Silicon, includes synthesis)
-
-```bash
-pip install 'kgmodule-utils[synthesis-mflux]'
-```
+Image generation is in [imagewright](https://github.com/Flux-Frontiers/imagewright)
+since 0.32.0. `TextSynthesizer.rewrite_for_image()` still turns a passage into
+an image prompt.
 
 ### With interactive graph rendering (pyvis / vis-network)
 
@@ -436,15 +434,10 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 | Class / function | Description |
 |---|---|
 | `TextBackend` | Enum: `omlx` \| `ollama` \| `openai` \| `anthropic` |
-| `ImageBackend` | Enum: `mflux-local` \| `mflux-serve` \| `openai` |
 | `TextConfig` | Backend config dataclass with `resolved_endpoint()` / `resolved_model()` |
-| `ImageConfig` | Backend config dataclass with `resolved_server_url()` / `resolved_model()` |
 | `TextSynthesizer` | `list_models()`, `synthesize_rag()`, `rewrite_for_image()` |
-| `ImageSynthesizer` | `generate()` → PIL Image, `generate_b64()` → base64 PNG |
 | `text_config_from_env()` | Build `TextConfig` from `SYNTH_*` env vars |
-| `image_config_from_env()` | Build `ImageConfig` from `IMAGE_*` env vars |
 | `text_synthesizer_from_env()` | Convenience: config + synthesizer in one call |
-| `image_synthesizer_from_env()` | Convenience: config + synthesizer in one call |
 
 ### `kg_utils.viz`
 
@@ -684,9 +677,8 @@ KG_utils/
 │       │   └── manager.py    # SnapshotManager
 │       ├── synthesis/
 │       │   ├── __init__.py   # Public API + factory functions
-│       │   ├── _config.py    # TextBackend, ImageBackend, TextConfig, ImageConfig, env factories
+│       │   ├── _config.py    # TextBackend, TextConfig, text_config_from_env
 │       │   ├── _text.py      # TextSynthesizer
-│       │   ├── _image.py     # ImageSynthesizer
 │       │   └── factory.py    # Per-request backend override helpers
 │       ├── viz/              # Shared graph rendering (viz extra)
 │       │   ├── __init__.py   # build_graph_html, select_nodes, GraphTheme, TooltipSpec

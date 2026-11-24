@@ -22,8 +22,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `read_source()` returns a file's lines and hash in one read; `read_lines()`
   now wraps it.
 
+### Removed
+
+- **The image half of `kg_utils.synthesis` (breaking).** Image generation
+  lives in [imagewright](https://github.com/Flux-Frontiers/imagewright), whose
+  `ImageBackend`, `ImageConfig`, `image_config_from_env` and
+  `ImageSynthesizer.generate`/`generate_b64` are the same code. Removed:
+  `ImageSynthesizer` (`synthesis/_image.py`), `ImageBackend`, `ImageConfig`,
+  `image_config_from_env`, `image_synthesizer_from_env`,
+  `image_synth_for_backend`, and the `[synthesis-mflux]` extra. No
+  re-export: import them from `imagewright`. The text side stays, including
+  `TextSynthesizer.rewrite_for_image()` and both image rewrite prompts. The
+  fleet's two worker handlers moved to imagewright in gutenberg-kg 1.43.0 and
+  corpus-pepys 0.8.0, and their images pin kgmodule-utils exactly.
+- The lock no longer limits installs to macOS and Linux; that limit came from
+  mflux.
+
 ### Changed
 
+- `handle_aux_ops` types its image factory as `ImageGenerator`, a Protocol
+  (`generate_b64` and the `_cfg` it reports), so any backend with that shape
+  works, imagewright's included.
 - `GraphStore.write()` and `clear()` drop the recorded hashes, because the
   nodes they describe may have changed. A writer that calls `store.write()`
   directly, as pycode_kg's CLI does, leaves the store unrecorded until it calls

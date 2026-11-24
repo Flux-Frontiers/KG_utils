@@ -8,13 +8,9 @@ from __future__ import annotations
 import pytest
 
 from kg_utils.synthesis._config import (
-    _IMAGE_DEFAULTS,
     _TEXT_DEFAULTS,
-    ImageBackend,
-    ImageConfig,
     TextBackend,
     TextConfig,
-    image_config_from_env,
     text_config_from_env,
 )
 
@@ -34,28 +30,11 @@ _SYNTH_VARS = [
     "ANTHROPIC_API_KEY",
 ]
 
-_IMAGE_VARS = [
-    "IMAGE_BACKEND",
-    "IMAGE_ENDPOINT",
-    "IMAGE_API_KEY",
-    "IMAGE_MODEL",
-    "IMAGE_STEPS",
-    "GUTENKG_IMAGE_MODEL",
-    "OPENAI_API_KEY",
-]
-
 
 @pytest.fixture()
 def clean_synth(monkeypatch: pytest.MonkeyPatch) -> None:
     """Remove all synthesis text env vars."""
     for k in _SYNTH_VARS:
-        monkeypatch.delenv(k, raising=False)
-
-
-@pytest.fixture()
-def clean_image(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Remove all synthesis image env vars."""
-    for k in _IMAGE_VARS:
         monkeypatch.delenv(k, raising=False)
 
 
@@ -79,23 +58,6 @@ def test_text_backend_from_string() -> None:
 def test_text_backend_invalid_raises() -> None:
     with pytest.raises(ValueError):
         TextBackend("vllm")
-
-
-# ---------------------------------------------------------------------------
-# ImageBackend enum
-# ---------------------------------------------------------------------------
-
-
-def test_image_backend_values() -> None:
-    assert ImageBackend.MFLUX_LOCAL.value == "mflux-local"
-    assert ImageBackend.MFLUX_SERVE.value == "mflux-serve"
-    assert ImageBackend.OPENAI.value == "openai"
-
-
-def test_image_backend_from_string() -> None:
-    assert ImageBackend("mflux-local") is ImageBackend.MFLUX_LOCAL
-    assert ImageBackend("mflux-serve") is ImageBackend.MFLUX_SERVE
-    assert ImageBackend("openai") is ImageBackend.OPENAI
 
 
 # ---------------------------------------------------------------------------
@@ -138,43 +100,6 @@ def test_text_config_max_tokens_default() -> None:
 
 def test_text_config_suppress_thinking_default() -> None:
     assert TextConfig().suppress_thinking is True
-
-
-# ---------------------------------------------------------------------------
-# ImageConfig defaults per backend
-# ---------------------------------------------------------------------------
-
-
-def test_image_config_mflux_serve_defaults() -> None:
-    cfg = ImageConfig(backend=ImageBackend.MFLUX_SERVE)
-    assert "localhost:8090" in cfg.resolved_server_url()
-    assert cfg.resolved_model() == _IMAGE_DEFAULTS[ImageBackend.MFLUX_SERVE]["model"]
-
-
-def test_image_config_mflux_local_defaults() -> None:
-    cfg = ImageConfig(backend=ImageBackend.MFLUX_LOCAL)
-    assert cfg.resolved_model() == "mlx-community/flux2-klein-4b-4bit"
-    assert cfg.resolved_server_url() == ""
-
-
-def test_image_config_openai_defaults() -> None:
-    cfg = ImageConfig(backend=ImageBackend.OPENAI)
-    assert cfg.resolved_model() == "gpt-image-1"
-    assert cfg.resolved_server_url() == ""
-
-
-def test_image_config_server_url_override() -> None:
-    cfg = ImageConfig(backend=ImageBackend.MFLUX_SERVE, server_url="http://gpu-box:8090")
-    assert cfg.resolved_server_url() == "http://gpu-box:8090"
-
-
-def test_image_config_model_override() -> None:
-    cfg = ImageConfig(backend=ImageBackend.OPENAI, model="dall-e-2")
-    assert cfg.resolved_model() == "dall-e-2"
-
-
-def test_image_config_steps_default() -> None:
-    assert ImageConfig().steps == 4
 
 
 # ---------------------------------------------------------------------------
@@ -323,99 +248,3 @@ def test_text_config_from_env_never_sends_the_omlx_key_elsewhere(
     monkeypatch.setenv("SYNTH_BACKEND", backend)
     monkeypatch.setenv("VLLM_API_KEY", "omlx-only")
     assert text_config_from_env().api_key == ""
-
-
-# ---------------------------------------------------------------------------
-# image_config_from_env — clean environment
-# ---------------------------------------------------------------------------
-
-
-def test_image_config_from_env_defaults(clean_image: None) -> None:
-    cfg = image_config_from_env()
-    assert cfg.backend is ImageBackend.MFLUX_SERVE
-    assert cfg.server_url == ""
-    assert cfg.api_key == ""
-    assert cfg.model == ""
-    assert cfg.steps == 4
-
-
-def test_image_config_from_env_backend_local(
-    monkeypatch: pytest.MonkeyPatch, clean_image: None
-) -> None:
-    monkeypatch.setenv("IMAGE_BACKEND", "mflux-local")
-    cfg = image_config_from_env()
-    assert cfg.backend is ImageBackend.MFLUX_LOCAL
-
-
-def test_image_config_from_env_backend_openai(
-    monkeypatch: pytest.MonkeyPatch, clean_image: None
-) -> None:
-    monkeypatch.setenv("IMAGE_BACKEND", "openai")
-    cfg = image_config_from_env()
-    assert cfg.backend is ImageBackend.OPENAI
-
-
-def test_image_config_from_env_invalid_backend_fallback(
-    monkeypatch: pytest.MonkeyPatch, clean_image: None
-) -> None:
-    monkeypatch.setenv("IMAGE_BACKEND", "diffusers")
-    cfg = image_config_from_env()
-    assert cfg.backend is ImageBackend.MFLUX_SERVE
-
-
-def test_image_config_from_env_endpoint(monkeypatch: pytest.MonkeyPatch, clean_image: None) -> None:
-    monkeypatch.setenv("IMAGE_ENDPOINT", "http://gpu-box:8090")
-    cfg = image_config_from_env()
-    assert cfg.server_url == "http://gpu-box:8090"
-
-
-def test_image_config_from_env_model(monkeypatch: pytest.MonkeyPatch, clean_image: None) -> None:
-    monkeypatch.setenv("IMAGE_MODEL", "dall-e-2")
-    cfg = image_config_from_env()
-    assert cfg.model == "dall-e-2"
-
-
-def test_image_config_from_env_steps(monkeypatch: pytest.MonkeyPatch, clean_image: None) -> None:
-    monkeypatch.setenv("IMAGE_STEPS", "8")
-    cfg = image_config_from_env()
-    assert cfg.steps == 8
-
-
-def test_image_config_from_env_api_key(monkeypatch: pytest.MonkeyPatch, clean_image: None) -> None:
-    monkeypatch.setenv("IMAGE_API_KEY", "img-key-abc")
-    cfg = image_config_from_env()
-    assert cfg.api_key == "img-key-abc"  # pragma: allowlist secret
-
-
-def test_image_config_from_env_openai_key_fallback(
-    monkeypatch: pytest.MonkeyPatch, clean_image: None
-) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-fallback")
-    cfg = image_config_from_env()
-    assert cfg.api_key == "sk-openai-fallback"  # pragma: allowlist secret
-
-
-def test_image_config_from_env_image_api_key_beats_openai(
-    monkeypatch: pytest.MonkeyPatch, clean_image: None
-) -> None:
-    monkeypatch.setenv("IMAGE_API_KEY", "img-wins")
-    monkeypatch.setenv("OPENAI_API_KEY", "openai-loses")
-    cfg = image_config_from_env()
-    assert cfg.api_key == "img-wins"  # pragma: allowlist secret
-
-
-def test_image_config_from_env_legacy_model(
-    monkeypatch: pytest.MonkeyPatch, clean_image: None
-) -> None:
-    monkeypatch.setenv("GUTENKG_IMAGE_MODEL", "flux2-klein-4b")
-    cfg = image_config_from_env()
-    assert cfg.model == "flux2-klein-4b"
-
-
-def test_image_config_from_env_image_model_beats_legacy(
-    monkeypatch: pytest.MonkeyPatch, clean_image: None
-) -> None:
-    monkeypatch.setenv("IMAGE_MODEL", "dall-e-3")
-    monkeypatch.setenv("GUTENKG_IMAGE_MODEL", "old-flux-model")
-    cfg = image_config_from_env()
-    assert cfg.model == "dall-e-3"

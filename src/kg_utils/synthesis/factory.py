@@ -6,18 +6,14 @@ from __future__ import annotations
 import os
 
 from kg_utils.synthesis._config import (
-    ImageBackend,
-    ImageConfig,
     TextBackend,
     TextConfig,
 )
-from kg_utils.synthesis._image import ImageSynthesizer
 from kg_utils.synthesis._text import TextSynthesizer
 
 __all__ = [
     "normalize_openai_base_url",
     "text_synth_for_backend",
-    "image_synth_for_backend",
 ]
 
 
@@ -68,34 +64,5 @@ def text_synth_for_backend(backend: str, fallback: TextSynthesizer) -> TextSynth
     if selected == TextBackend.ANTHROPIC:
         api_key = os.environ.get("ANTHROPIC_API_KEY") or ""
         return TextSynthesizer(TextConfig(backend=selected, api_key=api_key))
-
-    return fallback
-
-
-def image_synth_for_backend(backend: str, fallback: ImageSynthesizer) -> ImageSynthesizer:
-    """Return an ImageSynthesizer configured for a specific backend override.
-
-    Unknown or empty backend strings return ``fallback``.
-    """
-    backend_str = (backend or "").strip().lower()
-    if not backend_str:
-        return fallback
-
-    try:
-        selected = ImageBackend(backend_str)
-    except ValueError:
-        return fallback
-
-    if selected == ImageBackend.OPENAI:
-        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("IMAGE_API_KEY") or ""
-        return ImageSynthesizer(ImageConfig(backend=selected, api_key=api_key))
-
-    if selected == ImageBackend.MFLUX_SERVE:
-        server_url = os.environ.get("IMAGE_ENDPOINT") or ""
-        return ImageSynthesizer(ImageConfig(backend=selected, server_url=server_url))
-
-    if selected == ImageBackend.MFLUX_LOCAL:
-        model = os.environ.get("IMAGE_MODEL") or os.environ.get("GUTENKG_IMAGE_MODEL") or ""
-        return ImageSynthesizer(ImageConfig(backend=selected, model=model))
 
     return fallback
