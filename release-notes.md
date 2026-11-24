@@ -1,33 +1,49 @@
-# Release Notes — v0.31.0
+# Release Notes -- v0.32.0
 
-> Released: 2026-11-22
+> Released: 2026-11-24
 
-### Added
+`pack()` no longer serves text from a source file that changed after the graph
+was built. A node's snippet is cut from its live source file by the line
+numbers stored at build, so an edited file used to return someone else's lines
+under the node's name, with nothing to say they were wrong. This release also
+removes the image-generation half of `kg_utils.synthesis`, which now lives in
+imagewright. That removal is a breaking change for anyone who imported it from
+here.
 
-- **An Art Techno logo.** The backplane: one board carries a bus, and five KG
-  modules stand in their own slots on it, with the tagline THE SDK UNDER EVERY
-  GRAPH. `scripts/build_logo.py` draws the mark, a 64 px icon and a banner as
-  SVG under `assets/` and writes the PNGs. The README shows the banner at the
-  top, by absolute raw URL so PyPI shows it too.
-- **A second image rewrite prompt, for non-prose text.**
-  `TextSynthesizer.rewrite_for_image` takes `system=`; `None` keeps the
-  historical-prose prompt, so existing callers are unchanged. The new
-  `IMAGE_REWRITE_TECHNICAL_SYSTEM` asks for a clear technical or scientific
-  illustration of source code, structured records, agent memory or graph data
-  such as neurons and pathways, with no invented people or period scenes. Both
-  prompts are exported from `kg_utils.synthesis`; the historical one is
-  `IMAGE_REWRITE_SYSTEM`, and `_IMAGE_REWRITE_SYSTEM` still works.
-  `WorkerClient.rewrite(system=...)` sends it as an optional `system` field of
-  the `rewrite` op, and `handle_aux_ops` passes it through. A worker on an
-  older kgmodule-utils ignores the field and uses the historical prompt.
+## What changed
 
-### Changed
+**Source staleness check.** `build_graph()` and `sync()` record a sha256 for
+every source file the graph points at, in a new `sources` table in
+`graph.sqlite`. `pack()` hashes the files it already reads; when a file no
+longer matches, it omits every snippet from that file, still returns the
+nodes, and adds one warning per file asking for a rebuild. The new
+`KGModule.stale_sources()` reports which files changed or went missing, for
+status commands. This covers the KGs that quote their source files at pack
+time: pycode_kg, tscode_kg, swift_kg, vault_kg and genealogy_kg. Through kgrag,
+the stale text never reaches a federated answer, because kgrag already drops
+nodes that carry no snippet.
 
-- **The dev group installs `doc-kg`, so no test is skipped.** The test that
-  checks `doc_kg.index` still re-exports the embedder classes used to skip
-  unless `doc-kg` had been installed by hand. `doc-kg` is now a dev
-  dependency, and the test imports it directly, so a missing `doc_kg` fails.
-  The lock gains `doc-kg` alone. Nothing in the wheel changes.
+**Image generation moved to imagewright.** `ImageSynthesizer`, `ImageBackend`,
+`ImageConfig`, `image_config_from_env`, `image_synthesizer_from_env`,
+`image_synth_for_backend` and the `[synthesis-mflux]` extra are gone, with no
+re-export; imagewright carries the same code. The text side stays, including
+`TextSynthesizer.rewrite_for_image()` and both image rewrite prompts. The
+worker's `imagine` operation accepts any image backend with imagewright's
+shape. Without mflux, the lock no longer limits installs to macOS and Linux.
+
+## Upgrading
+
+Stores built before this release have no recorded hashes and behave exactly as
+before. Rebuild a store to turn the check on. A tool that writes the store
+directly through `GraphStore.write()`, as pycode_kg's CLI does, should call
+`GraphStore.record_sources(repo_root)` after its last write.
+
+If you imported image classes from `kg_utils.synthesis`, import them from
+`imagewright` instead, and replace the `kgmodule-utils[synthesis-mflux]` extra
+with imagewright's own install. Nothing else needs to change.
+
+Every fleet consumer's full suite passed against this release before the tag:
+15 repositories, 6,912 tests, no regressions.
 
 ---
 

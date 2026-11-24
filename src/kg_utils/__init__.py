@@ -71,4 +71,4 @@ The core install is stdlib-only; everything heavier is opt-in.
     pip install 'kgmodule-utils[synthesis]'        # httpx + openai + pillow
 """
 
-__version__ = "0.31.0"
+__version__ = "0.32.0"
