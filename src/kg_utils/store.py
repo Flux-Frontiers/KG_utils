@@ -16,6 +16,7 @@ brings existing databases forward; see the note there.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Iterable, Sequence
@@ -159,9 +160,10 @@ class GraphStore:
     # ------------------------------------------------------------------
 
     def clear(self) -> None:
-        """Delete all nodes and edges."""
+        """Delete all nodes and edges, and forget the recorded source hashes."""
         self.con.execute("DELETE FROM edges;")
         self.con.execute("DELETE FROM nodes;")
+        self.con.execute("DROP TABLE IF EXISTS sources;")
         self.con.commit()
 
     def write(
@@ -179,8 +181,52 @@ class GraphStore:
         """
         if wipe:
             self.clear()
+        # Recorded hashes describe the nodes as they were; any write may change
+        # those, so the writer records them again (record_sources) afterwards.
+        self.con.execute("DROP TABLE IF EXISTS sources;")
         self._upsert_nodes(nodes)
         self._upsert_edges(edges)
+
+    def record_sources(self, repo_root: Path) -> int:
+        """Record the sha256 of every source file the nodes point at.
+
+        :meth:`write` and :meth:`clear` drop these, so call this after the last
+        write of a build. ``pack()`` then omits the snippets of any file whose
+        bytes have changed since (sweep item 97).
+
+        :param repo_root: The root that each node's ``module_path`` is relative to.
+        :return: The number of files recorded.
+        """
+        paths = [
+            row[0]
+            for row in self.con.execute(
+                "SELECT DISTINCT module_path FROM nodes WHERE module_path IS NOT NULL"
+                " AND module_path != ''"
+            )
+        ]
+        rows = []
+        for rel in paths:
+            f = Path(repo_root) / rel
+            if f.is_file():
+                rows.append((rel, hashlib.sha256(f.read_bytes()).hexdigest()))
+        self.con.execute("DROP TABLE IF EXISTS sources;")
+        self.con.execute("CREATE TABLE sources (path TEXT PRIMARY KEY, sha256 TEXT NOT NULL);")
+        self.con.executemany("INSERT INTO sources (path, sha256) VALUES (?, ?)", rows)
+        self.con.commit()
+        return len(rows)
+
+    def source_hashes(self) -> dict[str, str] | None:
+        """The source hashes recorded at build, by path.
+
+        :return: ``{path: sha256}``, or ``None`` when the store has none recorded
+            (built before hashes existed, or by a writer that does not record).
+        """
+        exists = self.con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sources'"
+        ).fetchone()
+        if not exists:
+            return None
+        return dict(self.con.execute("SELECT path, sha256 FROM sources").fetchall())
 
     def _upsert_nodes(self, nodes: Iterable[NodeSpec]) -> None:
         rows = [

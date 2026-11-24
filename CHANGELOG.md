@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Source staleness check.** A node's snippet is cut from its live source
+  file by the line numbers stored at build, so a file edited since the build
+  served someone else's lines under the node's name. `build_graph()` and
+  `sync()` now record a sha256 per source file (`GraphStore.record_sources()`,
+  a `sources` table in `graph.sqlite`). `pack()` hashes the files it already
+  reads and omits every snippet of a file that no longer matches, adding one
+  warning per file: "`<path>` changed since the graph was built; its snippets
+  are omitted. Rebuild the graph." The node itself is still returned.
+  `KGModule.stale_sources()` returns `{path: "changed" | "missing"}`, `{}`
+  when current, or `None` for a store with no hashes recorded.
+  `read_source()` returns a file's lines and hash in one read; `read_lines()`
+  now wraps it.
+
+### Changed
+
+- `GraphStore.write()` and `clear()` drop the recorded hashes, because the
+  nodes they describe may have changed. A writer that calls `store.write()`
+  directly, as pycode_kg's CLI does, leaves the store unrecorded until it calls
+  `record_sources()`. An unrecorded store, including every store built before
+  this release, packs exactly as before.
+
 ## [0.31.0] - 2026-11-22
 
 ### Added

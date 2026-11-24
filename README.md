@@ -404,7 +404,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class | Description |
 |---|---|
-| `GraphStore` | SQLite persistence: `write()`, `expand()`, `query_nodes()`, `resolve_symbols()`, `callers_of()`, `stats()` |
+| `GraphStore` | SQLite persistence: `write()`, `expand()`, `query_nodes()`, `resolve_symbols()`, `callers_of()`, `stats()`. `record_sources()` stores a sha256 per source file and `source_hashes()` reads them back (`None` when none are recorded); every `write()` and `clear()` drops them |
 
 ### `kg_utils.semantic`
 
@@ -419,7 +419,7 @@ delta = mgr.diff_snapshots(snaps[-1]["key"], snaps[0]["key"])
 
 | Class | Description |
 |---|---|
-| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()`, `node()`, `neighbors()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand. `sync()` rewrites the graph and re-embeds only the nodes whose index text changed |
+| `KGModule` | Concrete base — implement `make_extractor()`, `kind()`, `analyze()`; get `build()`, `query()`, `pack()`, `stats()`, `node()`, `neighbors()` for free. `build_graph(wipe=True)` drops the vector index it invalidates; `drop_index()` does so on demand. `sync()` rewrites the graph and re-embeds only the nodes whose index text changed. Both record each source file's hash; `pack()` then omits the snippets of a file that changed since, with a warning, and `stale_sources()` lists changed and missing files |
 
 ### `kg_utils.snapshots`
 

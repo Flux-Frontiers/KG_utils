@@ -9,7 +9,7 @@ README's [API Reference](../README.md#api-reference).
 - **`kg_utils.store`** — `GraphStore`: SQLite-backed node/edge store with BFS expansion, symbol resolution, caller lookup, and provenance recording
 - **`kg_utils.semantic`** — `SemanticIndex`, `SentenceTransformerEmbedder`, `SeedHit`, model registry, `resolve_model_path()`
 - **`kg_utils.vector_backend`** — `VectorBackend` protocol and `SqliteVecBackend`, its one implementation: an exact (recall 1.0) store on sqlite-vec with SQL-prefiltered search, int8 or float32 vectors, and `VectorStoreNotFoundError` naming a missing store. LanceDB support was removed in 0.29.0
-- **`kg_utils.pipeline`** — `KGModule`: full build → query → pack pipeline base with hybrid semantic + lexical reranking and snippet extraction
+- **`kg_utils.pipeline`** — `KGModule`: full build → query → pack pipeline base with hybrid semantic + lexical reranking and snippet extraction; snippets are never cut from a source file that changed since the build (`stale_sources()` reports which)
 - **`kg_utils.ingest`** — `IngestPipeline`, `IngestManifest`, `AnydocConverter`: heterogeneous documents (PDF, Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV) → a staged Markdown corpus any builder can consume, with per-file provenance (`ingest` extra). Library layer only — the CLI surface is `kgrag ingest` in [kg-rag](https://github.com/Flux-Frontiers/KGRAG)
 - **`kg_utils.embedder`** — `get_embedder()`, `wrap_embedder()`, `load_sentence_transformer()` factory functions
 - **`kg_utils.embed`** — `Embedder` protocol, `DEFAULT_MODEL`, `KNOWN_MODELS`, `resolve_model_path()`

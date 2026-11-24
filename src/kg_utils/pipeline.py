@@ -35,6 +35,7 @@ Typical domain usage::
 
 from __future__ import annotations
 
+import hashlib
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -157,18 +158,31 @@ def safe_join(repo_root: Path, rel_path: str) -> Path:
     return p
 
 
+def read_source(path: Path) -> tuple[list[str], str | None]:
+    """Read a file's lines and the sha256 of its bytes, in one read.
+
+    :param path: Absolute path to the file.
+    :return: ``(lines, sha256)``; ``([], None)`` when the file is missing.
+        Lines are decoded as :func:`read_lines` decodes them.
+    """
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        return [], None
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        text = data.decode("utf-8", errors="ignore")
+    return text.splitlines(), hashlib.sha256(data).hexdigest()
+
+
 def read_lines(path: Path) -> list[str]:
     """Read all lines from a file, returning [] if the file is missing.
 
     :param path: Absolute path to the file.
     :return: List of lines (without newlines) or [] on error.
     """
-    try:
-        return path.read_text(encoding="utf-8").splitlines()
-    except UnicodeDecodeError:
-        return path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    except FileNotFoundError:
-        return []
+    return read_source(path)[0]
 
 
 def compute_span(
@@ -488,6 +502,7 @@ class KGModule(ABC):
             self.drop_index()
         self.store.write(node_specs, edge_specs, wipe=wipe)
         self._post_build_hook(self.store)
+        self.store.record_sources(self.repo_root)
 
         s = self.store.stats()
         return BuildStats(
@@ -532,6 +547,7 @@ class KGModule(ABC):
         node_specs, edge_specs = self._extract_specs()
         self.store.write(node_specs, edge_specs, wipe=True)
         self._post_build_hook(self.store)
+        self.store.record_sources(self.repo_root)
 
         idx = self.index.sync(self.store, signature=f"{self.model_name}:{self.embedder.dim}")
         s = self.store.stats()
@@ -837,17 +853,30 @@ class KGModule(ABC):
             }
             raw_nodes.append(n)
 
-        # Attach spans (needed for dedup)
+        # Source lines, read once per file. A file whose bytes no longer match
+        # the hash recorded at build reads as empty, so none of its snippets
+        # are cut from lines the graph does not describe (sweep item 97).
+        recorded = self.store.source_hashes()
         file_cache: dict[str, list[str]] = {}
+        stale: list[str] = []
+
+        def source_lines(mp: str) -> list[str]:
+            if mp not in file_cache:
+                lines, digest = read_source(safe_join(self.repo_root, mp))
+                if recorded is not None and mp in recorded and digest != recorded[mp]:
+                    stale.append(mp)
+                    lines = []
+                file_cache[mp] = lines
+            return file_cache[mp]
+
+        # Attach spans (needed for dedup)
         spans_by_qualname: dict[tuple[str, str], tuple[int, int]] = {}
         for n in raw_nodes:
             mp = n.get("module_path")
             if not mp:
                 n["_span"] = None
                 continue
-            if mp not in file_cache:
-                file_cache[mp] = read_lines(safe_join(self.repo_root, mp))
-            lines = file_cache[mp]
+            lines = source_lines(mp)
             lineno = n.get("lineno")
             if n.get("kind") != "module" and lineno is None and missing_lineno_policy != "legacy":
                 qualname = n.get("qualname") or ""
@@ -919,9 +948,7 @@ class KGModule(ABC):
             span = n.get("_span")
             if not mp or not span:
                 continue
-            if mp not in file_cache:
-                file_cache[mp] = read_lines(safe_join(self.repo_root, mp))
-            lines = file_cache[mp]
+            lines = source_lines(mp)
             start, end = span
 
             if n.get("kind") == "module" and len(lines) > max_lines:
@@ -942,6 +969,12 @@ class KGModule(ABC):
                 )
             elif end >= start and lines:
                 n["snippet"] = make_snippet(mp, lines, start, end)
+
+        warnings.extend(
+            f"`{mp}` changed since the graph was built; its snippets are omitted. "
+            "Rebuild the graph."
+            for mp in stale
+        )
 
         # Strip internal keys
         for n in kept:
@@ -1047,6 +1080,28 @@ class KGModule(ABC):
             if far is not None:
                 nodes.append(far)
         return {"node": node, "edges": edges, "nodes": nodes}
+
+    def stale_sources(self) -> dict[str, str] | None:
+        """Source files that no longer match the hashes recorded at build.
+
+        Hashes every recorded file now, so it costs one read of each source;
+        :meth:`pack` checks only the files it reads.
+
+        :return: ``{path: "changed" | "missing"}``, ``{}`` when every source is
+            current, or ``None`` when the store has no hashes recorded (built
+            before they existed, or by a writer that does not record them).
+        """
+        recorded = self.store.source_hashes()
+        if recorded is None:
+            return None
+        drift: dict[str, str] = {}
+        for path, sha in recorded.items():
+            digest = read_source(safe_join(self.repo_root, path))[1]
+            if digest is None:
+                drift[path] = "missing"
+            elif digest != sha:
+                drift[path] = "changed"
+        return drift
 
     def close(self) -> None:
         """Close the underlying SQLite connection."""
