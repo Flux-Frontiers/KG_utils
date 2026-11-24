@@ -17,14 +17,6 @@ class TextBackend(str, Enum):
     ANTHROPIC = "anthropic"  # Claude API — anthropic SDK; ANTHROPIC_API_KEY or an `ant` profile
 
 
-class ImageBackend(str, Enum):
-    """Image generation backend."""
-
-    MFLUX_LOCAL = "mflux-local"  # local Flux2Klein via mflux (Apple Silicon only)
-    MFLUX_SERVE = "mflux-serve"  # HTTP proxy to a running mflux-serve instance
-    OPENAI = "openai"  # OpenAI gpt-image-1 — requires OPENAI_API_KEY / IMAGE_API_KEY
-
-
 # Per-backend defaults — filled in when the user has not provided an override.
 _TEXT_DEFAULTS: dict[TextBackend, dict[str, str]] = {
     TextBackend.OMLX: {
@@ -43,19 +35,6 @@ _TEXT_DEFAULTS: dict[TextBackend, dict[str, str]] = {
     TextBackend.ANTHROPIC: {
         "endpoint": "",
         "model": "claude-opus-5-5",
-    },
-}
-
-_IMAGE_DEFAULTS: dict[ImageBackend, dict[str, str]] = {
-    ImageBackend.MFLUX_LOCAL: {
-        "model": "mlx-community/flux2-klein-4b-4bit",
-    },
-    ImageBackend.MFLUX_SERVE: {
-        "server_url": "http://localhost:8090",
-        "model": "flux2-klein-4b",
-    },
-    ImageBackend.OPENAI: {
-        "model": "gpt-image-1",
     },
 }
 
@@ -85,30 +64,6 @@ class TextConfig:
 
     def resolved_model(self) -> str:
         return self.model or _TEXT_DEFAULTS[self.backend]["model"]
-
-
-@dataclass
-class ImageConfig:
-    """Configuration for an image synthesis backend.
-
-    :param backend: Which image provider to use.
-    :param server_url: mflux-serve base URL override (empty = use backend default).
-    :param api_key: OpenAI API key (empty = read from OPENAI_API_KEY at call time).
-    :param model: Model-id override (empty = use backend default).
-    :param steps: Inference steps for mflux backends (ignored for OpenAI).
-    """
-
-    backend: ImageBackend = ImageBackend.MFLUX_SERVE
-    server_url: str = ""
-    api_key: str = ""
-    model: str = ""
-    steps: int = 4
-
-    def resolved_server_url(self) -> str:
-        return self.server_url or _IMAGE_DEFAULTS[self.backend].get("server_url", "")
-
-    def resolved_model(self) -> str:
-        return self.model or _IMAGE_DEFAULTS[self.backend].get("model", "")
 
 
 # ---------------------------------------------------------------------------
@@ -142,24 +97,3 @@ def text_config_from_env() -> TextConfig:
         api_key = os.environ.get("ANTHROPIC_API_KEY") or ""
     model = os.environ.get("SYNTH_MODEL") or os.environ.get("VLLM_MODEL") or ""
     return TextConfig(backend=backend, endpoint=endpoint, api_key=api_key, model=model)
-
-
-def image_config_from_env() -> ImageConfig:
-    """Build an ImageConfig from environment variables.
-
-    Reads ``IMAGE_BACKEND`` (default ``mflux-serve``) plus server-url/key/model/steps overrides.
-    Legacy var ``GUTENKG_IMAGE_MODEL`` is honoured as a fallback for ``IMAGE_MODEL``.
-    """
-    backend_str = os.environ.get("IMAGE_BACKEND", "mflux-serve")
-    try:
-        backend = ImageBackend(backend_str)
-    except ValueError:
-        backend = ImageBackend.MFLUX_SERVE
-
-    server_url = os.environ.get("IMAGE_ENDPOINT") or ""
-    api_key = os.environ.get("IMAGE_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
-    model = os.environ.get("IMAGE_MODEL") or os.environ.get("GUTENKG_IMAGE_MODEL") or ""
-    steps = int(os.environ.get("IMAGE_STEPS", "4"))
-    return ImageConfig(
-        backend=backend, server_url=server_url, api_key=api_key, model=model, steps=steps
-    )

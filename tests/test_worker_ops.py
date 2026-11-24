@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from kg_utils.synthesis._config import ImageBackend, ImageConfig, TextConfig
-from kg_utils.synthesis._image import ImageSynthesizer
+from kg_utils.synthesis._config import TextConfig
 from kg_utils.synthesis._text import TextSynthesizer
 from kg_utils.worker.ops import handle_aux_ops
 
@@ -17,10 +17,18 @@ def _text_synth() -> TextSynthesizer:
     return synth
 
 
-def _image_synth() -> ImageSynthesizer:
-    synth = ImageSynthesizer(ImageConfig(backend=ImageBackend.MFLUX_SERVE, model="flux2-klein"))
-    synth.generate_b64 = MagicMock(return_value="abc123")  # type: ignore[method-assign]
-    return synth
+class _ImageGen:
+    """Stands in for imagewright's ImageSynthesizer, an external image server."""
+
+    def __init__(self) -> None:
+        self._cfg = SimpleNamespace(
+            resolved_model=lambda: "flux2-klein", backend=SimpleNamespace(value="mflux-serve")
+        )
+        self.generate_b64 = MagicMock(return_value="abc123")
+
+
+def _image_synth() -> _ImageGen:
+    return _ImageGen()
 
 
 def test_handle_aux_ops_returns_none_for_unknown_op() -> None:

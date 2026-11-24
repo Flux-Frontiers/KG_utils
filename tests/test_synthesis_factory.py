@@ -7,14 +7,11 @@ from unittest.mock import patch
 import pytest
 
 from kg_utils.synthesis import (
-    ImageConfig,
-    ImageSynthesizer,
     TextConfig,
     TextSynthesizer,
 )
-from kg_utils.synthesis._config import ImageBackend, TextBackend
+from kg_utils.synthesis._config import TextBackend
 from kg_utils.synthesis.factory import (
-    image_synth_for_backend,
     normalize_openai_base_url,
     text_synth_for_backend,
 )
@@ -31,10 +28,6 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "VLLM_MODEL",
         "OLLAMA_ENDPOINT",
         "OPENAI_API_KEY",
-        "IMAGE_API_KEY",
-        "IMAGE_ENDPOINT",
-        "IMAGE_MODEL",
-        "GUTENKG_IMAGE_MODEL",
     ]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
@@ -116,62 +109,3 @@ def test_text_synth_for_backend_openai_prefers_openai_key(monkeypatch: pytest.Mo
     cfg = mock_cls.call_args.args[0]
     assert cfg.backend is TextBackend.OPENAI
     assert cfg.api_key == "openai-key"  # pragma: allowlist secret
-
-
-def test_image_synth_for_backend_empty_returns_fallback() -> None:
-    fallback = ImageSynthesizer(ImageConfig())
-    assert image_synth_for_backend("", fallback) is fallback
-
-
-def test_image_synth_for_backend_unknown_returns_fallback() -> None:
-    fallback = ImageSynthesizer(ImageConfig())
-    assert image_synth_for_backend("bad-backend", fallback) is fallback
-
-
-def test_image_synth_for_backend_openai_prefers_openai_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
-    monkeypatch.setenv("IMAGE_API_KEY", "image-key")
-
-    fallback = ImageSynthesizer(ImageConfig())
-    with patch("kg_utils.synthesis.factory.ImageSynthesizer") as mock_cls:
-        image_synth_for_backend("openai", fallback)
-    cfg = mock_cls.call_args.args[0]
-    assert cfg.backend is ImageBackend.OPENAI
-    assert cfg.api_key == "openai-key"  # pragma: allowlist secret
-
-
-def test_image_synth_for_backend_mflux_serve_uses_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("IMAGE_ENDPOINT", "http://gpu:8090")
-
-    fallback = ImageSynthesizer(ImageConfig())
-    with patch("kg_utils.synthesis.factory.ImageSynthesizer") as mock_cls:
-        image_synth_for_backend("mflux-serve", fallback)
-    cfg = mock_cls.call_args.args[0]
-    assert cfg.backend is ImageBackend.MFLUX_SERVE
-    assert cfg.server_url == "http://gpu:8090"
-
-
-def test_image_synth_for_backend_mflux_local_prefers_image_model(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("IMAGE_MODEL", "flux-new")
-    monkeypatch.setenv("GUTENKG_IMAGE_MODEL", "flux-old")
-
-    fallback = ImageSynthesizer(ImageConfig())
-    with patch("kg_utils.synthesis.factory.ImageSynthesizer") as mock_cls:
-        image_synth_for_backend("mflux-local", fallback)
-    cfg = mock_cls.call_args.args[0]
-    assert cfg.backend is ImageBackend.MFLUX_LOCAL
-    assert cfg.model == "flux-new"
-
-
-def test_image_synth_for_backend_mflux_local_falls_back_to_legacy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("GUTENKG_IMAGE_MODEL", "flux-legacy")
-
-    fallback = ImageSynthesizer(ImageConfig())
-    with patch("kg_utils.synthesis.factory.ImageSynthesizer") as mock_cls:
-        image_synth_for_backend("mflux-local", fallback)
-    cfg = mock_cls.call_args.args[0]
-    assert cfg.model == "flux-legacy"

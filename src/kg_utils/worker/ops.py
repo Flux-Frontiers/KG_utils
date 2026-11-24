@@ -4,17 +4,29 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any, Protocol
 
-from kg_utils.synthesis._image import ImageSynthesizer
 from kg_utils.synthesis._text import TextSynthesizer
 
-__all__ = ["handle_aux_ops"]
+__all__ = ["ImageGenerator", "handle_aux_ops"]
+
+
+class ImageGenerator(Protocol):
+    """What ``imagine`` needs from an image backend, such as imagewright's ImageSynthesizer.
+
+    ``_cfg`` exposes ``resolved_model()`` and ``backend.value``, which the
+    reply reports.
+    """
+
+    _cfg: Any
+
+    def generate_b64(self, prompt: str, **kwargs: Any) -> str: ...
 
 
 def handle_aux_ops(
     inp: dict,
     text_synth_factory: Callable[[str], TextSynthesizer],
-    image_synth_factory: Callable[[str], ImageSynthesizer],
+    image_synth_factory: Callable[[str], ImageGenerator],
 ) -> dict | None:
     """Handle shared non-query worker operations.
 

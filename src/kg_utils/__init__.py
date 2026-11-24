@@ -23,9 +23,9 @@ Sub-packages / modules:
                           wrap_embedder(), load_sentence_transformer(), resolve_device().
     kg_utils.corpus_embedder — CorpusEmbedder, EmbeddingCache: multi-process,
                           device-safe corpus embedding engine.
-    kg_utils.synthesis  — Unified text + image synthesis: TextSynthesizer, ImageSynthesizer.
-                          Backends: omlx | ollama | openai (text);
-                                    mflux-local | mflux-serve | openai (image).
+    kg_utils.synthesis  — Unified text synthesis: TextSynthesizer.
+                          Backends: omlx | ollama | openai | anthropic. Image
+                          generation is in the imagewright package.
     kg_utils.worker     — RunPod worker protocol helpers and WorkerClient for /runsync calls.
     kg_utils.retrieval  — Shared retrieval helpers: hit_to_dict, attach_content_by_sqlite.
     kg_utils.analysis   — ScoreSet, load_scores, available_metrics: persisted
@@ -69,7 +69,6 @@ The core install is stdlib-only; everything heavier is opt-in.
     pip install 'kgmodule-utils[viz3d-qt]'         # + PyQt5 + quiltwright — ray-trace
                                                    #   and cast from a live viewer
     pip install 'kgmodule-utils[synthesis]'        # httpx + openai + pillow
-    pip install 'kgmodule-utils[synthesis-mflux]'  # + mflux (Apple Silicon local gen)
 """
 
 __version__ = "0.31.0"
